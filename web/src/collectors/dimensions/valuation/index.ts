@@ -130,8 +130,8 @@ export const valuationSource: Source = {
       targets: target ? targetsIn(base.currency, { low: target.low, mean: target.mean, high: target.high, analysts: target.analysts, currency: target.currency, sources: target.sources }) : null,
     };
     const context = [`Business: ${[profile?.sector, profile?.industry].filter(Boolean).join(" / ") || "unknown"}. ${profile?.description?.slice(0, 500) ?? ""}`, `Analyst position: ${ticker?.position ?? "watch"}.`].join("\n");
-    const bucket = f.quote && f.quote.price > 0 ? Math.round(Math.log(f.quote.price) / Math.log(1.15)) : "none";
-    const factsHash = fnv(JSON.stringify({ v: VALUATION_VERSION, inputs: f.inputs, history: f.history, peers: f.peers, targets: f.targets, bucket, context }));
+    const bucket = marketBucket(f.quote?.price ?? null);
+    const factsHash = valuationFactsHash(f, bucket, context);
 
     // The 8 methods at once (Kevin 2026-11-06 « speeder »): each reads the same facts, none reads another.
     const done = await Promise.all(
@@ -170,6 +170,26 @@ export const valuationSource: Source = {
 async function subjects(db: Db): Promise<string[]> {
   const withLines = new Set((await db.selectDistinct({ symbol: goldFinancialLines.symbol }).from(goldFinancialLines).where(eq(goldFinancialLines.line, "revenue"))).map((r) => r.symbol));
   return (await analysedSymbols(db)).filter((s) => withLines.has(s));
+}
+
+/** A market-driven figure in 15% steps (log scale), the quote's rule: a price tick must not re-ask the methods. */
+export function marketBucket(x: number | null | undefined): number | string {
+  if (x === null || x === undefined || !Number.isFinite(x)) return "none";
+  return x > 0 ? Math.round(Math.log(x) / Math.log(1.15)) : "not-positive";
+}
+
+/**
+ * The valuation's input hash. Reported figures and histories count exactly; what moves with every tick (peers' multiples
+ * today, analyst targets, the forward EPS consensus) counts in 15% buckets, sources left out. Without it every run in
+ * market hours re-asked Claude and the Fair Value swung (Water Oasis 1.37 -> 1.03 -> 1.61 HKD in 2 hours, 2026-11-06).
+ */
+export function valuationFactsHash(f: ValuationFacts, bucket: number | string, context: string): string {
+  const inputs = Object.fromEntries(
+    Object.entries(f.inputs).map(([k, i]) => [k, k === "eps-forward" ? { b: marketBucket(i!.value), period: i!.period } : { value: i!.value, period: i!.period }]),
+  );
+  const peers = [...f.peers].sort((a, b) => a.symbol.localeCompare(b.symbol)).map((p) => [p.symbol, p.currency, marketBucket(p.evEbitda), marketBucket(p.pe)]);
+  const targets = f.targets ? [marketBucket(f.targets.low), marketBucket(f.targets.mean), marketBucket(f.targets.high), f.targets.currency] : null;
+  return fnv(JSON.stringify({ v: VALUATION_VERSION, inputs, history: f.history, peers, targets, bucket, context }));
 }
 
 export const valuationDim: Dimension = {
