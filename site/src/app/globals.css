@@ -386,6 +386,11 @@ body:has(.hero) .site-footer {
   line-height: 1.08;
   letter-spacing: -0.01em;
 }
+.hero-sub {
+  margin-top: 24px;
+  font-size: clamp(19px, 1.6vw, 23px);
+  color: rgba(255, 255, 255, 0.85);
+}
 .hero-link {
   display: inline-block;
   margin-top: 32px;
