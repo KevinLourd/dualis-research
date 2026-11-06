@@ -1,0 +1,34 @@
+{
+  "_doc": "Accounts we write for, per channel. owner: thierry (his own), duality (his fund Duality Asset Management), dualis (the Dualis Research brand, none yet). website: a site whose text also teaches the voice (the fund's). samples: posts pasted by hand to learn the voice when the channel has no free feed (LinkedIn, X). Edit here or in Content > Channels.",
+  "accounts": [
+    {
+      "channel": "substack",
+      "owner": "thierry",
+      "name": "Analysis Paralysis",
+      "url": "https://analysisparalysis888.substack.com",
+      "handle": "analysisparalysis888"
+    },
+    {
+      "channel": "linkedin",
+      "owner": "thierry",
+      "name": "Thierry Matin",
+      "url": "https://www.linkedin.com/in/thierrymatin/",
+      "handle": "thierrymatin"
+    },
+    {
+      "channel": "linkedin",
+      "owner": "duality",
+      "name": "Duality Asset Management",
+      "url": "https://www.linkedin.com/company/duality-asset-management/",
+      "handle": "duality-asset-management",
+      "website": "https://dualityfund.com"
+    },
+    {
+      "channel": "x",
+      "owner": "thierry",
+      "name": "@quantum_macro",
+      "url": "https://x.com/quantum_macro",
+      "handle": "quantum_macro"
+    }
+  ]
+}

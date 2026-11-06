@@ -1,0 +1,12 @@
+{
+  "name": "dualis-inspiration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.56.0"
+  }
+}

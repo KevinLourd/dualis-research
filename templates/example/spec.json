@@ -1,0 +1,76 @@
+{
+  "outDir": "images",
+  "logo": "split-disc",
+  "article": {
+    "example": true,
+    "company": "Harlow Fasteners (EXAMPLE)",
+    "thesis": "A cyclical low priced as a permanent decline. Margins are already turning.",
+    "ticker": "EXMP",
+    "exchange": "NYSE",
+    "price": "$24.10",
+    "marketCap": "$720M",
+    "position": "LONG",
+    "target": "$32.90",
+    "upside": "+37%",
+    "horizon": "18 months",
+    "date": "2026-11-04"
+  },
+  "images": [
+    {
+      "type": "header",
+      "file": "01-header.png",
+      "kicker": "Research note · Initiation"
+    },
+    {
+      "type": "bullbear",
+      "file": "02-bull-vs-bear.png",
+      "title": "Two ways to read the margin recovery",
+      "bull": [
+        "Pricing sticks and the 2019 margin of 14.8% comes back by 2028.",
+        "The new plant cuts unit costs and frees $40M of working capital.",
+        "Buybacks shrink the share count 4% a year."
+      ],
+      "bear": [
+        "Volumes fall again in 2027 and fixed costs stay.",
+        "A large customer moves work in house.",
+        "Refinancing in 2027 adds 200 bp of interest cost."
+      ],
+      "bullValue": "Bull value $48.10 (+100%)",
+      "bearValue": "Bear value $16.00 (-34%)",
+      "verdict": "The base case needs no heroics: margins back to 15%, still below the 2019 peak."
+    },
+    {
+      "type": "scenarios",
+      "file": "03-scenarios.png",
+      "title": "Bear, base and bull, with the math shown",
+      "rows": [
+        { "label": "Revenue 2028E", "bear": "$820M", "base": "$920M", "bull": "$1,010M" },
+        { "label": "EBITDA margin", "bear": "11.2%", "base": "15.0%", "bull": "17.1%" },
+        { "label": "EBITDA 2028E", "bear": "$92M", "base": "$138M", "bull": "$173M" },
+        { "label": "EV / EBITDA", "bear": "6.5x", "base": "8.0x", "bull": "9.0x" },
+        { "label": "Enterprise value", "bear": "$598M", "base": "$1,104M", "bull": "$1,557M" },
+        { "label": "Less net debt", "bear": "$120M", "base": "$120M", "bull": "$120M" },
+        { "label": "Equity value", "bear": "$478M", "base": "$984M", "bull": "$1,437M" },
+        { "label": "Value per share (29.9M shares)", "bear": "$16.00", "base": "$32.90", "bull": "$48.10", "emphasis": true },
+        { "label": "Upside vs $24.10", "bear": "-34%", "base": "+37%", "bull": "+100%", "signed": true },
+        { "label": "Probability", "bear": "25%", "base": "50%", "bull": "25%" }
+      ],
+      "weighted": { "label": "Probability-weighted value", "value": "$32.50", "upside": "+35%" },
+      "source": "Source: Dualis Research estimates. EXAMPLE figures, not a real company."
+    },
+    {
+      "type": "chart",
+      "file": "04-chart-margin.png",
+      "title": "Margins are already turning",
+      "subtitle": "EBITDA margin, %, 2019 to 2028E",
+      "x": ["2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026E", "2027E", "2028E"],
+      "ySuffix": "%",
+      "series": [
+        { "name": "Reported", "color": "brand", "values": [14.8, 13.9, 9.6, 10.2, 11.0, 11.8, 12.4, null, null, null] },
+        { "name": "Dualis base case", "color": "brand", "dashed": true, "values": [null, null, null, null, null, null, 12.4, 13.1, 14.0, 15.0] }
+      ],
+      "refs": [{ "label": "2019 level", "value": 14.8, "color": "muted" }],
+      "source": "Source: company filings, Dualis Research estimates. EXAMPLE figures, not a real company."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+DROP TABLE "silver"."content_channels" CASCADE;

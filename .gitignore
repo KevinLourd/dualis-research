@@ -1,0 +1,15 @@
+node_modules/
+.next/
+dist/
+.env*
+!.env.example
+.DS_Store
+*.log
+.context/
+legacy/stock-digest/config.json
+token_cache.json
+__pycache__/
+run_log.txt
+last_run_date.txt
+secrets/
+.pgdata/

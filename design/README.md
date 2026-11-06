@@ -1,0 +1,52 @@
+# Dualis Research
+
+Independent equity research. Every idea is weighed from both sides before we take one.
+
+Version 2, November 2026 (v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
+
+## Voice
+- The claim first, the evidence after. Titles state a view ("Monro is a cheap call on Icahn's next move"), never a topic ("Monro update").
+- Short sentences, one idea each. Numbers carry a date and a source.
+- Calm and confident. No hype words, no rocket emojis, no em dashes.
+- Both sides, always: every note says what would make us wrong.
+- English only. Every published piece ends with the disclaimer.
+
+## Colour
+- **Navy (`brand`) is the base.** It carries the logo, headings, page bands and the closing band.
+- **Purple (`accent`) is the one accent** (Thierry, 2026-11-05): the Subscribe button, the active tab, step dots, chart bars. Never a second accent.
+- **`long` green and `short` red are data, never decoration.** They mark a position, an upside or a move.
+- Grounds: `paper` for the page, `surface` for the note body. Text in `ink`, captions and sources in `muted`.
+- Separate with `rule` hairlines, never shadows.
+
+## Charts (Substack Notes, articles, website)
+Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/thierry-note-cpng-2026-11-03.png`): `chart-bg` #161616 ground, faint `chart-grid` lines, legend on top, a value label on every bar or point, "E" after an estimate period (FY26E), source line under the chart. Main series in `chart-bar` purple (rounded 4px tops), second series as a `chart-line` orange line with dots, benchmark in `chart-bar-muted`. Site component: `site/src/components/dark-chart.tsx`.
+
+## Type
+- **Newsreader** (serif, Google Fonts) for titles and headings: the research-house voice.
+- **IBM Plex Sans** for body and interface. **IBM Plex Mono** for tickers, prices and tables, with tabular figures.
+- Labels (`label`) are uppercase with 0.06em tracking: TICKER, TARGET, UPSIDE.
+
+## Logo
+**The split D** (Kevin 2026-11-05): the D of Dualis, split by a price line that dips, then turns up. Long and short in one letter, and the moment a narrative turns. Files and rules: `assets/Logos/README.md`. The wordmark is "DUALIS" over "RESEARCH" in Newsreader caps beside the mark.
+
+## Research note anatomy (Substack and website, same order)
+1. **Header strip**: ticker, exchange, price, market cap, LONG/SHORT tag, target, upside, date.
+2. **Key takeaways**: 3 bullets (free).
+3. One-line position disclosure.
+4. Contents.
+5. The business.
+6. Our view and drivers, numbered.
+7. **Bull vs Bear**: two columns side by side. This is the Dualis signature.
+8. Catalysts with dates.
+9. What if we're wrong (risks and kill criteria).
+10. Valuation: bear, base and bull scenarios with the math shown. Charts are captioned "Source: Dualis Research estimates".
+11. Thesis scorecard, updated in later notes: On track, Watch or Off track.
+12. Disclosures and methodology.
+
+The paywall sits after item 4 or 5.
+
+## Website (near copy of Aurelion Research, Kevin 2026-11-05)
+Pages: Home (one full-bleed hero), Company, Research (with the research portal), Portfolio (year-to-date only), About (Thierry, photo), Contact, Plans, Disclaimer. Every inner page opens on a navy band (section label, one line, social row) and closes on a navy call to action. Big serif type, lots of air, grey sections between white ones. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers are drawn from the post itself (its constellation, shelf, title, date), never AI images. Process visual: a constellation of industries linked along the value chain.
+
+## Disclaimer (verbatim)
+Not investment advice. For information only. The author may hold positions in the securities discussed.

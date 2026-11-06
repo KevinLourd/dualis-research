@@ -1,0 +1,28 @@
+{
+  "name": "dualis-wa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dualis Research's own linked WhatsApp device: sends the outbox, records Thierry's messages and voice notes in bronze/silver/gold.",
+  "scripts": {
+    "build": "esbuild src/main.ts src/transcribe-cli.ts --bundle --platform=node --target=node22 --format=esm --packages=external --tsconfig=tsconfig.build.json --outdir=dist --out-extension:.js=.mjs",
+    "start": "node dist/main.mjs",
+    "typecheck": "tsc --noEmit",
+    "transcribe": "node dist/transcribe-cli.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.318",
+    "@huggingface/transformers": "4.3.2",
+    "baileys": "7.0.0-rc14",
+    "drizzle-orm": "0.45.4",
+    "pino": "10.4.0",
+    "postgres": "3.4.7",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/qrcode": "1.5.6",
+    "esbuild": "0.25.12",
+    "typescript": "^5"
+  }
+}

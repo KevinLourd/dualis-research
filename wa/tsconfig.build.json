@@ -1,0 +1,4 @@
+{
+  "//": "esbuild only: resolves the web `@/` alias; bare packages (drizzle-orm...) stay external, resolved from wa/node_modules.",
+  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["../web/src/*"] } }
+}

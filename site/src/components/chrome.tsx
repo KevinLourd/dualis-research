@@ -1,0 +1,67 @@
+import Link from "next/link";
+import { BRAND, DISCLAIMER } from "@/lib/model";
+import { Mark } from "./mark";
+import { SubscribeButton } from "./subscribe-button";
+
+const NAV = [
+  { href: "/company", label: "Company" },
+  { href: "/research", label: "Research" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
+];
+
+export function Header({ substackUrl }: { substackUrl: string | null }) {
+  return (
+    <header className="site-header">
+      <div className="wrap bar">
+        <Link href="/" className="brand" aria-label={`${BRAND}, home`}>
+          <Mark />
+          <span className="wordmark">
+            <span>Dualis</span>
+            <span>Research</span>
+          </span>
+        </Link>
+        <nav className="nav" aria-label="Main">
+          {NAV.map((n) => (
+            <Link key={n.href} href={n.href}>
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="bar-actions">
+          <SubscribeButton substackUrl={substackUrl} />
+          {substackUrl && (
+            <a target="_blank" rel="noopener noreferrer" className="btn btn-outline" href={substackUrl}>
+              Read on Substack
+            </a>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function Footer() {
+  return (
+    <footer className="site-footer">
+      <div className="wrap">
+        <p className="footer-contact">
+          Contact: <Link href="/contact">write to Thierry</Link>
+        </p>
+        <div className="footer-row">
+          <ul>
+            <li>
+              <Link href="/disclaimer">Disclaimer</Link>
+            </li>
+            <li>
+              <Link href="/subscribe">Plans</Link>
+            </li>
+          </ul>
+          <span>© 2026 {BRAND}. All rights reserved.</span>
+        </div>
+        <p className="footer-legal">{DISCLAIMER}</p>
+      </div>
+    </footer>
+  );
+}

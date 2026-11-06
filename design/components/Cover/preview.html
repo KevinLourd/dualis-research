@@ -1,0 +1,60 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dualis Research</title>
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--font-sans); overflow:hidden; }
+  .cover { position:relative; height:288px; overflow:hidden; }
+  .art { position:absolute; top:0; left:480px; width:480px; height:288px; overflow:hidden; }
+  .art svg { display:block; width:480px; height:288px; }
+  .brand { fill:var(--brand); }
+  .deep { fill:var(--ink); }
+  .long { fill:var(--long); }
+  .short { fill:var(--short); }
+  .half { fill:var(--paper); }
+  .ring { fill:none; stroke:var(--paper); stroke-width:2; }
+  .words { position:absolute; left:var(--space-8); bottom:var(--space-8); max-width:440px; }
+  .name { margin:0; font-family:var(--font-serif); font-size:92px; line-height:.95; font-weight:600; letter-spacing:-.02em; color:var(--ink); }
+  .tag { margin:var(--space-3) 0 0; font-size:14px; line-height:20px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <div class="art">
+    <!--
+      blocks: brand slab 240x288 (5x space-12), ink 96x144, long 96x48, short 96x48; square corners (radius-none)
+      arrangement: one tall navy slab bleeding top and bottom with satellites stacked to its right
+      pattern: literal motif, the split disc ("every idea weighed from both sides"): 12 discs on the slab, half paper, half cut out
+      steps: pitch space-12 (48px) + space-6 offsets, disc r=16, ring stroke 2
+    -->
+    <svg viewBox="0 0 480 288" aria-hidden="true">
+      <rect class="brand" x="48" y="0" width="240" height="288"/>
+      <rect class="deep" x="288" y="0" width="96" height="144"/>
+      <rect class="long" x="288" y="144" width="96" height="48"/>
+      <rect class="short" x="288" y="192" width="96" height="48"/>
+      <g>
+        <circle class="ring" cx="96" cy="48" r="16"/><path class="half" d="M107.3 36.7 A16 16 0 0 1 84.7 59.3 Z"/>
+        <circle class="ring" cx="144" cy="48" r="16"/><path class="half" d="M155.3 36.7 A16 16 0 0 1 132.7 59.3 Z"/>
+        <circle class="ring" cx="192" cy="48" r="16"/><path class="half" d="M203.3 36.7 A16 16 0 0 1 180.7 59.3 Z"/>
+        <circle class="ring" cx="240" cy="48" r="16"/><path class="half" d="M251.3 36.7 A16 16 0 0 1 228.7 59.3 Z"/>
+        <circle class="ring" cx="96" cy="144" r="16"/><path class="half" d="M107.3 132.7 A16 16 0 0 1 84.7 155.3 Z"/>
+        <circle class="ring" cx="144" cy="144" r="16"/><path class="half" d="M155.3 132.7 A16 16 0 0 1 132.7 155.3 Z"/>
+        <circle class="ring" cx="192" cy="144" r="16"/><path class="half" d="M203.3 132.7 A16 16 0 0 1 180.7 155.3 Z"/>
+        <circle class="ring" cx="240" cy="144" r="16"/><path class="half" d="M251.3 132.7 A16 16 0 0 1 228.7 155.3 Z"/>
+        <circle class="ring" cx="96" cy="240" r="16"/><path class="half" d="M107.3 228.7 A16 16 0 0 1 84.7 251.3 Z"/>
+        <circle class="ring" cx="144" cy="240" r="16"/><path class="half" d="M155.3 228.7 A16 16 0 0 1 132.7 251.3 Z"/>
+        <circle class="ring" cx="192" cy="240" r="16"/><path class="half" d="M203.3 228.7 A16 16 0 0 1 180.7 251.3 Z"/>
+        <circle class="ring" cx="240" cy="240" r="16"/><path class="half" d="M251.3 228.7 A16 16 0 0 1 228.7 251.3 Z"/>
+      </g>
+    </svg>
+  </div>
+  <div class="words">
+    <h1 class="name">Dualis Research</h1>
+    <p class="tag">Every idea weighed from both sides.</p>
+  </div>
+</div>
+</body>
+</html>

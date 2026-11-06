@@ -1,0 +1,1 @@
+ALTER TABLE "gold"."content_library" ADD COLUMN "research_category" text;

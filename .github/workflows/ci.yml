@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # Syntactically valid placeholder so `next build` can render Clerk's provider; no real app behind it.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2ktcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA==
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Tests (in-process Postgres, no Docker)
+        run: pnpm test
+      - name: Build (Next + OpenNext Worker bundle)
+        run: pnpm cf:build
+      - name: Worker size under the free 3 MiB limit
+        run: |
+          npx wrangler deploy --dry-run --outdir .wrangler-dry | tee dry.log
+          gz=$(grep -o 'gzip: [0-9.]* KiB' dry.log | grep -o '[0-9.]*')
+          echo "Worker gzip size: ${gz} KiB"
+          awk -v s="$gz" 'BEGIN { exit (s > 3072) }' || { echo "::error::Worker is ${gz} KiB gzipped, over the 3 MiB free plan limit"; exit 1; }
+
+  site:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Tests
+        run: pnpm test
+      - name: Build (Next + OpenNext Worker bundle)
+        run: pnpm cf:build
+      - name: Worker size under the free 3 MiB limit
+        run: |
+          npx wrangler deploy --dry-run --outdir .wrangler-dry | tee dry.log
+          gz=$(grep -o 'gzip: [0-9.]* KiB' dry.log | grep -o '[0-9.]*')
+          echo "Worker gzip size: ${gz} KiB"
+          awk -v s="$gz" 'BEGIN { exit (s > 3072) }' || { echo "::error::Worker is ${gz} KiB gzipped, over the 3 MiB free plan limit"; exit 1; }
+
+  wa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: wa/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (service + the shared web/src/whatsapp logic)
+        run: pnpm typecheck
+      - name: Bundle
+        run: pnpm build

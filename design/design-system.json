@@ -1,0 +1,64 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-04T12:00:00Z"
+  },
+  "title": "Dualis Research",
+  "namespace": "Dualis",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Logos"
+  ],
+  "assetGroups": {
+    "Logos": {
+      "name": "Logos",
+      "tile": "m",
+      "order": [
+        "dualis-mark.svg",
+        "dualis-mark-white.svg",
+        "dualis-mark-mono-5b3fd6.svg",
+        "dualis-avatar.svg"
+      ],
+      "files": {
+        "dualis-mark.svg": {
+          "name": "dualis-mark.svg",
+          "blob": "b07165bb7a9461f14fde500dbf96d35f",
+          "size": 318,
+          "type": "image/svg+xml"
+        },
+        "dualis-mark-white.svg": {
+          "name": "dualis-mark-white.svg",
+          "blob": "f6e17f08465729e51ca1f7f110d591d0",
+          "size": 363,
+          "type": "image/svg+xml"
+        },
+        "dualis-mark-mono-5b3fd6.svg": {
+          "name": "dualis-mark-mono-5b3fd6.svg",
+          "blob": "8062d19ad06e3ec248463a92f635b4fb",
+          "size": 363,
+          "type": "image/svg+xml"
+        },
+        "dualis-avatar.svg": {
+          "name": "dualis-avatar.svg",
+          "blob": "f68f22da5e3af659eedf0e93e0f539b0",
+          "size": 416,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Kevin Lourd",
+    "at": "2026-11-05T12:00:00Z",
+    "via": "Claude Code",
+    "note": "Logo: the split D"
+  }
+}
