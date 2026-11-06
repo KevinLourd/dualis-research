@@ -24,9 +24,10 @@ export type DriverCategory = (typeof DRIVER_CATEGORIES)[number];
 /**
  * What a news item does to a Narrative Driver, what a driver's news add up to, and where the whole narrative stands
  * (Kevin 2026-11-06). reversal = the reason the market holds turns against it (shown "Inflection" when the price sits
- * below fair value, "Crack" above); continuation = it strengthens the reason; noise = it does not touch it.
+ * below fair value, "Crack" above); continuation = it strengthens the reason; noise = it does not touch it;
+ * too-old = a news item from before the market adopted its current story (`narrative-since`): never judged, never a signal.
  */
-export type EvidenceEffect = "reversal" | "continuation" | "noise";
+export type EvidenceEffect = "reversal" | "continuation" | "noise" | "too-old";
 export type Strength = "strong" | "weak" | "noise";
 /** The five tags, strongest reversal first: `<effect>:<strength>` or `noise`. */
 export const NARRATIVE_TAGS = ["reversal:strong", "reversal:weak", "noise", "continuation:weak", "continuation:strong"] as const;

@@ -10,6 +10,7 @@ import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { analysis } from "./dimensions/analysis";
 import { analysisPrompt, parseAnalysis } from "./dimensions/analysis/prompt";
+import { narrativeSinceDim, sinceChoices } from "./dimensions/narrative-since";
 import { batchSubject, evidenceDim, parseBatch, parseBatchSubject, parseEvidenceSubject, verdictRank } from "./dimensions/evidence";
 import { collectPlan, dimensionsFor, stagesFor, STAGES, DIMENSIONS } from "./registry";
 import { narrativeStateDim } from "./dimensions/narrative-state";
@@ -32,6 +33,7 @@ const ANSWER = {
 };
 
 let calls: string[] = [];
+let lastEvidencePrompt = "";
 const fake: Complete = async ({ prompt, system }) => {
   if (system.includes("one-line signal notes")) {
     calls.push("note");
@@ -48,7 +50,14 @@ const fake: Complete = async ({ prompt, system }) => {
     return { text: JSON.stringify({ summary: "The market sees a cyclical parts maker after a 2025 dip.", claims: [{ text: "Revenue fell to KRW 291.8B in 2025.", drivers: [1, 7], sources: [{ type: "exhibit", ref: "1", label: "Revenue" }, { type: "bogus", ref: "x" }] }], exhibits: [{ title: "Share price", chart: "line", series: ["line:revenue", "nope"], takeaway: "Back to a year ago." }, { title: "Invented", chart: "bar", series: ["nope"], takeaway: "x" }] }), model: "fake" };
   }
   const verdict = (v: string, reason: string) => ({ text: JSON.stringify({ verdict: v, probability: 0.8, cited_sentence: "buyback", reason }), model: "fake" });
+  if (prompt.includes("Since which month has the market held THIS story")) {
+    calls.push("since");
+    expect(prompt).toContain("vs today's fair value");
+    // The story took hold 2 months ago.
+    return verdict(sinceChoices()[4], "The price fell below fair value two months ago.");
+  }
   if (prompt.includes("For EACH item below and EACH driver")) {
+    lastEvidencePrompt = prompt;
     calls.push("evidence");
     // The buyback reverses the cash reason (driver 2) and is noise for the cycle reason (driver 1).
     const n = (prompt.match(/^\[\d+\]/gm) ?? []).length;
@@ -185,6 +194,40 @@ describe("analysis dimension", () => {
   });
 });
 
+describe("Too old (Kevin 2026-11-06)", () => {
+  it("news from before the month the current story took hold are Too old: never judged, never under a driver, never a signal", async () => {
+    await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
+    await db.insert(gold.priceBars).values([{ symbol: SYMBOL, date: new Date(Date.now() - 100 * 86_400_000).toISOString().slice(0, 10), open: 40000, high: 40000, low: 40000, close: 40000, volume: 1, sources: ["naver"], alternatives: [] }, { symbol: SYMBOL, date: new Date().toISOString().slice(0, 10), open: 30000, high: 30000, low: 30000, close: 30000, volume: 1, sources: ["naver"], alternatives: [] }]);
+    calls = [];
+    await runDimension(db, narrativeSinceDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual(["since"]);
+    calls = [];
+    await runDimension(db, narrativeSinceDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual([]);
+
+    const recent = "6f1d1a52-2222-4a3b-9c1d-000000000001";
+    const old = "6f1d1a52-2222-4a3b-9c1d-000000000002";
+    await db.insert(gold.filings).values([
+      { id: recent, symbol: SYMBOL, registry: "dart", filingKey: "n1", form: null, title: "Share buyback trust", filedAt: new Date(), url: null, language: "ko", sources: ["dart"] },
+      { id: old, symbol: SYMBOL, registry: "dart", filingKey: "n0", form: null, title: "New debt agreement", filedAt: new Date(Date.now() - 120 * 86_400_000), url: null, language: "ko", sources: ["dart"] },
+    ]);
+    calls = [];
+    await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual(["evidence"]);
+    expect(lastEvidencePrompt).toContain("Share buyback trust");
+    expect(lastEvidencePrompt).not.toContain("New debt agreement");
+    const rows = await db.select().from(evidence);
+    const tooOld = rows.find((r) => r.id === `${SYMBOL}|filing:${old}`)!;
+    expect(tooOld).toMatchObject({ effect: "too-old", strength: "noise", driverId: null, verdicts: [] });
+    expect(tooOld.why).toMatch(/^Before \w+ \d{4}, when the market adopted its current story/);
+    expect(rows.find((r) => r.id === `${SYMBOL}|filing:${recent}`)).toMatchObject({ effect: "reversal", strength: "strong" });
+
+    await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
+    const states = await db.select().from(narrativeStates);
+    expect(states.flatMap((x) => x.evidenceIds)).not.toContain(tooOld.id);
+  });
+});
+
 describe("signal rule", () => {
   const fv = { value: 100, currency: "USD", method: "m" };
   const q = (close: number) => ({ close, currency: "USD", date: "2026-11-04" });
@@ -215,8 +258,8 @@ describe("speed (Kevin 2026-11-06)", () => {
   it("every dimension sits in exactly one stage, after the ones it reads", () => {
     expect(STAGES.flat().sort()).toEqual(DIMENSIONS.map((d) => d.name).sort());
     const at = (n: string) => STAGES.findIndex((s) => s.includes(n));
-    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["analysis", "evidence"], ["catalysts", "thesis-confidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"]]) expect(at(before)).toBeLessThan(at(after));
-    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["analysis", "catalysts"], ["thesis-confidence", "evidence"], ["narrative-state"], ["signals"]]);
+    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["catalysts", "thesis-confidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"]]) expect(at(before)).toBeLessThan(at(after));
+    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["analysis", "catalysts"], ["thesis-confidence", "narrative-since"], ["evidence"], ["narrative-state"], ["signals"]]);
   });
   it("a merge collects only what its files can move", () => {
     expect(collectPlan(["web/src/console/analysis.tsx", "site/src/app/page.tsx", "CLAUDE.md"])).toBeNull();

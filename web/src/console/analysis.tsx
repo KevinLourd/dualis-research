@@ -391,8 +391,9 @@ function newsRows(symbol: string, objects: Analysis["objects"]): NewsRow[] {
     day: day(e.eventDay),
     headline: e.headline,
     publisher: e.publisher,
-    strength: e.strength,
+    strength: e.effect === "too-old" ? "too-old" : e.strength,
     tags: objects.drivers.map((d) => {
+      if (e.effect === "too-old") return { effect: "too-old", strength: "noise" };
       const v = e.verdicts.find((x) => x.driverId === d.id);
       return v ? { effect: v.effect, strength: v.strength } : null;
     }),

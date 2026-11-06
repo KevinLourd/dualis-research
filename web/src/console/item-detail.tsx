@@ -41,7 +41,13 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
     subtitle: `${day(c.eventDay)}${c.publisher ? ` · ${c.publisher}` : ""}`,
     body: (
       <>
-        {d.evidence ? (
+        {d.evidence?.effect === "too-old" ? (
+          // Too old (Kevin 2026-11-06): from before the current story, judged against no driver.
+          <div className="flex flex-col gap-2">
+            <TagBadge effect="too-old" strength="noise" gapPct={d.gapPct} />
+            {d.evidence.why && <p className="text-base leading-relaxed text-kumo-strong">{d.evidence.why}</p>}
+          </div>
+        ) : d.evidence ? (
           // Judged against EACH driver (Kevin 2026-11-06): one tag per driver, why, and the sentence it rests on.
           <ul className="flex flex-col divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
             {d.drivers.map((drv) => {
