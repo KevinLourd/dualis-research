@@ -1,0 +1,46 @@
+name: CPU probe (temporary)
+
+on:
+  push:
+    branches: [KevinLourd/5aaa1]
+    paths: [".github/workflows/cpu-probe.yml", ".context-probe"]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BASE: https://dualis-console.dualis-research.workers.dev
+    steps:
+      - name: Tail and hit
+        run: |
+          npx -y wrangler@4 tail dualis-console --format json > tail.jsonl 2> tail.err &
+          sleep 15
+          for p in /sign-in / /favicon.ico; do
+            echo "== $p"
+            for i in $(seq 1 25); do curl -s -o /dev/null -w "%{http_code} " "$BASE$p"; done; echo
+          done
+          sleep 15
+          kill %1 || true
+          python3 - <<'PY'
+          import json, collections
+          dec = json.JSONDecoder(); s = open("tail.jsonl").read(); i = 0; rows = []
+          while i < len(s):
+              while i < len(s) and s[i].isspace(): i += 1
+              if i >= len(s): break
+              o, i = dec.raw_decode(s, i); rows.append(o)
+          if rows: print("keys", sorted(rows[0].keys()))
+          by = collections.defaultdict(list)
+          for o in rows:
+              url = ((o.get("event") or {}).get("request") or {}).get("url", "?")
+              path = url.split("workers.dev")[-1]
+              by[path].append((o.get("outcome"), o.get("cpuTime"), o.get("wallTime")))
+          for p, v in by.items():
+              print(p, len(v), collections.Counter(x[0] for x in v))
+              print("   cpu", sorted([x[1] for x in v if x[1] is not None]))
+              print("   wall", sorted([x[2] for x in v if x[2] is not None]))
+          PY
