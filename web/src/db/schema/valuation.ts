@@ -112,6 +112,8 @@ export const goldMethodValuations = gold.table(
     peers: jsonb("peers").$type<PeerRow[]>().notNull(),
     summary: text("summary"),
     report: text("report"),
+    /** Latest date the method's data carries (`dataAsOf`): how fresh it is, not when it was computed. */
+    dataAsOf: timestamp("data_as_of", { withTimezone: true }),
     /** = silver.method_valuations.id */
     version: uuid("version").notNull(),
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),

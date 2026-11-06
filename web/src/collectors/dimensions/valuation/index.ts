@@ -21,7 +21,7 @@ import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } fr
 import { fnv } from "../analysis/facts";
 import { analysedSymbols } from "../watchlist";
 import { targetsIn, valuationFacts } from "./facts";
-import { historyOf, methodSpec, runScenarios, VALUATION_METHODS, weighted, type MethodSpec, type ValuationFacts } from "./methods";
+import { dataAsOf, historyOf, methodSpec, runScenarios, VALUATION_METHODS, weighted, type MethodSpec, type ValuationFacts } from "./methods";
 import { METHOD_SYSTEM, SYNTHESIS_SYSTEM, VALUATION_VERSION, methodPrompt, parseMethodAnswer, parseReport, parseWeights, reportPrompt, weightsPrompt } from "./prompt";
 
 export { VALUATION_METHODS } from "./methods";
@@ -247,6 +247,7 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     peers: r.result.peers,
     summary: r.result.summary,
     report: r.result.report,
+    dataAsOf: dataAsOf(r.result.inputs, r.createdAt),
     version: r.id,
     asOf: r.createdAt,
   }));

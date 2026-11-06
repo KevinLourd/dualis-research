@@ -10,7 +10,7 @@ import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { parsePeers, peersDim, readSummary } from "./dimensions/peers";
 import { valuationDim } from "./dimensions/valuation";
-import { methodSpec, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
+import { dataAsOf, methodSpec, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
 import type { SourceContext } from "./types";
@@ -56,6 +56,15 @@ describe("valuation methods: the arithmetic", () => {
   it("weighted fair value normalises the weights over the methods given", () => {
     const w = weighted([{ method: "ev-ebitda", low: 1, base: 2, high: 3 }, { method: "dcf", low: 3, base: 4, high: 5 }], { "ev-ebitda": 30, dcf: 10 });
     expect(w).toEqual({ low: 1.5, base: 2.5, high: 3.5, weights: { "ev-ebitda": 0.75, dcf: 0.25 } });
+  });
+});
+
+describe("data freshness", () => {
+  it("is the latest date the inputs carry (a month = its last day), never when it ran", () => {
+    const ran = new Date("2026-11-06T10:00:00Z");
+    expect(dataAsOf([{ period: "fiscal year 2025-12" }, { period: "last 4 quarters to 2026-09" }], ran).toISOString().slice(0, 10)).toBe("2026-09-30");
+    expect(dataAsOf([{ period: "quarter 2026-06" }, { period: "2026-11-05" }], ran).toISOString().slice(0, 10)).toBe("2026-11-05");
+    expect(dataAsOf([{ period: "today" }], ran)).toBe(ran);
   });
 });
 
@@ -142,6 +151,7 @@ describe("fair value pyramid", () => {
     const rows = new Map((await db.select().from(goldMethodValuations)).map((r) => [r.method, r]));
     expect(rows.get("ev-ebitda")).toMatchObject({ applicable: 1, low: (4 * 70e9 + 100e9) / 16.5e6, base: (6 * 70e9 + 100e9) / 16.5e6, high: (8 * 70e9 + 100e9) / 16.5e6 });
     expect(rows.get("ev-ebitda")!.history?.points.map((p) => p.value)).toEqual([5, 7, 6]);
+    expect(rows.get("ev-ebitda")!.dataAsOf?.toISOString().slice(0, 10)).toBe("2025-12-31");
     expect(rows.get("pb")).toMatchObject({ applicable: 0, reason: "Book value says little for this business." });
     expect(rows.get("dividend-yield")).toMatchObject({ applicable: 0, reason: "No dividend paid last fiscal year." });
     expect(rows.get("analyst-targets")).toMatchObject({ applicable: 1, low: 35000, base: 42000, high: 50000 });

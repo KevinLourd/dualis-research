@@ -1,0 +1,1 @@
+ALTER TABLE "gold"."method_valuations" ADD COLUMN "data_as_of" timestamp with time zone;

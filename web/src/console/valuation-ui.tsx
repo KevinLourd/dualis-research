@@ -2,7 +2,7 @@ import { Badge } from "@cloudflare/kumo";
 import { CaretRightIcon } from "@phosphor-icons/react/ssr";
 import type { Valuation } from "./analysis-queries";
 import { FootballField, type FieldRow } from "./football-field";
-import { price } from "./format";
+import { price, relativeTime } from "./format";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "./kumo";
 import { RowLink } from "./row-link";
 
@@ -47,9 +47,14 @@ export function MethodsTable({ symbol, v }: { symbol: string; v: Valuation }) {
           {v.methods.map((m) => (
             <RowLink key={m.method} href={methodHref(symbol, m.method)} label={`Open ${m.name}`}>
               <KTableCell className="py-3 pl-4 align-top">
+                {/* The name and how fresh its data is; the description lives in the method's panel (Kevin 2026-11-06). */}
                 <span className="flex flex-col gap-0.5">
                   <span className={`font-medium ${m.applicable ? "text-kumo-strong" : "text-kumo-subtle"}`}>{m.name}</span>
-                  <span className="text-sm text-kumo-subtle">{m.applicable ? (m.summary ?? m.family) : m.reason}</span>
+                  {m.applicable && m.dataAsOf && (
+                    <time dateTime={m.dataAsOf.toISOString()} title={`Latest figure: ${m.dataAsOf.toISOString().slice(0, 10)}`} className="text-sm text-kumo-subtle">
+                      Data from {relativeTime(m.dataAsOf)}
+                    </time>
+                  )}
                 </span>
               </KTableCell>
               <KTableCell className="py-3 text-right align-top font-mono tabular">{val(m.low)}</KTableCell>
