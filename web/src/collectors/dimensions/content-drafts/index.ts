@@ -1,73 +1,114 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { evidence, narrativeDrivers, narratives, signalChanges, signals } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { goldCatalysts } from "@/db/schema/catalysts";
 import * as content from "@/db/schema/content";
 import type { DraftChart, DraftInputs } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
-import { goldNewsItems } from "@/db/schema/news";
-import { theses as goldTheses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
-import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
+import { refreshGoldIdea, utcDay } from "@/content/ideas";
+import type { Dimension, PromoteResult, Source } from "../../types";
 import { activeAccounts } from "../content-accounts";
 import { voiceGuides } from "../content-voices";
 import { chartOptions, type ChartOption } from "./charts";
-import { type DraftFormat, draftPrompt, draftSystem, parseGeneration, PROMPT_VERSION, withDisclaimer } from "./format";
+import { DRAFT_FORMATS, type DraftFormat, draftPrompt, draftSystem, type IdeaContext, parseGeneration, PROMPT_VERSION, withDisclaimer } from "./format";
 
 export const DRAFTS_DIMENSION = "content-drafts";
 export const CLAUDE_SOURCE = "claude";
-/** A catalyst older than this is not fresh enough to post about (the day's window plus the night before). */
-const FRESH_HOURS = 36;
-/** The day's drafts are spread over this window, until the next morning collection. */
-export const SLOT_WINDOW_HOURS = 24;
 
-/** Formats written per channel; a channel with no account still gets an unassigned draft. */
-const FORMATS_BY_CHANNEL: Record<string, DraftFormat[]> = {
-  x: ["x-post"],
-  linkedin: ["linkedin-post"],
-  substack: ["substack-note", "substack-article"],
+/** The channel a format is published on. */
+export const CHANNEL_OF: Record<DraftFormat, "x" | "linkedin" | "substack"> = {
+  "x-post": "x",
+  "linkedin-post": "linkedin",
+  "substack-note": "substack",
+  "substack-article": "substack",
 };
+/** Whose voice a draft takes when a channel has several accounts: Thierry's own first. */
+const OWNER_ORDER = ["thierry", "dualis", "duality"];
 
-type Prepared = {
-  inputs: DraftInputs;
-  narrative: string | null;
-  newsSummary: string | null;
+type DraftRequestFetch = {
+  promptVersion: string;
+  model: string;
+  requestId: string;
+  ideaId: string;
   format: DraftFormat;
-  account: { id: string; name: string } | null;
-  voiceGuide: string | null;
+  accountId: string | null;
+  inputs: DraftInputs;
   exhibits: ChartOption[];
+  prompt: string;
 };
-/** What one generation needs; kept between `subjects` (which reads the database) and the source's fetch. */
-const prepared = new Map<string, Prepared>();
 
-/** One LLM call per (catalyst, account, format), in that account's voice. The raw answer lands in bronze. */
+/** The account a format is written for, and its voice guide. */
+async function accountFor(db: Db, format: DraftFormat) {
+  const accounts = (await activeAccounts(db, CHANNEL_OF[format])).sort((a, b) => OWNER_ORDER.indexOf(a.owner) - OWNER_ORDER.indexOf(b.owner));
+  const account = accounts[0] ?? null;
+  return { account, voiceGuide: account ? ((await voiceGuides(db)).get(account.id) ?? null) : null };
+}
+
+/** The ticker's story and the evidence an Idea rests on, in words, read from gold at draft time. */
+async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: string): Promise<IdeaContext> {
+  const refs = (kind: string) => idea.sourceRefs.filter((r) => r.kind === kind).map((r) => r.ref.slice(kind.length + 1));
+  const evidenceIds = refs("evidence");
+  const driverIds = refs("driver");
+  const changeIds = refs("change");
+  const [[n], [s], ev, drv, ch] = await Promise.all([
+    db.select().from(narratives).where(eq(narratives.symbol, symbol)),
+    db.select().from(signals).where(eq(signals.symbol, symbol)),
+    evidenceIds.length ? db.select().from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
+    db.select().from(narrativeDrivers).where(driverIds.length ? inArray(narrativeDrivers.id, driverIds) : eq(narrativeDrivers.symbol, symbol)),
+    changeIds.length ? db.select().from(signalChanges).where(inArray(signalChanges.id, changeIds)) : [],
+  ]);
+  return {
+    narrative: n?.detail ? `${n.text} ${n.detail}` : (n?.text ?? null),
+    signal: s ? (s.signal === "none" ? "no signal" : `${s.signal}, ${s.strength}`) : null,
+    fairValue:
+      s && s.fairValue !== null
+        ? `${s.fairValue} ${s.currency ?? ""}${s.fairValueLabel ? ` (${s.fairValueLabel})` : ""}; quote ${s.quote ?? "?"} on ${s.quoteDate ?? "?"}${s.gapPct !== null ? `, ${Math.round(s.gapPct * 100)}% vs fair value` : ""}`
+        : null,
+    evidence: ev.map((e) => ({ headline: e.headline, publisher: e.publisher, day: e.eventDay, why: e.why, url: e.url })),
+    drivers: drv.map((d) => ({ title: d.title, summary: d.summary })),
+    signalChanges: ch.map((c) => ({ label: `${c.fromSignal} ${c.fromStrength} to ${c.toSignal} ${c.toStrength} on ${utcDay(c.at)}`, note: c.updateNote })),
+  };
+}
+
+/** One LLM call per draft request (an Idea x a format), in the voice of that channel's account. The raw answer lands in bronze. */
 export const claudeDrafts: Source = {
   name: CLAUDE_SOURCE,
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
   covers: () => true,
   concurrency: 4,
   async fetch(subject, ctx) {
-    const p = prepared.get(subject);
-    if (!p) throw new Error(`no prepared inputs for ${subject}`);
     if (!ctx.complete) throw new Error("no LLM in the collector context");
-    const system = draftSystem(p.format, p.voiceGuide, p.account?.name ?? null);
-    const prompt = draftPrompt(p.inputs, p.narrative, p.newsSummary, p.exhibits.map((x) => ({ id: x.id, label: x.label })));
-    const { text, model } = await ctx.complete({ system, prompt });
-    const request = {
-      promptVersion: PROMPT_VERSION,
-      model,
-      format: p.format,
-      accountId: p.account?.id ?? null,
-      inputs: p.inputs,
-      narrative: p.narrative,
-      // The exhibit data offered, snapshot from gold: promotion builds the charts from it, never from a later read.
-      exhibits: p.exhibits,
-      prompt,
+    if (!ctx.db) throw new Error("no database in the collector context");
+    const db = ctx.db;
+    const requestId = subject.replace(/^request:/, "");
+    const [req] = await db.select().from(content.contentDraftRequests).where(eq(content.contentDraftRequests.id, requestId));
+    if (!req) throw new Error(`draft request ${requestId} not found`);
+    const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, req.ideaId));
+    if (!idea) throw new Error(`idea ${req.ideaId} not found`);
+    const format = req.format as DraftFormat;
+    const symbol = idea.symbol ?? idea.sourceRefs.find((r) => r.symbol)?.symbol ?? "";
+    const [profile] = symbol ? await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)) : [];
+    const inputs: DraftInputs = {
+      symbol,
+      companyName: profile?.name ?? null,
+      news: null,
+      worthJudgmentId: null,
+      worth: null,
+      thesis: null,
+      driver: null,
+      chart: null,
+      idea: { id: idea.id, title: idea.title, angle: idea.angle, sources: idea.sourceRefs },
     };
+    const { account, voiceGuide } = await accountFor(db, format);
+    const exhibits = format === "substack-article" && symbol ? await chartOptions(db, symbol, inputs.companyName) : [];
+    const prompt = draftPrompt(inputs, await ideaContext(db, idea, symbol), exhibits.map((x) => ({ id: x.id, label: x.label })));
+    const { text, model } = await ctx.complete({ system: draftSystem(format, voiceGuide, account?.name ?? null), prompt });
+    const request: DraftRequestFetch = { promptVersion: PROMPT_VERSION, model, requestId, ideaId: idea.id, format, accountId: account?.id ?? null, inputs, exhibits, prompt };
     const outcome = { request, httpStatus: null, payloadText: text };
     try {
-      parseGeneration(p.format, text, p.exhibits.map((x) => x.id));
+      parseGeneration(format, text, exhibits.map((x) => x.id));
     } catch (err) {
-      return { ...outcome, error: `answer is not the expected ${p.format}: ${err instanceof Error ? err.message : String(err)}` };
+      return { ...outcome, error: `answer is not the expected ${format}: ${err instanceof Error ? err.message : String(err)}` };
     }
     return outcome;
   },
@@ -75,130 +116,46 @@ export const claudeDrafts: Source = {
 
 export const contentDrafts: Dimension = {
   name: DRAFTS_DIMENSION,
-  description: "Drafts for every news that cracks the market narrative, per account (its voice) and channel, spread over the next 24 hours.",
+  description: "Drafts Thierry asked for from the Ideas table: one per Idea and channel x format, in that channel's account voice.",
   sources: [claudeDrafts],
   subjects: pickDraftSubjects,
   promote: promoteDrafts,
 };
 
-/**
- * Every fresh news catalyst that CONTRADICTS the market narrative (gold.catalysts, judged once by the catalysts dimension) and was not
- * drafted yet x every account of every channel (one unassigned draft when a channel has no account yet).
- */
-export async function pickDraftSubjects(db: Db, ctx: SourceContext): Promise<string[]> {
-  prepared.clear();
-  const since = new Date(Date.now() - FRESH_HOURS * 3600_000);
-  const catalysts = await db
-    .select()
-    .from(goldCatalysts)
-    .where(and(eq(goldCatalysts.kind, "news"), eq(goldCatalysts.direction, "contradicts"), gte(goldCatalysts.eventAt, since)))
-    .orderBy(desc(goldCatalysts.probability));
-  const drafted = new Set(
-    (await db.selectDistinct({ key: sql<string>`${content.contentDrafts.inputKey} || '|' || coalesce(${content.contentDrafts.accountId}, '') || '|' || ${content.contentDrafts.format}` }).from(content.contentDrafts)).map(
-      (r) => r.key,
-    ),
-  );
-  if (catalysts.length === 0) return [];
-  if (!ctx.complete) throw new Error("no LLM in the collector context");
-
-  const symbols = [...new Set(catalysts.map((c) => c.symbol))];
-  const theses = await thesesBySymbol(db, symbols);
-  const names = new Map(
-    (await db.select({ symbol: gold.companyProfiles.symbol, name: gold.companyProfiles.name }).from(gold.companyProfiles).where(inArray(gold.companyProfiles.symbol, symbols))).map((r) => [r.symbol, r.name]),
-  );
-  const newsIds = catalysts.flatMap((c) => c.newsItemIds.slice(0, 1));
-  const news = new Map(
-    (newsIds.length ? await db.select().from(goldNewsItems).where(inArray(goldNewsItems.id, newsIds)) : []).map((n) => [n.id, n]),
-  );
-  const accounts = await activeAccounts(db);
-  const voices = await voiceGuides(db);
-  const chartsBySymbol = new Map<string, ChartOption[]>();
-
-  const out: string[] = [];
-  for (const c of catalysts) {
-    const t = theses.get(c.symbol);
-    if (!t) continue; // no thesis, no draft
-    const n = c.newsItemIds[0] ? news.get(c.newsItemIds[0]) : undefined;
-    const inputs: DraftInputs = {
-      symbol: c.symbol,
-      companyName: names.get(c.symbol) ?? null,
-      news: n
-        ? { id: n.id, title: n.title, url: n.url, publisher: n.publisher, publishedAt: (n.publishedAt ?? n.firstSeenAt).toISOString() }
-        : { id: c.id, title: c.headline, url: c.url ?? "", publisher: c.publisher, publishedAt: c.eventAt.toISOString() },
-      worthJudgmentId: null,
-      worth: { probability: c.probability, citedSentence: c.evidence },
-      catalyst: { id: c.id, direction: c.direction, probability: c.probability, reason: c.reason },
-      thesis: t.thesis,
-      driver: null,
-      chart: null,
-    };
-    for (const [channel, formats] of Object.entries(FORMATS_BY_CHANNEL)) {
-      const forChannel = accounts.filter((a) => a.channel === channel);
-      const targets: ({ id: string; name: string } | null)[] = forChannel.length ? forChannel.map((a) => ({ id: a.id, name: a.name })) : [null];
-      for (const account of targets) {
-        for (const format of formats) {
-          const key = `${c.id}|${account?.id ?? ""}|${format}`;
-          if (drafted.has(key)) continue;
-          let exhibits: ChartOption[] = [];
-          if (format === "substack-article") {
-            if (!chartsBySymbol.has(c.symbol)) chartsBySymbol.set(c.symbol, await chartOptions(db, c.symbol, inputs.companyName));
-            exhibits = chartsBySymbol.get(c.symbol)!;
-          }
-          prepared.set(key, { inputs, narrative: t.narrative, newsSummary: n?.summary ?? null, format, account, voiceGuide: account ? (voices.get(account.id) ?? null) : null, exhibits });
-          out.push(key);
-        }
-      }
-    }
-  }
-  return out;
-}
-
-/** The thesis as the thesis dimension serves it (gold.theses: active text, Thierry's word winning) + the market's narrative. */
-async function thesesBySymbol(db: Db, symbols: string[]) {
-  const theses = await db
-    .select({ symbol: goldTheses.symbol, summary: goldTheses.summary, state: goldTheses.summaryState, narrative: goldTheses.narrative })
-    .from(goldTheses)
-    .where(and(inArray(goldTheses.symbol, symbols), sql`coalesce(${goldTheses.summary}, '') <> ''`));
-  const out = new Map<string, { thesis: { id: string; author: string; summary: string }; narrative: string | null }>();
-  for (const t of theses) {
-    // summary_state says whose words these are: draft (Claude), accepted / edited / thierry (Thierry's call).
-    out.set(t.symbol, { thesis: { id: t.symbol, author: t.state ?? "draft", summary: t.summary! }, narrative: t.narrative });
-  }
-  return out;
+/** Every pending draft request, oldest first. */
+export async function pickDraftSubjects(db: Db): Promise<string[]> {
+  const pending = await db
+    .select({ id: content.contentDraftRequests.id, format: content.contentDraftRequests.format })
+    .from(content.contentDraftRequests)
+    .where(eq(content.contentDraftRequests.status, "pending"))
+    .orderBy(content.contentDraftRequests.requestedAt);
+  return pending.filter((r) => (DRAFT_FORMATS as readonly string[]).includes(r.format)).map((r) => `request:${r.id}`);
 }
 
 /**
- * Spreads the publishing slots of the catalysts drafted in one run over the next 24 hours: the strongest first,
- * evenly spaced, every channel of one catalyst at the same slot.
- */
-export function slotsFor(catalystIds: string[], start: Date, windowHours = SLOT_WINDOW_HOURS): Map<string, Date> {
-  const step = (windowHours * 3600_000) / Math.max(catalystIds.length, 1);
-  return new Map(catalystIds.map((id, i) => [id, new Date(start.getTime() + Math.round((i + 0.5) * step))]));
-}
-
-/**
- * Bronze generation -> silver.content_drafts (one row per generation, stored once: re-promoting the same bronze row
- * changes nothing) -> gold.content_drafts (latest version per catalyst x account x format).
+ * Bronze generation -> silver.content_drafts (stored once: re-promoting the same bronze row changes nothing), its
+ * request marked done (or failed, with the reason) -> gold.content_drafts and the Idea's gold row.
  */
 export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<PromoteResult> {
   let n = 0;
-  const ok = rows.filter((r) => !r.error && r.source === CLAUDE_SOURCE);
-  // Slots: this run's catalysts in order of strength (the order subjects were picked in).
-  const order: string[] = [];
-  for (const f of ok) {
-    const id = (f.request as { inputs: DraftInputs }).inputs.catalyst?.id ?? (f.request as { inputs: DraftInputs }).inputs.news?.id ?? f.id;
-    if (!order.includes(id)) order.push(id);
-  }
-  const runStart = ok.length ? new Date(Math.min(...ok.map((f) => f.fetchedAt.getTime()))) : new Date();
-  const slots = slotsFor(order, runStart);
-
-  for (const f of ok) {
-    const req = f.request as { inputs: DraftInputs; model: string; format: DraftFormat; accountId: string | null; exhibits: ChartOption[] };
+  const touched = new Set<string>();
+  for (const f of rows.filter((r) => r.source === CLAUDE_SOURCE && r.subject.startsWith("request:"))) {
+    const requestId = f.subject.slice("request:".length);
+    if (f.error) {
+      const [r] = await db
+        .update(content.contentDraftRequests)
+        .set({ status: "failed", error: f.error, finishedAt: new Date(), sources: sql`array_append(${content.contentDraftRequests.sources}, ${CLAUDE_SOURCE})`, bronzeIds: sql`array_append(${content.contentDraftRequests.bronzeIds}, ${f.id}::uuid)` })
+        .where(and(eq(content.contentDraftRequests.id, requestId), eq(content.contentDraftRequests.status, "pending")))
+        .returning({ ideaId: content.contentDraftRequests.ideaId });
+      if (r) touched.add(r.ideaId);
+      continue;
+    }
+    const req = f.request as DraftRequestFetch;
     const format = req.format;
     const offered = req.exhibits ?? [];
     const generated = parseGeneration(format, f.payloadText ?? "", offered.map((x) => x.id));
     const charts: DraftChart[] | null = format === "substack-article" ? generated.exhibitIds.map((id) => offered.find((x) => x.id === id)!.chart) : null;
-    const inputKey = req.inputs.catalyst?.id ?? req.inputs.news?.id ?? "thesis";
+    const inputKey = `idea:${req.ideaId}`;
     const [{ prior }] = await db
       .select({ prior: sql<number>`count(distinct ${content.contentDrafts.generationBronzeId})::int` })
       .from(content.contentDrafts)
@@ -210,12 +167,13 @@ export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<Promot
           sql`${content.contentDrafts.generationBronzeId} <> ${f.id}`,
         ),
       );
-    const inserted = await db
+    const [inserted] = await db
       .insert(content.contentDrafts)
       .values({
         generationBronzeId: f.id,
         symbol: req.inputs.symbol,
         inputKey,
+        ideaId: req.ideaId,
         format,
         accountId: req.accountId,
         version: prior + 1,
@@ -223,16 +181,25 @@ export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<Promot
         body: generated.body,
         inputs: req.inputs,
         charts,
-        scheduledAt: slots.get(inputKey) ?? null,
+        scheduledAt: null,
         model: req.model,
         sources: [CLAUDE_SOURCE],
         bronzeIds: [f.id],
       })
       .onConflictDoNothing()
       .returning({ id: content.contentDrafts.id });
-    n += inserted.length;
+    const draftId =
+      inserted?.id ??
+      (await db.select({ id: content.contentDrafts.id }).from(content.contentDrafts).where(and(eq(content.contentDrafts.generationBronzeId, f.id), eq(content.contentDrafts.format, format))))[0]?.id;
+    if (inserted) n += 1;
+    await db
+      .update(content.contentDraftRequests)
+      .set({ status: "done", draftId, error: null, finishedAt: new Date(), sources: sql`array_append(${content.contentDraftRequests.sources}, ${CLAUDE_SOURCE})`, bronzeIds: sql`array_append(${content.contentDraftRequests.bronzeIds}, ${f.id}::uuid)` })
+      .where(and(eq(content.contentDraftRequests.id, requestId), eq(content.contentDraftRequests.status, "pending")));
+    touched.add(req.ideaId);
   }
   await rebuildGoldDrafts(db);
+  for (const ideaId of touched) await refreshGoldIdea(db, ideaId);
   return { silverRowsBySource: { [CLAUDE_SOURCE]: n } };
 }
 
@@ -257,6 +224,7 @@ export function toGoldDraft(d: content.SilverContentDraft, accountNames: Map<str
     id: d.id,
     symbol: d.symbol,
     inputKey: d.inputKey,
+    ideaId: d.ideaId,
     format: d.format,
     accountId: d.accountId,
     accountName: d.accountId ? (accountNames.get(d.accountId) ?? d.accountId) : null,

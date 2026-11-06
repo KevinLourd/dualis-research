@@ -189,6 +189,7 @@ export async function promoteReplies(db: Db, rows: BronzeFetch[]): Promise<Promo
           generationBronzeId: f.id,
           symbol: draft.symbol,
           inputKey: draft.inputKey,
+          ideaId: draft.ideaId,
           format: draft.format,
           accountId: draft.accountId,
           version: draft.version + 1,

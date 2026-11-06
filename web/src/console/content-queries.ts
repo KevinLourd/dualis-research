@@ -1,7 +1,8 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
+import { cache } from "react";
 import { getDb } from "@/db/client";
 import { runs } from "@/db/schema/ops";
-import { goldContentAccounts, goldContentDrafts, goldContentLibrary, goldContentPublications } from "@/db/schema/content";
+import { goldContentAccounts, goldContentDrafts, goldContentIdeas, goldContentLibrary, goldContentPublications } from "@/db/schema/content";
 
 /** Content section reads: gold only. */
 
@@ -18,9 +19,8 @@ export async function listPublications() {
   return getDb().select().from(goldContentPublications).orderBy(asc(goldContentPublications.kind), asc(goldContentPublications.name));
 }
 
-export async function listDrafts() {
-  return getDb().select().from(goldContentDrafts).orderBy(desc(goldContentDrafts.createdAt), asc(goldContentDrafts.symbol));
-}
+/** Every draft, newest first (layout and page share one read per request). */
+export const listDrafts = cache(async () => getDb().select().from(goldContentDrafts).orderBy(desc(goldContentDrafts.createdAt), asc(goldContentDrafts.symbol)));
 
 export async function getDraft(id: string) {
   const [draft] = await getDb().select().from(goldContentDrafts).where(eq(goldContentDrafts.id, id));
@@ -32,7 +32,12 @@ export async function listAccounts() {
 }
 
 /** Latest collector run of a content dimension (ops), so an empty page can say why it is empty. */
-export async function lastContentRun(dimension: "content-posts" | "content-drafts") {
+export async function lastContentRun(dimension: "content-posts" | "content-drafts" | "content-ideas") {
   const [run] = await getDb().select().from(runs).where(eq(runs.dimension, dimension)).orderBy(desc(runs.startedAt)).limit(1);
   return run ?? null;
 }
+
+/** The Ideas table: newest day first, best score first within a day. */
+export const listIdeas = cache(async () =>
+  getDb().select().from(goldContentIdeas).orderBy(desc(goldContentIdeas.day), sql`${goldContentIdeas.bestScore} desc nulls last`, asc(goldContentIdeas.rank)),
+);

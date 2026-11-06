@@ -30,6 +30,8 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ONEDRIVE_TOKEN_KEY: ${{ secrets.ONEDRIVE_TOKEN_KEY }}
+      # Optional: lets Create draft (Content > Ideas) start draft.yml at once; without it a request waits for the next collect.
+      DRAFT_DISPATCH_TOKEN: ${{ secrets.DRAFT_DISPATCH_TOKEN }}
     steps:
       - name: Required secrets are set
         working-directory: .
@@ -61,7 +63,7 @@ jobs:
         run: pnpm cf:build
       - name: Deploy to Cloudflare Workers (runtime secrets uploaded with the version)
         run: |
-          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY }))'
+          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY, DRAFT_DISPATCH_TOKEN: process.env.DRAFT_DISPATCH_TOKEN || undefined }))'
           set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
           pnpm cf:deploy -- --secrets-file "$RUNNER_TEMP/worker-secrets.json" | tee deploy.log
           rm -f "$RUNNER_TEMP/worker-secrets.json"
