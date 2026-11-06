@@ -309,7 +309,7 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
             size="sm"
             icon={<ChartLineIcon size={28} className="text-kumo-inactive" />}
             title="No driver yet"
-            description="Up to three drivers per ticker, each in its category with charts of reported data. The news that cracks or turns each driver will sit under it."
+            description="Up to five drivers per ticker, each in its category with charts of reported data. The news that cracks or turns each driver will sit under it."
           />
         )}
       </Section>
