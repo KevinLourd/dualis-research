@@ -3,7 +3,7 @@ name: CPU probe (temporary)
 on:
   push:
     branches: ["KevinLourd/dualis-console-503-cpu"]
-    paths: [".github/workflows/cpu-probe.yml", ".context-probe"]
+    paths: [".github/workflows/cpu-probe.yml", "web/worker.ts", "web/wrangler.jsonc"]
 
 permissions:
   contents: read
@@ -11,19 +11,46 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
     env:
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      BASE: https://dualis-console.dualis-research.workers.dev
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ONEDRIVE_TOKEN_KEY: ${{ secrets.ONEDRIVE_TOKEN_KEY }}
+      PROD: https://dualis-console.dualis-research.workers.dev
     steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm cf:build
+      - name: Upload a preview version (prod deployment untouched)
+        run: |
+          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/s.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY }))'
+          npx wrangler versions upload --secrets-file "$RUNNER_TEMP/s.json" 2>&1 | tee up.log
+          rm -f "$RUNNER_TEMP/s.json"
       - name: Tail and hit
         run: |
-          npx -y wrangler@4 tail dualis-console --format json > tail.jsonl 2> tail.err &
+          PREV=$(grep -o 'https://[a-zA-Z0-9-]*-dualis-console[a-zA-Z0-9.-]*\.workers\.dev' up.log | head -1)
+          echo "preview $PREV"
+          npx wrangler tail dualis-console --format json > tail.jsonl 2> tail.err &
           sleep 15
-          for p in /sign-in / /favicon.ico; do
-            echo "== $p"
-            for i in $(seq 1 25); do curl -s -o /dev/null -w "%{http_code} " "$BASE$p"; done; echo
-          done
+          for base in "$PROD" "$PREV"; do for p in /sign-in /; do
+            echo "== $base$p"
+            for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code} " "$base$p"; done; echo
+          done; done
           sleep 15
           kill %1 || true
           python3 - <<'PY'
@@ -33,14 +60,13 @@ jobs:
               while i < len(s) and s[i].isspace(): i += 1
               if i >= len(s): break
               o, i = dec.raw_decode(s, i); rows.append(o)
-          if rows: print("keys", sorted(rows[0].keys()))
           by = collections.defaultdict(list)
           for o in rows:
               url = ((o.get("event") or {}).get("request") or {}).get("url", "?")
-              path = url.split("workers.dev")[-1]
-              by[path].append((o.get("outcome"), o.get("cpuTime"), o.get("wallTime")))
-          for p, v in by.items():
-              print(p, len(v), collections.Counter(x[0] for x in v))
+              host, _, path = url.partition(".workers.dev")
+              ver = ((o.get("scriptVersion") or {}).get("id") or "?")[:8]
+              by[(ver, host.split("//")[-1][:20], path)].append((o.get("outcome"), o.get("cpuTime")))
+          for k, v in sorted(by.items()):
+              print(k, len(v), dict(collections.Counter(x[0] for x in v)))
               print("   cpu", sorted([x[1] for x in v if x[1] is not None]))
-              print("   wall", sorted([x[2] for x in v if x[2] is not None]))
           PY
