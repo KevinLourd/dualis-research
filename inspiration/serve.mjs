@@ -1,3 +1,4 @@
+import os from "node:os";
 // Serves the captured sites on local subdomains (port 4400 by default):
 //   inspo.localhost:4400          index of every site, with screenshots
 //   <id>.localhost:4400           live copy: original HTML + JS, assets from the local cache,
@@ -10,7 +11,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const MIRRORS = path.join(ROOT, "mirrors");
+// Outside the repo so every workspace reuses one capture (Kevin 2026-11-06: a fresh workspace re-captured for 10 min).
+const MIRRORS = process.env.DUALIS_MIRRORS ?? path.join(os.homedir(), ".cache", "dualis-inspiration");
 const PORT = Number(process.env.PORT ?? 4400);
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 

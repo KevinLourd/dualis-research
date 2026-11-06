@@ -1,3 +1,4 @@
+import os from "node:os";
 // Captures the inspiration sites listed in sites.json into mirrors/ (gitignored: third-party content).
 // Per site: every response the browser received (HTML, CSS, JS, fonts, images) in a cache,
 // a static snapshot of each rendered page (scripts removed), and desktop + mobile screenshots.
@@ -9,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const MIRRORS = path.join(ROOT, "mirrors");
+// Outside the repo so every workspace reuses one capture (Kevin 2026-11-06: a fresh workspace re-captured for 10 min).
+const MIRRORS = process.env.DUALIS_MIRRORS ?? path.join(os.homedir(), ".cache", "dualis-inspiration");
 const MAX_PAGES = 6;
 const args = process.argv.slice(2);
 const headed = args.includes("--headed");
