@@ -60,6 +60,7 @@ jobs:
       - name: Deploy to Cloudflare Workers (runtime secrets uploaded with the version)
         run: |
           node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY }))'
+          set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
           pnpm cf:deploy -- --secrets-file "$RUNNER_TEMP/worker-secrets.json" | tee deploy.log
           rm -f "$RUNNER_TEMP/worker-secrets.json"
           url=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)
@@ -105,6 +106,7 @@ jobs:
           printf 'WHATSAPP_ALLOWLIST=%s\n' "$WHATSAPP_ALLOWLIST" >> wa/box.env
           tar czf "$RUNNER_TEMP/wa.tgz" --exclude=wa/node_modules --exclude=wa/dist wa web/src
           rm wa/box.env
+          set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
           ssh -i "$RUNNER_TEMP/wa_key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$RUNNER_TEMP/wa_known_hosts" "$WA_DEPLOY_HOST" < "$RUNNER_TEMP/wa.tgz" | tee wa-deploy.log
           rm -f "$RUNNER_TEMP/wa_key" "$RUNNER_TEMP/wa.tgz"
           echo "### WhatsApp service" >> "$GITHUB_STEP_SUMMARY"
