@@ -2,7 +2,7 @@ name: CPU probe (temporary)
 
 on:
   push:
-    branches: [KevinLourd/5aaa1]
+    branches: ["KevinLourd/dualis-console-503-cpu"]
     paths: [".github/workflows/cpu-probe.yml", ".context-probe"]
 
 permissions:
