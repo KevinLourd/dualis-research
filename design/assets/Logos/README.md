@@ -1,6 +1,6 @@
 # Logos
 
-The Dualis mark (chosen by Kevin 2026-11-05): the **D of Dualis, split by a price line that dips, then turns up**. Two sides in one letter (long and short), and the moment a narrative turns. Built with the logo-design skill (kaankiziltug/logo-design-skill): concepts, 16 px tests, then this kit.
+The Dualis mark (Kevin 2026-11-06, option C "split seal", replaces the 2026-11-05 split D): **a square frame cut on the diagonal, one half filled, the D in the open half**. Two sides of one name: long and short, price and value. Wordmark: DUALIS / RESEARCH in wide-tracked IBM Plex Sans caps. Interim: Thierry finds it a bit generic and wants something as unique as Citrini's mark; new directions are being explored.
 
 - `dualis-mark.svg`: master, `brand` indigo `#2B2463`, 256 grid.
 - `dualis-mark-black.svg`, `-white.svg` (on indigo or dark), `-square.svg`, PNGs at 1024.
