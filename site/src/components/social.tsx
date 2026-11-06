@@ -1,7 +1,7 @@
 import { LINKEDIN_URL, X_URL } from "@/lib/model";
 import { LinkedInIcon, SubstackIcon, XIcon } from "./icons";
 
-/** Substack, X and LinkedIn, the row Aurelion keeps at the top right of every page band. */
+/** Substack, X and LinkedIn, in the footer of every page. */
 export function Social({ substackUrl, className = "social" }: { substackUrl: string | null; className?: string }) {
   return (
     <div className={className}>

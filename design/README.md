@@ -44,8 +44,8 @@ Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/th
 
 The paywall sits after item 4 or 5.
 
-## Website (near copy of Aurelion Research, Kevin 2026-11-05)
-Pages: Home (one full-bleed hero), Company, Research (with the research portal), Portfolio (year-to-date only), About (Thierry, photo), Contact, Plans, Disclaimer. Every inner page opens on a navy band (section label, one line, social row) and closes on a navy call to action. Big serif type, lots of air, grey sections between white ones. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers are drawn from the post itself (its constellation, shelf, title, date), never AI images. Process visual: a constellation of industries linked along the value chain.
+## Website (Aurelion's pages, our own rendering)
+Pages (Kevin 2026-11-05): Home (one full-bleed hero), Company, Research (with the research portal), Portfolio (year-to-date only), About (Thierry, photo), Contact, Plans, Disclaimer. Rendering of our own (Thierry 2026-11-06, "we copy them too closely"): every inner page opens on a pale indigo band (section name, one serif statement) and closes on a deep indigo band (statement left, one action right). Section headings in IBM Plex Sans, statements in Newsreader, sentence case. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers: a Wikimedia Commons photo of the company or its industry under an indigo veil, with shelf, title, date and mark, never AI images. The reports also run as a black horizontal strip: black and white covers, the one under the pointer grows and turns to colour. Process visual: a constellation of industries linked along the value chain.
 
 ## Disclaimer (verbatim)
 Not investment advice. For information only. The author may hold positions in the securities discussed.

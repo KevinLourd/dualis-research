@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CATEGORIES, categoryLabel, formatDate, shelf, type ResearchCategory } from "@/lib/model";
 import type { Publication } from "@/lib/queries";
-import { Cover } from "./cover";
+import { Cover, PhotoCredit } from "./cover";
 
 /**
  * The research portal: a black and white list of what Thierry published; the row under the pointer shows its report
@@ -49,7 +49,7 @@ export function Portal({ posts }: { posts: Publication[] }) {
         <aside className="portal-preview" aria-live="polite">
           {active && (
             <a target="_blank" rel="noopener noreferrer" href={active.url} className="pp-card">
-              <Cover id={active.id} title={active.title} category={active.category} publishedAt={active.publishedAt} />
+              <Cover post={active} />
               <div className="pp-text">
                 <p className="pp-shelf">{categoryLabel(active.category)}</p>
                 <h3>{active.title}</h3>
@@ -59,9 +59,14 @@ export function Portal({ posts }: { posts: Publication[] }) {
                   {active.wordCount ? ` · ${Math.max(1, Math.round(active.wordCount / 230))} min read` : ""}
                   {active.audience === "everyone" ? " · Free" : active.audience ? " · Subscribers" : ""}
                 </p>
-                <span className="link-arrow">Read the report →</span>
+                <span className="link-arrow">Read the report</span>
               </div>
             </a>
+          )}
+          {active?.photo && (
+            <p className="pp-credit">
+              <PhotoCredit photo={active.photo} />
+            </p>
           )}
         </aside>
       </div>

@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
 import { PageBand } from "@/components/page-band";
 import { DISCLAIMER } from "@/lib/model";
-import { getSubstackUrl } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Disclaimer" };
 
 export default async function Disclaimer() {
-  const substackUrl = await getSubstackUrl();
   return (
     <>
-      <PageBand label="Disclaimer" substackUrl={substackUrl} />
+      <PageBand label="Disclaimer" />
       <section className="section">
         <div className="wrap narrow prose">
           <p className="lead">{DISCLAIMER}</p>
