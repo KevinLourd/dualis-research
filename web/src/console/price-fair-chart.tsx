@@ -18,10 +18,10 @@ echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, Mark
  * labelled with the day it was set (gold keeps no earlier values); only reported closes are drawn.
  */
 
-export type FairLine = { value: number; currency: string | null; author: "thierry" | "claude"; since: string | null; claudeValue: number | null };
+export type FairLine = { value: number; currency: string | null; author: "thierry" | "claude"; since: string | null; claudeValue: number | null; low: number | null; high: number | null };
 type Range = "6M" | "1Y" | "5Y";
 const MONTHS: Record<Range, number> = { "6M": 6, "1Y": 12, "5Y": 60 };
-const ZONE = { buy: "rgba(22, 128, 61, 0.06)", sell: "rgba(190, 18, 60, 0.06)" };
+const ZONE = { buy: "rgba(22, 128, 61, 0.06)", sell: "rgba(190, 18, 60, 0.06)", range: "rgba(43, 36, 99, 0.10)" };
 
 const fmtNum = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 });
 const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -57,7 +57,8 @@ export function PriceFairValueChart({
   const ink = dark ? INK.dark : INK.light;
   const text = { fontFamily: FONT, fontSize: 11, color: ink.muted };
   const closes = shown.map((b) => b.close);
-  const levels = [...closes, ...(fair ? [fair.value] : []), ...(fair?.claudeValue ? [fair.claudeValue] : [])];
+  const fvRange = fair && fair.low !== null && fair.high !== null ? { low: fair.low, high: fair.high } : null;
+  const levels = [...closes, ...(fair ? [fair.value] : []), ...(fair?.claudeValue ? [fair.claudeValue] : []), ...(fvRange ? [fvRange.low, fvRange.high] : [])];
   const lo = Math.min(...levels);
   const hi = Math.max(...levels);
   const pad = (hi - lo) * 0.08 || hi * 0.05;
@@ -73,6 +74,13 @@ export function PriceFairValueChart({
           lineStyle: { color: ink.navy, width: 1.5, type: "dashed" },
           label: { show: true, position: "insideEndTop", fontFamily: FONT, fontSize: 10, color: ink.text, formatter: `${fairLabel} ${fmtNum(fair.value)}` },
         },
+        // The fair value range (Kevin 2026-11-06: « montre le range, pas que la FV »): its low and high, dotted.
+        ...(fvRange
+          ? [
+              { yAxis: fvRange.high, lineStyle: { color: ink.navy, width: 1, type: "dotted" }, label: { show: true, position: "insideEndTop", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `High ${fmtNum(fvRange.high)}` } },
+              { yAxis: fvRange.low, lineStyle: { color: ink.navy, width: 1, type: "dotted" }, label: { show: true, position: "insideEndBottom", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `Low ${fmtNum(fvRange.low)}` } },
+            ]
+          : []),
         ...(fair.claudeValue
           ? [{ yAxis: fair.claudeValue, lineStyle: { color: ink.muted, width: 1, type: "dotted" }, label: { show: true, position: "insideEndBottom", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `Claude ${fmtNum(fair.claudeValue)}` } }]
         : []),
@@ -116,6 +124,7 @@ export function PriceFairValueChart({
               data: [
                 [{ yAxis: fair.value, itemStyle: { color: ZONE.sell }, label: { show: true, position: "insideTopLeft", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: "SELL zone" } }, { yAxis: yMax }],
                 [{ yAxis: yMin, itemStyle: { color: ZONE.buy }, label: { show: true, position: "insideBottomLeft", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: "BUY zone" } }, { yAxis: fair.value }],
+                ...(fvRange ? [[{ yAxis: fvRange.low, itemStyle: { color: ZONE.range } }, { yAxis: fvRange.high }]] : []),
               ],
             }
           : undefined,
@@ -144,6 +153,7 @@ export function PriceFairValueChart({
         {fair && gap !== null ? (
           <>
             Last close {fmtNum(last.close)} is {Math.abs(Math.round(gap * 100))}% {gap < 0 ? "below" : "above"} {fair.author === "thierry" ? "your fair value" : "the fair value (Claude)"} of {fmtNum(fair.value)}
+            {fvRange ? ` (range ${fmtNum(fvRange.low)} to ${fmtNum(fvRange.high)})` : ""}
             {fair.since ? `, set ${day(fair.since)}` : ""}: {gap < 0 ? "BUY zone" : "SELL zone"}.
           </>
         ) : (

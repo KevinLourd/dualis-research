@@ -218,6 +218,8 @@ export const priceVsFairValue = cache(async (symbol: string) => {
             author: fair.author,
             since: fair.asOf ? fair.asOf.toISOString().slice(0, 10) : null,
             claudeValue: fair.author === "thierry" ? fair.claudeValue : null,
+            low: fair.low,
+            high: fair.high,
           }
         : null,
   };
