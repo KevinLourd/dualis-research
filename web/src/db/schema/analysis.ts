@@ -13,7 +13,7 @@ import { silver } from "./silver";
 export const DRIVER_CATEGORIES = [
   "Industry & cycle",
   "Business economics",
-  "Expectations",
+  "Consensus expectations",
   "Balance sheet & capital",
   "Management & insiders",
   "Corporate events",
@@ -145,7 +145,7 @@ export type GoldNarrativeRationale = typeof narrativeRationales.$inferSelect;
 
 /**
  * Narrative Driver: a reason the market holds the narrative (below fair value: why it is pessimistic; above: why it is
- * optimistic). Max 3 per ticker, each in ONE Driver Category. id = `<symbol>:<rank>`.
+ * optimistic). 1 to 5 per ticker, each in ONE Driver Category. id = `<symbol>:<rank>`.
  */
 export const narrativeDrivers = gold.table(
   "narrative_drivers",

@@ -79,7 +79,7 @@ export type TickerAnalysis = {
   narrative: { text: string; detail: string | null; asOf: Date } | null;
   /** Narrative Rationale: why the market holds the story, claims with drivers and sources, its own exhibits. */
   rationale: (GoldNarrativeRationale & { exhibits: GoldExhibit[] }) | null;
-  /** Rank order, max 3; each with its Exhibits (chart data inside) and the Evidence judged against it, newest first. */
+  /** Rank order, 1 to 5; each with its Exhibits (chart data inside) and the Evidence judged against it, newest first. */
   drivers: DriverWithExhibits[];
   /** Where the whole narrative stands (ticker-level tag), from its drivers' tags. */
   narrativeState: GoldNarrativeState | null;
