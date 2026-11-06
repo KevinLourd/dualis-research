@@ -17,7 +17,7 @@ export default async function DraftPreviewPage({ params }: { params: Promise<{ i
   return (
     <>
       <KBreadcrumbs>
-        <KBreadcrumbsLink href="/content">Drafts</KBreadcrumbsLink>
+        <KBreadcrumbsLink href="/content/drafts">Drafts</KBreadcrumbsLink>
         <KBreadcrumbsSeparator />
         <KBreadcrumbsCurrent>
           {FORMAT_LABEL[draft.format] ?? draft.format} · {draft.symbol}

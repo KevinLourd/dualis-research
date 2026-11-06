@@ -4,6 +4,9 @@ import * as content from "@/db/schema/content";
 import { runs } from "@/db/schema/ops";
 import type { Db } from "@/db/types";
 import { accountId, rebuildGoldAccounts } from "@/collectors/dimensions/content-accounts";
+import { DRAFT_FORMATS, type DraftFormat } from "@/collectors/dimensions/content-drafts/format";
+import { refreshGoldIdea } from "./ideas";
+import { syncPublishedDraft } from "./published";
 
 /**
  * Thierry's own acts in the console (approve a draft, mark it posted, add an account, paste voice samples) are a manual SOURCE like
@@ -53,6 +56,22 @@ export async function setDraftStatus(
     })
     .where(eq(content.contentDrafts.id, draftId));
   await db.update(content.goldContentDrafts).set({ status, statusAt: now, postedUrl }).where(eq(content.goldContentDrafts.id, draftId));
+  const [updated] = await db.select().from(content.contentDrafts).where(eq(content.contentDrafts.id, draftId));
+  await syncPublishedDraft(db, updated);
+}
+
+/**
+ * Thierry asks for a draft of an Idea on one channel x format (the Create draft button). The request lands in bronze,
+ * then silver (pending), then the Idea's gold row; the content-drafts dimension writes the draft. A second click while
+ * one is pending changes nothing.
+ */
+export async function requestDraft(db: Db, ideaId: string, format: DraftFormat, userId: string | null): Promise<void> {
+  if (!DRAFT_FORMATS.includes(format)) throw new Error(`unknown format ${format}`);
+  const [idea] = await db.select({ id: content.contentIdeas.id }).from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
+  if (!idea) throw new Error(`idea ${ideaId} not found`);
+  const bronzeId = await recordAct(db, `idea:${ideaId}#${format}`, { request: "draft", format }, userId);
+  await db.insert(content.contentDraftRequests).values({ ideaId, format, sources: [CONSOLE_SOURCE], bronzeIds: [bronzeId] }).onConflictDoNothing();
+  await refreshGoldIdea(db, ideaId);
 }
 
 /** Normalizes what Thierry typed into an account URL + handle: a Substack host, an X handle or URL, a LinkedIn URL. */

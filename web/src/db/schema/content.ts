@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { boolean, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { gold } from "./gold";
 import { silver } from "./silver";
@@ -78,6 +79,8 @@ export type DraftInputs = {
   catalyst?: { id: string; direction: string; probability: number; reason: string | null } | null;
   thesis: { id: string; author: string; summary: string } | null;
   driver: { id: string; name: string } | null;
+  /** The Idea the draft tells (drafts made from the Ideas table); null on older, news-made drafts. */
+  idea?: { id: string; title: string; angle: string; sources: IdeaSourceRef[] } | null;
   /** Null until driver data charts exist; the UI says so. */
   chart: { title: string; url: string } | null;
 };
@@ -104,8 +107,10 @@ export const contentDrafts = silver.table(
     id: uuid("id").primaryKey().defaultRandom(),
     generationBronzeId: uuid("generation_bronze_id").notNull(),
     symbol: text("symbol").notNull(),
-    /** Stable key of the inputs (news id, or "thesis" when the draft rests on the thesis alone). */
+    /** Stable key of the inputs (`idea:<id>`, a news id on older drafts). */
     inputKey: text("input_key").notNull(),
+    /** The Idea it tells (silver.content_ideas.id); null on drafts made before Ideas existed. */
+    ideaId: uuid("idea_id"),
     format: contentFormatEnum("format").notNull(),
     /** The account it is written for (its voice); null for drafts written before accounts existed. */
     accountId: text("account_id"),
@@ -233,6 +238,7 @@ export const goldContentDrafts = gold.table(
     id: uuid("id").primaryKey(),
     symbol: text("symbol").notNull(),
     inputKey: text("input_key").notNull(),
+    ideaId: uuid("idea_id"),
     format: text("format").notNull(),
     accountId: text("account_id"),
     accountName: text("account_name"),
@@ -321,3 +327,132 @@ export const contentReplies = silver.table("content_replies", {
   bronzeIds: uuid("bronze_ids").array().notNull(),
   handledAt: timestamp("handled_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Ideas (Kevin 2026-11-06): what Dualis could publish next, proposed once a day by Claude from the analysis objects
+ * (Signal Changes, Evidence, Narrative Drivers, Fair Values, Research Reports) and the publication history, then scored
+ * per channel x format. A draft is made from an Idea on request (the Create draft button).
+ */
+export const IDEA_SOURCE_KINDS = ["signal", "change", "evidence", "driver", "fair-value", "report"] as const;
+export type IdeaSourceKind = (typeof IDEA_SOURCE_KINDS)[number];
+/** What an Idea rests on: `ref` = `<kind>:<id>` as offered to the model, `label` = what it says in words. */
+export type IdeaSourceRef = { kind: IdeaSourceKind; ref: string; symbol: string | null; label: string };
+/** How well an Idea fits one channel x format (0-100), and why. */
+export type IdeaScore = { format: string; score: number; why: string };
+export type DraftRequestStatus = "pending" | "done" | "failed";
+export type IdeaRequest = { id: string; format: string; status: DraftRequestStatus; requestedAt: string; draftId: string | null; error: string | null };
+
+/** One Idea. Natural key: (generation bronze id, rank). */
+export const contentIdeas = silver.table(
+  "content_ideas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    generationBronzeId: uuid("generation_bronze_id").notNull(),
+    rank: integer("rank").notNull(),
+    /** UTC day of the generation (YYYY-MM-DD). */
+    day: text("day").notNull(),
+    /** The ticker it is about; null for an idea across tickers. */
+    symbol: text("symbol"),
+    /** ONE plain sentence: the idea. */
+    title: text("title").notNull(),
+    /** Why it is worth a post now, one or two sentences. */
+    angle: text("angle").notNull(),
+    sourceRefs: jsonb("source_refs").$type<IdeaSourceRef[]>().notNull(),
+    model: text("model").notNull(),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("content_ideas_natural_key").on(t.generationBronzeId, t.rank), index("content_ideas_day").on(t.day)],
+);
+export type SilverContentIdea = typeof contentIdeas.$inferSelect;
+
+/** Score of one Idea on one channel x format. Natural key: (idea, format); made once. */
+export const contentIdeaScores = silver.table(
+  "content_idea_scores",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id").notNull(),
+    format: contentFormatEnum("format").notNull(),
+    score: integer("score").notNull(),
+    why: text("why").notNull(),
+    model: text("model").notNull(),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("content_idea_scores_natural_key").on(t.ideaId, t.format)],
+);
+
+/**
+ * Thierry asks for a draft of an Idea on one channel x format (console button, source `console`). The content-drafts
+ * dimension writes it and marks the request done (or failed, with the reason). One pending request per (idea, format).
+ */
+export const contentDraftRequests = silver.table(
+  "content_draft_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id").notNull(),
+    format: contentFormatEnum("format").notNull(),
+    status: text("status").$type<DraftRequestStatus>().notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    draftId: uuid("draft_id"),
+    error: text("error"),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+  },
+  (t) => [
+    index("content_draft_requests_idea").on(t.ideaId),
+    uniqueIndex("content_draft_requests_one_pending").on(t.ideaId, t.format).where(sql`status = 'pending'`),
+  ],
+);
+export type SilverDraftRequest = typeof contentDraftRequests.$inferSelect;
+
+/** The Ideas table: the last 14 days of Ideas, best score first within a day. Same id as silver. */
+export const goldContentIdeas = gold.table(
+  "content_ideas",
+  {
+    id: uuid("id").primaryKey(),
+    day: text("day").notNull(),
+    rank: integer("rank").notNull(),
+    symbol: text("symbol"),
+    companyName: text("company_name"),
+    title: text("title").notNull(),
+    angle: text("angle").notNull(),
+    sourceRefs: jsonb("source_refs").$type<IdeaSourceRef[]>().notNull(),
+    /** Every channel x format scored, best first. */
+    scores: jsonb("scores").$type<IdeaScore[]>().notNull(),
+    bestFormat: text("best_format"),
+    bestScore: integer("best_score"),
+    /** Draft requests, newest first. */
+    requests: jsonb("requests").$type<IdeaRequest[]>().notNull(),
+    draftCount: integer("draft_count").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    rebuiltAt,
+  },
+  (t) => [index("gold_content_ideas_day").on(t.day)],
+);
+export type GoldContentIdea = typeof goldContentIdeas.$inferSelect;
+
+/**
+ * Publication history of Dualis across channels (one inbox of what went out): Thierry's own Substack posts (feed) and
+ * every draft marked posted (console or WhatsApp). The Ideas read it so they do not repeat a recent post.
+ * id = `post:<silver post id>` or `draft:<draft id>`.
+ */
+export const goldContentPublished = gold.table(
+  "content_published",
+  {
+    id: text("id").primaryKey(),
+    format: text("format").notNull(),
+    title: text("title").notNull(),
+    url: text("url"),
+    tickers: text("tickers").array().notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    /** Where we learned it: "substack" (his feed), "console" / "whatsapp" (marked posted). */
+    source: text("source").notNull(),
+    rebuiltAt,
+  },
+  (t) => [index("gold_content_published_at").on(t.publishedAt)],
+);
+export type GoldContentPublished = typeof goldContentPublished.$inferSelect;
