@@ -75,7 +75,6 @@ function Facts({ row, wide, range }: { row: BoardRow; wide: boolean; range: { lo
             Range {price(range.low)} to {price(range.high)}
           </span>
         )}
-        {row.fairValueLabel && <span className="text-sm text-kumo-subtle">{row.fairValueLabel}</span>}
         {caret}
       </Link>
       <Link href={itemHref(row.symbol, "price")} scroll={false} className={clickable} title="Price history and sources">
