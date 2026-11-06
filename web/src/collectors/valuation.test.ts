@@ -9,7 +9,7 @@ import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { parsePeers, peersDim, readSummary } from "./dimensions/peers";
-import { valuationDim } from "./dimensions/valuation";
+import { valuationDim, valuationFactsHash } from "./dimensions/valuation";
 import { dataAsOf, methodSpec, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
@@ -56,6 +56,30 @@ describe("valuation methods: the arithmetic", () => {
   it("weighted fair value normalises the weights over the methods given", () => {
     const w = weighted([{ method: "ev-ebitda", low: 1, base: 2, high: 3 }, { method: "dcf", low: 3, base: 4, high: 5 }], { "ev-ebitda": 30, dcf: 10 });
     expect(w).toEqual({ low: 1.5, base: 2.5, high: 3.5, weights: { "ev-ebitda": 0.75, dcf: 0.25 } });
+  });
+});
+
+describe("input hash: a price tick does not re-ask the methods", () => {
+  const withMarket = (peerEv: number, targetMean: number): ValuationFacts => ({
+    ...facts(),
+    peers: [
+      { symbol: "B", name: "B", currency: "USD", evEbitda: peerEv * 1.2, pe: 14, sources: ["yahoo"] },
+      { symbol: "A", name: "A", currency: "USD", evEbitda: peerEv, pe: 12, sources: ["yahoo"] },
+    ],
+    targets: { low: targetMean * 0.8, mean: targetMean, high: targetMean * 1.2, analysts: 3, currency: "USD", sources: ["yahoo"] },
+  });
+  it("same hash when peers' multiples and targets drift a few percent, or their sources and order change", () => {
+    const a = withMarket(8, 12);
+    const b = withMarket(8.1, 12.1);
+    b.peers = [...b.peers].reverse().map((p) => ({ ...p, sources: ["yahoo", "other"] }));
+    expect(valuationFactsHash(b, 3, "ctx")).toBe(valuationFactsHash(a, 3, "ctx"));
+  });
+  it("new hash when a peer multiple moves a whole step, or a reported figure changes", () => {
+    const a = withMarket(8, 12);
+    expect(valuationFactsHash(withMarket(12, 12), 3, "ctx")).not.toBe(valuationFactsHash(a, 3, "ctx"));
+    const c = withMarket(8, 12);
+    c.inputs = { ...c.inputs, ebitda: { ...c.inputs.ebitda!, value: 301 } };
+    expect(valuationFactsHash(c, 3, "ctx")).not.toBe(valuationFactsHash(a, 3, "ctx"));
   });
 });
 
