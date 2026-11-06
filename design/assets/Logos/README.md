@@ -1,6 +1,6 @@
 # Logos
 
-The Dualis mark (Kevin 2026-11-06, option C "split seal", replaces the 2026-11-05 split D): **a square frame cut on the diagonal, one half filled, the D in the open half**. Two sides of one name: long and short, price and value. Wordmark: DUALIS / RESEARCH in wide-tracked IBM Plex Sans caps. Interim: Thierry finds it a bit generic and wants something as unique as Citrini's mark; new directions are being explored.
+The Dualis mark (Kevin 2026-11-06, "try 2 for now": round 2 option 02 "Guilloche"): **a Roman D inside a banknote rosette, two families of waves crossing around it**. Money's own craft (banknote guilloche) around the letter of both sides. Two versions drawn as a pair: `dualis-seal.svg` (detailed: chart watermarks, large uses) and `dualis-mark.svg` (simplified: header, footer, covers, 16 px icons). How we got there: `proposals/process.md` (studio method, competitor audit, 2 rounds), `proposals/round-2.png`. Charts carry the seal as a faint watermark, like Citrini (`site` dark charts, console exhibits).
 
 - `dualis-mark.svg`: master, `brand` indigo `#2B2463`, 256 grid.
 - `dualis-mark-black.svg`, `-white.svg` (on indigo or dark), `-square.svg`, PNGs at 1024.

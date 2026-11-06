@@ -8,6 +8,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import { useMemo, useState } from "react";
 import { FONT, INK, SOURCE_LABEL } from "./driver-chart";
 import { monthYear } from "./exhibit-format";
+import { ChartWatermark } from "./chart-watermark";
 import { usePageDark } from "./use-page-dark";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, AriaComponent, CanvasRenderer]);
@@ -146,8 +147,9 @@ export function PriceFairValueChart({
         </span>
         <Tabs variant="segmented" size="sm" value={range} onValueChange={(v) => setRange(v as Range)} tabs={ranges.map((r) => ({ value: r, label: r }))} />
       </figcaption>
-      <div className="border-t border-kumo-line pt-1">
+      <div className="relative border-t border-kumo-line pt-1">
         <Chart echarts={echarts} options={options as never} height={240} isDarkMode={dark} />
+        <ChartWatermark dark={dark} />
       </div>
       <p className="text-[12px] text-kumo-default">
         {fair && gap !== null ? (
