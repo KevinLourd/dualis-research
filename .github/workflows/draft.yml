@@ -32,6 +32,15 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: ffmpeg
-        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
+      # ffmpeg for the card video: a static build from GitHub, cached (apt-get on the runner hung 15+ min, 2026-11-06).
+      - name: Restore ffmpeg
+        id: ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ~/ffmpeg
+          key: ffmpeg-btbn-n8.1
+      - name: Download ffmpeg
+        if: steps.ffmpeg.outputs.cache-hit != 'true'
+        run: mkdir -p ~/ffmpeg && curl -fsSL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz | tar -xJ -C ~/ffmpeg --strip-components=1
+      - run: echo "FFMPEG_PATH=$HOME/ffmpeg/bin/ffmpeg" >> "$GITHUB_ENV" && ~/ffmpeg/bin/ffmpeg -version | head -1
       - run: pnpm collect content-drafts,content-visuals
