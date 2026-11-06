@@ -1,11 +1,8 @@
-import { SealWatermark } from "./mark";
-
 /** Price follows the narrative; value follows the business. The gap is the trade (Thierry's method, 2026-11-04). */
 export function NarrativeFigure() {
   return (
     <svg className="figure-narrative" viewBox="0 0 520 380" role="img" aria-label="Market price swinging around fundamental value">
       <rect width="520" height="380" className="fn-bg" />
-      <SealWatermark w={520} h={380} />
       {[80, 150, 220, 290].map((y) => (
         <line key={y} x1="40" x2="490" y1={y} y2={y} className="fn-grid" />
       ))}
