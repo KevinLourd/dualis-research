@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { evidence, exhibits, fairValues, narrativeDrivers, narrativeRationales, narratives, narrativeStates, researchReports, signalChanges, signals } from "@/db/schema/analysis";
+import { evidence, exhibits, fairValues, narrativeDrivers, narrativeRationales, narratives, narrativeStates, researchReports, signalChanges, signals, signalStates } from "@/db/schema/analysis";
 import { goldFinancialLines, financialMetrics } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import { theses } from "@/db/schema/thesis";
@@ -32,9 +32,11 @@ const ANSWER = {
 
 let calls: string[] = [];
 const fake: Complete = async ({ prompt, system }) => {
-  if (system.includes("short research update notes")) {
+  if (system.includes("one-line signal notes")) {
     calls.push("note");
-    return { text: "Worldex moved to BUY: a buyback inflects the narrative.", model: "fake" };
+    expect(prompt).toContain("ONE short sentence");
+    expect(prompt).not.toMatch(/Fair value \d/);
+    return { text: prompt.includes("to BUY (weak inflection)") ? "BUY: a buyback trust turns the cash story." : "Signal moved.", model: "fake" };
   }
   if (system.includes("equity research reports")) {
     calls.push("report");
@@ -149,7 +151,17 @@ describe("analysis dimension", () => {
     expect(s).toMatchObject({ signal: "BUY", strength: "weak", fairValue: 40000, quote: 30000, evidenceIds: [e.id] });
     expect(s.gapPct).toBeCloseTo(-0.25, 6);
     const [change] = await db.select().from(signalChanges);
-    expect(change).toMatchObject({ symbol: SYMBOL, fromSignal: "none", toSignal: "BUY", toStrength: "weak", updateNote: expect.stringContaining("BUY") });
+    expect(change).toMatchObject({ symbol: SYMBOL, fromSignal: "none", toSignal: "BUY", toStrength: "weak", updateNote: "BUY: a buyback trust turns the cash story." });
+
+    // A note written by an older prompt is written again once.
+    await db.update(signalStates).set({ updateNote: "A long paragraph of fair value arithmetic.", noteVersion: null }).where(eq(signalStates.baseline, 0));
+    calls = [];
+    await runDimension(db, signalsDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual(["note"]);
+    expect((await db.select().from(signalChanges))[0].updateNote).toBe("BUY: a buyback trust turns the cash story.");
+    calls = [];
+    await runDimension(db, signalsDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual([]);
   });
 
   it("asks for drivers that SUPPORT the narrative, never one against it", () => {

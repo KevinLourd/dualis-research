@@ -8,7 +8,10 @@ import type { GoldConsensus } from "@/db/schema/consensus";
 import { type DriverWithExhibits, getTickerAnalysis } from "./analysis-queries";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
-import { CallBadge, FairValue, QuoteGap, StrengthBadge } from "./board";
+import { CallBadge, FairValue, QuoteGap, StrengthBadge, TickerTag } from "./board";
+import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "./kumo";
+import { RowLink } from "./row-link";
+import { signalWordsOf } from "./signal-history";
 import { ExhibitChart } from "./driver-chart";
 import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
@@ -59,7 +62,7 @@ function Facts({ row, wide }: { row: BoardRow; wide: boolean }) {
       </div>
       <div className={cell}>
         <span className="text-sm text-kumo-subtle">Strength</span>
-        <span><StrengthBadge strength={row.strength} /></span>
+        <span><TickerTag row={row} /></span>
       </div>
       {/* The number only: how it was computed opens in its own panel (Kevin 2026-11-05). */}
       <Link href={itemHref(row.symbol, "fair-value")} scroll={false} className={clickable} title="How the fair value was computed">
@@ -80,7 +83,7 @@ function Facts({ row, wide }: { row: BoardRow; wide: boolean }) {
 const METRIC: Record<string, string> = { revenue: "Revenue", ebitda: "EBITDA", "operating-income": "Operating income", "net-income": "Net income", eps: "EPS" };
 export const metricLabel = (m: string) => METRIC[m] ?? m;
 
-/** The latest period with a consensus per metric: mean vs actual, a click opens every period. */
+/** KPIs vs consensus (Analysis page only): the latest period with a consensus per metric, one table row each; a row opens every period. */
 function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
   const latest = new Map<string, GoldConsensus>();
   for (const r of rows) if (r.mean !== null && !latest.has(r.metric)) latest.set(r.metric, r);
@@ -88,28 +91,67 @@ function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
   const fmt = (metric: string, v: number | null) =>
     v === null ? "–" : metric === "eps" ? v.toFixed(2) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
   return (
-    <ul className="flex flex-col divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
-      {[...latest.values()].map((r) => {
-        const vs = r.actual !== null && r.mean ? (r.actual - r.mean) / Math.abs(r.mean) : null;
-        return (
-          <li key={r.metric}>
-            <Link href={itemHref(symbol, `kpi:${r.metric}`)} scroll={false} className="flex items-baseline justify-between gap-4 px-4 py-3 transition-colors hover:bg-kumo-tint">
-              <span className="flex flex-col">
-                <span className="text-base font-medium text-kumo-strong">{metricLabel(r.metric)}</span>
-                <span className="text-sm text-kumo-subtle">
-                  {r.periodType === "year" ? "Fiscal year" : "Quarter"} ending {r.periodEnd}
-                </span>
-              </span>
-              <span className="flex items-baseline gap-4 font-mono text-sm tabular">
-                <span className="text-kumo-subtle">Consensus {fmt(r.metric, r.mean)}</span>
-                <span className="text-kumo-strong">Actual {fmt(r.metric, r.actual)}</span>
-                {vs !== null && <span className={vs >= 0 ? "text-dualis-long" : "text-dualis-short"}>{`${vs >= 0 ? "+" : "-"}${Math.abs(vs * 100).toFixed(1)}%`}</span>}
-              </span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="rounded-lg ring-1 ring-kumo-hairline">
+      <KTable>
+        <KTableHeader>
+          <KTableRow>
+            <KTableHead className="pl-4">Metric</KTableHead>
+            <KTableHead>Period</KTableHead>
+            <KTableHead className="text-right">Consensus</KTableHead>
+            <KTableHead className="text-right">Actual</KTableHead>
+            <KTableHead className="text-right">vs consensus</KTableHead>
+            <KTableHead className="w-10 pr-4" />
+          </KTableRow>
+        </KTableHeader>
+        <KTableBody>
+          {[...latest.values()].map((r) => {
+            const vs = r.actual !== null && r.mean ? (r.actual - r.mean) / Math.abs(r.mean) : null;
+            return (
+              <RowLink key={r.metric} href={itemHref(symbol, `kpi:${r.metric}`)} label={`Open ${metricLabel(r.metric)} vs consensus`}>
+                <KTableCell className="py-3 pl-4 font-medium text-kumo-strong">{metricLabel(r.metric)}</KTableCell>
+                <KTableCell className="py-3 whitespace-nowrap text-kumo-subtle">{`${r.periodType === "year" ? "FY" : "Q"} ${r.periodEnd}`}</KTableCell>
+                <KTableCell className="py-3 text-right font-mono tabular">{fmt(r.metric, r.mean)}</KTableCell>
+                <KTableCell className="py-3 text-right font-mono tabular text-kumo-strong">{fmt(r.metric, r.actual)}</KTableCell>
+                <KTableCell className={`py-3 text-right font-mono tabular ${vs === null ? "text-kumo-subtle" : vs >= 0 ? "text-dualis-long" : "text-dualis-short"}`}>
+                  {vs === null ? "Not reported yet" : `${vs >= 0 ? "+" : "-"}${Math.abs(vs * 100).toFixed(1)}%`}
+                </KTableCell>
+                <KTableCell className="py-3 pr-4 text-right">
+                  <CaretRightIcon size={16} weight="bold" aria-hidden className="text-kumo-subtle" />
+                </KTableCell>
+              </RowLink>
+            );
+          })}
+        </KTableBody>
+      </KTable>
+    </div>
+  );
+}
+
+/** Signal history (Analysis page only): every change after the baseline, newest first, with its one-line note. */
+function SignalHistory({ changes }: { changes: Analysis["objects"]["signalChanges"] }) {
+  return (
+    <div className="rounded-lg ring-1 ring-kumo-hairline">
+      <KTable>
+        <KTableHeader>
+          <KTableRow>
+            <KTableHead className="w-32 pl-4">Date</KTableHead>
+            <KTableHead className="w-80">Signal</KTableHead>
+            <KTableHead className="pr-4">Why</KTableHead>
+          </KTableRow>
+        </KTableHeader>
+        <KTableBody>
+          {changes.map((c) => (
+            <KTableRow key={c.id}>
+              <KTableCell className="py-3 pl-4 align-top whitespace-nowrap tabular text-kumo-subtle" title={utc(c.at)}>{day(c.at.toISOString().slice(0, 10))}</KTableCell>
+              <KTableCell className="py-3 align-top text-kumo-default">
+                {signalWordsOf(c.fromSignal, c.fromStrength)} <span className="text-kumo-subtle">→</span> <span className="font-medium text-kumo-strong">{signalWordsOf(c.toSignal, c.toStrength)}</span>
+              </KTableCell>
+              <KTableCell className="py-3 pr-4 align-top text-kumo-strong">{c.updateNote ?? "–"}</KTableCell>
+            </KTableRow>
+          ))}
+        </KTableBody>
+      </KTable>
+    </div>
   );
 }
 
@@ -199,7 +241,6 @@ function Drivers({ symbol, drivers, gapPct }: { symbol: string; drivers: DriverW
 export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
   const { row, data, why, consensus, objects, chart } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
-  const lastChange = objects.signalChanges[0];
   const { thesis, latest, state, evidence } = why;
   const symbol = row.symbol;
   // Thierry's own words win; else the analysis' narrative; else the first thesis draft.
@@ -216,15 +257,6 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
         </Link>
       )}
       <Facts row={row} wide={variant === "page"} />
-
-      {lastChange?.updateNote && (
-        <Section title="What changed">
-          <p className="max-w-prose text-lg leading-relaxed text-kumo-strong">{lastChange.updateNote}</p>
-          <time dateTime={lastChange.at.toISOString()} title={utc(lastChange.at)} className="text-sm text-kumo-subtle">
-            {relativeTime(lastChange.at)}
-          </time>
-        </Section>
-      )}
 
       {chart.bars.length > 0 && (
         <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} />
@@ -288,12 +320,16 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
         </Section>
       )}
 
-      <Section title="KPIs vs consensus">
-        <Kpis symbol={symbol} rows={consensus} />
-      </Section>
-
       {variant === "page" && (
         <>
+          <Section title="KPIs vs consensus">
+            <Kpis symbol={symbol} rows={consensus} />
+          </Section>
+          {objects.signalChanges.length > 0 && (
+            <Section title="Signal history">
+              <SignalHistory changes={objects.signalChanges} />
+            </Section>
+          )}
           {objects.drivers.length > 0 && objects.evidence.length > 0 && (
             <Section title={`News · ${objects.evidence.length}`}>
               <NewsTable rows={newsRows(symbol, objects)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} gapPct={gapPct} />

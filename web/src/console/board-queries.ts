@@ -33,6 +33,10 @@ export type BoardRow = {
   gap: { pct: number; side: "below" | "above" } | null;
   call: SignalCall | null;
   strength: SignalStrength;
+  /** The ticker's tag as shown (Kevin 2026-11-06: "Weak inflection", never a bare "Weak"): the signal's reversal, else the narrative's own tag. */
+  tag: { effect: string; strength: string } | null;
+  /** quote / fair value - 1 (negative = below), the side a reversal reads on (Inflection below, Crack above). */
+  gapPct: number | null;
   since: Date | null;
 };
 
@@ -50,11 +54,13 @@ async function readBoard(symbol?: string): Promise<BoardRow[]> {
       quoteCurrency: quotes.currency,
       quoteDate: quotes.date,
       signal: signals,
+      state: { effect: narrativeStates.effect, strength: narrativeStates.strength },
     })
     .from(tickers)
     .leftJoin(companyProfiles, eq(companyProfiles.symbol, tickers.symbol))
     .leftJoin(quotes, eq(quotes.symbol, tickers.symbol))
     .leftJoin(signals, eq(signals.symbol, tickers.symbol))
+    .leftJoin(narrativeStates, and(eq(narrativeStates.symbol, tickers.symbol), eq(narrativeStates.level, "ticker")))
     .where(symbol ? eq(tickers.symbol, symbol) : undefined)
     .orderBy(asc(tickers.symbol));
   return rows.map((r) => {
@@ -78,6 +84,8 @@ async function readBoard(symbol?: string): Promise<BoardRow[]> {
       gap: s?.gapPct === null || s?.gapPct === undefined ? null : { pct: Math.abs(s.gapPct), side: s.gapPct < 0 ? "below" : "above" },
       call: s && s.signal !== "none" ? s.signal : null,
       strength: s?.strength ?? "noise",
+      tag: s && s.signal !== "none" ? { effect: "reversal", strength: s.strength } : (r.state?.effect ? { effect: r.state.effect, strength: r.state.strength! } : null),
+      gapPct: s?.gapPct ?? null,
       since: s?.since ?? null,
     };
   });

@@ -6,6 +6,7 @@ import type { BoardRow } from "./board-queries";
 import { price } from "./format";
 import { CompanyLogo } from "./market";
 import { RowLink } from "./row-link";
+import { TagBadge } from "./tag-badge";
 
 /** Level A pieces (server components): the call, the strength, the quote against the fair value, the Signals table. */
 
@@ -25,6 +26,11 @@ export function StrengthBadge({ strength }: { strength: SignalStrength }) {
       {STRENGTH_WORD[strength]}
     </Badge>
   );
+}
+
+/** The ticker's tag in words ("Weak inflection", "Strong crack"); a ticker not tagged yet reads by its strength. */
+export function TickerTag({ row }: { row: Pick<BoardRow, "tag" | "strength" | "gapPct"> }) {
+  return row.tag ? <TagBadge effect={row.tag.effect} strength={row.tag.strength} gapPct={row.gapPct} /> : <StrengthBadge strength={row.strength} />;
 }
 
 /** The last close, and how far it sits from the fair value. */
@@ -89,7 +95,7 @@ export function SignalTable({ rows, panelHref }: { rows: BoardRow[]; panelHref: 
                 <QuoteGap row={r} />
               </KTableCell>
               <KTableCell className="py-4 pl-10 pr-6">
-                <StrengthBadge strength={r.strength} />
+                <TickerTag row={r} />
               </KTableCell>
             </RowLink>
           ))}
