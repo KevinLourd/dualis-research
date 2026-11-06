@@ -1,3 +1,4 @@
+import { type OutreachStatus, outreachStatusValues } from "@/db/schema/growth";
 /** One drafted message in data/outreach/*.md. */
 export type OutreachDraft = {
   handle: string;
@@ -77,6 +78,20 @@ export function parseTargetContacts(text: string): Map<string, { label: string; 
     out.set(handle, contacts);
   }
   return out;
+}
+
+/** data/growth/outreach-log.json: what Thierry said he did with which authors (fails loud on a bad entry). */
+export function parseOutreachLog(payload: unknown): { at: Date; status: OutreachStatus; handles: string[] }[] {
+  if (!Array.isArray(payload)) throw new Error("outreach log is not a list");
+  return payload.map((e: { at?: unknown; status?: unknown; handles?: unknown }) => {
+    const at = typeof e.at === "string" ? new Date(e.at) : null;
+    if (!at || Number.isNaN(at.getTime())) throw new Error(`outreach log entry has no valid "at": ${JSON.stringify(e)}`);
+    if (!outreachStatusValues.includes(e.status as OutreachStatus)) throw new Error(`outreach log entry has an unknown status: ${JSON.stringify(e)}`);
+    if (!Array.isArray(e.handles) || e.handles.length === 0 || !e.handles.every((h) => typeof h === "string" && h)) {
+      throw new Error(`outreach log entry has no handles: ${JSON.stringify(e)}`);
+    }
+    return { at, status: e.status as OutreachStatus, handles: e.handles as string[] };
+  });
 }
 
 /** Kevin's readings of Thierry's count on the Substack dashboard. */

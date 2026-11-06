@@ -9,7 +9,7 @@ import { recordOutreachEdit } from "@/growth/manual";
 import { fixturePrivateFiles, testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { growthOutreach } from ".";
-import { parseOutreachMarkdown } from "./parse";
+import { parseOutreachLog, parseOutreachMarkdown } from "./parse";
 
 const privateFile = (path: string) => fixturePrivateFiles()[path];
 
@@ -42,7 +42,13 @@ describe("growth-outreach dimension", () => {
     let gold = await db.select().from(growth.goldGrowthOutreach);
     // One row per author across every outreach file in data/outreach (new batches add files).
     expect(gold.map((g) => g.handle).sort()).toEqual(["annexample", "quickvalue", "roadwriter"]);
-    expect(gold.every((g) => g.status === "draft" && g.bodySource === "claude-draft")).toBe(true);
+    expect(gold.every((g) => g.bodySource === "claude-draft")).toBe(true);
+    // What Thierry said he sent (data/growth/outreach-log.json): each handle keeps its latest entry.
+    expect(Object.fromEntries(gold.map((g) => [g.handle, [g.status, g.statusAt?.toISOString() ?? null]]))).toEqual({
+      annexample: ["sent", "2026-11-05T14:09:00.000Z"],
+      quickvalue: ["draft", null],
+      roadwriter: ["dropped", "2026-11-06T05:00:00.000Z"],
+    });
 
     await recordOutreachEdit(db, "quickvalue", { body: "Hi, my own words.", userId: "user_1" });
     await recordOutreachEdit(db, "quickvalue", { status: "sent", userId: "user_1" });
@@ -61,7 +67,7 @@ describe("growth-outreach dimension", () => {
       { label: "Substack DM", href: "https://substack.com/@annexample" },
       { label: "ann@example.com", href: "mailto:ann@example.com" },
     ]);
-    expect(ann.sources).toEqual(["claude-draft", "targets-doc"]);
+    expect(ann.sources).toEqual(["claude-draft", "outreach-log", "targets-doc"]);
     const road = gold.find((g) => g.handle === "roadwriter")!;
     expect(road.contacts.map((c) => c.label)).toEqual(["Substack DM", "X @roadwriterx"]);
     // Kevin's dashboard reading is the 2026-11-04 count.
@@ -73,6 +79,20 @@ describe("growth-outreach dimension", () => {
     await db.delete(privateFiles).where(eq(privateFiles.path, "docs/acquisition-targets.md"));
     const report = await runDimension(db, growthOutreach, { trigger: "test", ctx: { env: {}, fetch } });
     expect(JSON.stringify(report)).toContain("docs/acquisition-targets.md is not in app.private_files");
+  });
+
+  it("marks an author whose publication recommends Analysis Paralysis, from the Substack crawl's edges", async () => {
+    const seen = new Date("2026-11-06T04:00:00Z");
+    await db.insert(growth.substackPublications).values({ id: "111", name: "Example Stocks", host: "example.substack.com", authorHandle: "annexample", reachedFrom: [], sources: [], bronzeIds: [] });
+    await db.insert(growth.substackRecommendations).values({ fromId: "111", toId: "5953722", sources: ["substack-recommendations"], bronzeIds: [], firstSeenAt: seen });
+    await runDimension(db, growthOutreach, { trigger: "test", ctx: { env: {}, fetch } });
+    const gold = await db.select().from(growth.goldGrowthOutreach);
+    expect(gold.filter((g) => g.recommendsUsSince).map((g) => [g.handle, g.recommendsUsSince!.toISOString()])).toEqual([["annexample", seen.toISOString()]]);
+  });
+
+  it("fails loud on a bad outreach log entry", () => {
+    expect(() => parseOutreachLog([{ at: "2026-11-05", status: "ghosted", handles: ["x"] }])).toThrow(/unknown status/);
+    expect(() => parseOutreachLog([{ at: "nope", status: "sent", handles: ["x"] }])).toThrow(/valid "at"/);
   });
 
   it("refuses an unknown status", async () => {
