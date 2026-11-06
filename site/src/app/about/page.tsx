@@ -21,8 +21,8 @@ export default async function About() {
           </div>
           <div className="person-text">
             <h2>Thierry Matin</h2>
-            <p className="role">Founder, Lead Research Analyst</p>
-            <p>Thierry founded Dualis Research and runs Duality Asset Management, a global long/short equity fund that invests only its own capital, with a focus on smaller companies.</p>
+            <p className="role">Founder and Lead Analyst</p>
+            <p>Thierry is the founder and lead analyst of Dualis Research. He covers smaller listed companies, long and short, across Asia, North America and Europe.</p>
             <p>His work starts where attention is scarce: under-covered markets, small caps, and turnarounds investors have given up on. He reads the narrative the market is paying for against what the business is worth, and acts when the two disagree.</p>
             <Career />
             <p className="person-links">

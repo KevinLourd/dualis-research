@@ -25,7 +25,7 @@ export function formatMonth(iso: string | null): string | null {
 }
 
 /**
- * The fund's year-to-date performance, as Thierry PUBLISHED it ("Up 45%+ YTD vs 11.5% for the S&P500", Analysis
+ * The portfolio's year-to-date performance, as Thierry PUBLISHED it ("Up 45%+ YTD vs 11.5% for the S&P500", Analysis
  * Paralysis, 2026-10-16). Replace with the brokerage statement figure when he shares it.
  */
 export const TRACK_RECORD = {
@@ -34,7 +34,7 @@ export const TRACK_RECORD = {
   benchmarkPct: 11.5,
   asOf: "2026-10-16",
   sourceUrl: "https://analysisparalysis888.substack.com/p/up-45-ytd-vs-115-for-the-s-and-p500",
-  note: "Duality Asset Management portfolio, year to date as of October 16, 2026, as published by Thierry Matin. Gross of fees, not audited. Past performance does not guarantee future results.",
+  note: "Portfolio return year to date as of October 16, 2026, as published by Thierry Matin. Gross of fees, not audited. Past performance does not guarantee future results.",
 } as const;
 
 /** Markets the coverage universe spans (the console collects filings and prices for each). */
@@ -44,7 +44,7 @@ export const MARKETS = ["Japan", "Korea", "Hong Kong", "Kazakhstan", "Canada", "
 export const SUBSTACK_PROFILE_URL = "https://substack.com/@analysisparalysis888";
 
 export const LINKEDIN_URL = "https://www.linkedin.com/in/thierrymatin/";
-/** Thierry's X account (WhatsApp 2026-11-04). The fund itself has no social accounts. */
+/** Thierry's X account (WhatsApp 2026-11-04). */
 export const X_URL = "https://x.com/quantum_macro";
 export const X_HANDLE = "@quantum_macro";
 

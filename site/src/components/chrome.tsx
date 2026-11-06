@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BRAND, DISCLAIMER } from "@/lib/model";
+import { BRAND, DISCLAIMER, subscribeHref } from "@/lib/model";
 import { Mark } from "./mark";
 import { Social } from "./social";
 import { SubscribeButton } from "./subscribe-button";
@@ -44,6 +44,7 @@ export function Header({ substackUrl }: { substackUrl: string | null }) {
 }
 
 export function Footer({ substackUrl }: { substackUrl: string | null }) {
+  const subscribe = subscribeHref(substackUrl);
   return (
     <footer className="site-footer">
       <div className="wrap">
@@ -61,9 +62,25 @@ export function Footer({ substackUrl }: { substackUrl: string | null }) {
             <li>
               <Link href="/subscribe">Plans</Link>
             </li>
+            <li>
+              <Link href="/terms">Terms of Use</Link>
+            </li>
+            <li>
+              <Link href="/privacy">Privacy Policy</Link>
+            </li>
           </ul>
-          <span>© 2026 {BRAND}. All rights reserved.</span>
+          {subscribe && (
+            // A plain GET form: Substack's subscribe page opens with the address filled in. Nothing is stored here.
+            <form className="footer-signup" action={subscribe} method="get" target="_blank">
+              <label htmlFor="footer-email">Get every report by email</label>
+              <div className="fs-row">
+                <input id="footer-email" type="email" name="email" placeholder="you@example.com" required autoComplete="email" />
+                <button type="submit">Subscribe</button>
+              </div>
+            </form>
+          )}
         </div>
+        <p className="footer-legal">© 2026 {BRAND}. All rights reserved.</p>
         <p className="footer-legal">{DISCLAIMER}</p>
       </div>
     </footer>
