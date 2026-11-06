@@ -1,6 +1,6 @@
 name: Draft
 
-# Writes the drafts Thierry asked for on the Ideas table (Create draft), started by the console right after his click
+# Writes the drafts Thierry asked for on the Ideas table (Create draft) and their visuals, started by the console right after his click
 # (DRAFT_DISPATCH_TOKEN on the Worker). Its own concurrency group: never queued behind a long collect.
 on:
   workflow_dispatch:
@@ -11,7 +11,8 @@ concurrency:
 
 jobs:
   draft:
-    runs-on: ubuntu-latest
+    # 24.04: Chrome is on the image (the news capture uses it), ffmpeg is added below (the card video).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
@@ -31,4 +32,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm collect content-drafts
+      - name: ffmpeg
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
+      - run: pnpm collect content-drafts,content-visuals

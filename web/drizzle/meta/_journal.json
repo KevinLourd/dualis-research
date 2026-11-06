@@ -239,6 +239,13 @@
       "when": 1793964518969,
       "tag": "0033_content-ideas",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793967385988,
+      "tag": "0034_content-visuals",
+      "breakpoints": true
     }
   ]
 }

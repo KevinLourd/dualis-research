@@ -1,7 +1,7 @@
 import { NotePencilIcon } from "@phosphor-icons/react/ssr";
 import { FORMAT_LABEL } from "@/collectors/dimensions/content-drafts/format";
 import { Chip } from "@/console/chip";
-import { getDraft, listDrafts, listIdeas } from "@/console/content-queries";
+import { getDraft, listDrafts, listIdeas, listVisuals } from "@/console/content-queries";
 import { DraftPanel, StatusBadge } from "@/console/draft-panel";
 import { relativeTime } from "@/console/format";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
@@ -34,6 +34,7 @@ export default async function DraftsPage({ searchParams }: { searchParams: Promi
   const { draft: draftId, ...filters } = await searchParams;
   const status = filters.status ?? "all";
   const [all, ideas, selected] = await Promise.all([listDrafts(), listIdeas(), draftId ? getDraft(draftId) : null]);
+  const visuals = selected?.ideaId ? await listVisuals(selected.ideaId) : [];
   const ideaTitle = new Map(ideas.map((i) => [i.id, i.title]));
   const scoped = all.filter((d) => (!filters.ticker || d.symbol === filters.ticker) && (!filters.idea || d.ideaId === filters.idea));
   const rows = scoped.filter((d) => status === "all" || d.status === status);
@@ -119,7 +120,7 @@ export default async function DraftsPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      {selected && <DraftPanel draft={selected} closeHref={close} />}
+      {selected && <DraftPanel draft={selected} closeHref={close} visuals={visuals} />}
     </>
   );
 }

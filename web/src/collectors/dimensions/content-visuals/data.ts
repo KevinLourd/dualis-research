@@ -1,0 +1,45 @@
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { evidence, fairValues } from "@/db/schema/analysis";
+import * as content from "@/db/schema/content";
+import { companyProfiles, priceBars } from "@/db/schema/gold";
+import type { Db } from "@/db/types";
+
+/** What the visuals of one Idea are drawn from, read from gold when they are made. */
+export type VisualInput = {
+  symbol: string;
+  companyName: string | null;
+  /** The Idea in one sentence: the card's headline. */
+  title: string;
+  /** Closes of the last 12 months, oldest first. */
+  bars: { date: string; close: number }[];
+  priceSources: string[];
+  fair: { value: number; currency: string | null; low: number | null; high: number | null } | null;
+  /** The first news the Idea cites that has a link: what a capture shows. */
+  newsUrl: string | null;
+};
+
+const PRICE_SOURCE_LABEL: Record<string, string> = { yahoo: "Yahoo Finance", nasdaq: "Nasdaq", cnbc: "CNBC", naver: "Naver Finance" };
+/** A chart needs this many closes to say anything. */
+export const MIN_BARS = 20;
+
+export async function visualInput(db: Db, idea: content.SilverContentIdea, now = new Date()): Promise<VisualInput> {
+  const symbol = idea.symbol ?? idea.sourceRefs.find((r) => r.symbol)?.symbol ?? "";
+  const since = new Date(now.getTime() - 365 * 86400_000).toISOString().slice(0, 10);
+  const evidenceIds = idea.sourceRefs.filter((r) => r.kind === "evidence").map((r) => r.ref.slice("evidence:".length));
+  const [[profile], bars, [fair], items] = await Promise.all([
+    db.select({ name: companyProfiles.name }).from(companyProfiles).where(eq(companyProfiles.symbol, symbol)),
+    db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(and(eq(priceBars.symbol, symbol), gte(priceBars.date, since))).orderBy(asc(priceBars.date)),
+    db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
+    evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
+  ]);
+  const newsUrl = evidenceIds.map((id) => items.find((e) => e.id === id)?.url).find((u): u is string => !!u) ?? null;
+  return {
+    symbol,
+    companyName: profile?.name ?? null,
+    title: idea.title,
+    bars: bars.map((b) => ({ date: b.date, close: b.close })),
+    priceSources: [...new Set(bars.flatMap((b) => b.sources))].map((s) => PRICE_SOURCE_LABEL[s] ?? s),
+    fair: fair ? { value: fair.value, currency: fair.currency, low: fair.low, high: fair.high } : null,
+    newsUrl,
+  };
+}
