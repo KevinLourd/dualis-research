@@ -19,7 +19,7 @@ export default function Home() {
           <br />
           for buy-side opportunities
         </h1>
-        <p className="hero-sub">Written for investors, never for the companies we cover.</p>
+        <p className="hero-sub">Long and short ideas in small and mid caps.</p>
         <Link href="/research" className="hero-link">
           Read the research
         </Link>
