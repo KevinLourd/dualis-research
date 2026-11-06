@@ -13,13 +13,13 @@ export default function Home() {
       </video>
       <div className="hero-veil" />
       <div className="wrap hero-inner">
+        {/* Thierry 2026-11-06: buy-side, on the investor's side, unlike sell-side analysts paid by the companies. */}
         <h1>
           Independent research
           <br />
-          on the small caps
-          <br />
-          the market gets wrong
+          for buy-side opportunities
         </h1>
+        <p className="hero-sub">Written for investors, never for the companies we cover.</p>
         <Link href="/research" className="hero-link">
           Read the research
         </Link>
