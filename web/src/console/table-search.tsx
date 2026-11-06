@@ -9,13 +9,16 @@ import { queryWords, rowMatches } from "./search-match";
  * A search box over every table inside it (Kevin 2026-11-06: « in each tab add a search bar »). Filtering runs in the
  * browser on the rows already on screen (no server render per keystroke: Workers CPU rule), so any server-rendered
  * table works without change. The query sits in `?q=` (history only, no navigation) so a search is a link, and it stays
- * when a tab below changes the table (the box lives above the tabs, new rows are filtered as they arrive).
+ * when a tab changes the table (new rows are filtered as they arrive). With `tabs`, the box sits IN the tab row, on its
+ * right (Kevin 2026-11-06: « la search bar DANS chaque tab »), never above the tabs.
  */
 export function TableSearch({
   placeholder = "Search",
+  tabs,
   children,
 }: {
   placeholder?: string;
+  tabs?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
@@ -59,10 +62,14 @@ export function TableSearch({
   };
 
   const active = queryWords(query).length > 0;
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <InputGroup className="w-full max-w-sm">
+  const box = (
+    <div className="flex shrink-0 items-center gap-3">
+      {active && (
+        <span className="text-sm tabular-nums text-kumo-subtle">
+          {counts.shown} of {counts.total}
+        </span>
+      )}
+      <InputGroup size="sm" className={tabs ? "w-64" : "w-full max-w-sm"}>
           <InputGroup.Addon>
             <MagnifyingGlassIcon size={16} />
           </InputGroup.Addon>
@@ -75,13 +82,19 @@ export function TableSearch({
               change(e.target.value)
             }
           />
-        </InputGroup>
-        {active && (
-          <span className="text-sm tabular-nums text-kumo-subtle">
-            {counts.shown} of {counts.total}
-          </span>
-        )}
-      </div>
+      </InputGroup>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      {tabs ? (
+        <div className="flex items-center gap-6">
+          <div className="min-w-0 flex-1">{tabs}</div>
+          {box}
+        </div>
+      ) : (
+        box
+      )}
       <div ref={scope} className="contents">
         {children}
       </div>

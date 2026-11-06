@@ -27,7 +27,6 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Signals" description="Where the market's story on a stock is cracking or turning, strongest first. Open a row to see why." />
-      <TableSearch placeholder="Search a company or ticker">
       {strong.length === 0 ? (
         <ComingNext
           icon={<LightningIcon size={40} className="text-kumo-inactive" />}
@@ -37,8 +36,8 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
       ) : (
         <SignalTable rows={strong} panelHref={panelHref} />
       )}
-      <div className="flex flex-col gap-4 pt-6">
-        <BoardTabs value={tab} weak={weak.length} noise={noise.length} inactive={inactive.length} />
+      <div className="pt-6">
+      <TableSearch placeholder="Search a company or ticker" tabs={<BoardTabs value={tab} weak={weak.length} noise={noise.length} inactive={inactive.length} />}>
         {below.length === 0 ? (
           <p className="text-base text-kumo-subtle">{tab === "weak" ? "No weak signal." : tab === "noise" ? "No ticker without a signal." : "Every watchlist ticker is analysed."}</p>
         ) : tab === "inactive" ? (
@@ -46,8 +45,8 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
         ) : (
           <SignalTable rows={below} panelHref={panelHref} />
         )}
-      </div>
       </TableSearch>
+      </div>
       {analysis && (
         <SlideOver title={analysisTitle(analysis.row)} subtitle={analysis.row.symbol} closeHref={base} size="lg">
           <AnalysisBody analysis={analysis} variant="panel" />
