@@ -14,33 +14,20 @@ import { formatUnit } from "./exhibit-format";
 import { day, price, utc } from "./format";
 import { Section } from "./signal";
 import { Fact, FactList, SourceTags } from "./ui";
+import { sourceNote } from "./source-labels";
 
 /**
  * Level C: the detail of one item of the analysis (`?item=` on the Analysis page): what it says, its chart, and where
- * it comes from (gold row, silver key, every source tag, the original document).
+ * it comes from (a research-note "Source:" line naming the providers, the original document).
  * Items: `fair-value`, `narrative` (its detail + Rationale), `news:<catalyst id>` (= its Evidence id), `driver:<id>`, `exhibit:<id>`, `kpi:<metric>`, `price`.
  */
 
 export type ItemView = { title: string; subtitle?: string; body: React.ReactNode };
 
-function Provenance({ gold, silver, sources }: { gold: string; silver: string; sources: string[] }) {
-  return (
-    <Section title="Sources">
-      <div className="rounded-lg ring-1 ring-kumo-hairline">
-        <FactList>
-          <Fact label="Gold">
-            <span className="font-mono text-[12px] break-all">{gold}</span>
-          </Fact>
-          <Fact label="Silver">
-            <span className="font-mono text-[12px] break-all">{silver}</span>
-          </Fact>
-          <Fact label="Bronze">
-            <SourceTags sources={sources} />
-          </Fact>
-        </FactList>
-      </div>
-    </Section>
-  );
+/** Where an item comes from, as a research note prints it: "Source: Company filings (DART), Yahoo Finance, Dualis Research." */
+function SourceNote({ sources }: { sources: string[] }) {
+  const note = sourceNote(sources);
+  return note ? <p className="text-sm text-kumo-subtle">{note}</p> : null;
 }
 
 const external = "inline-flex items-start gap-1.5 text-base font-medium text-kumo-strong hover:text-kumo-link";
@@ -120,11 +107,7 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
             {d.articles.length + d.filings.length === 0 && <li className="text-base text-kumo-subtle">No document is linked to this item any more.</li>}
           </ul>
         </Section>
-        <Provenance
-          gold={d.evidence ? `gold.evidence ${c.id} (judged against ${d.evidence.driverId ?? "no driver"}), gold.catalysts ${c.id}` : `gold.catalysts ${c.id}`}
-          silver={`silver.catalyst_events ${c.id} (${c.newsItemIds.length} article${c.newsItemIds.length === 1 ? "" : "s"}, ${c.filingIds.length} filing${c.filingIds.length === 1 ? "" : "s"}, judged against the narrative)`}
-          sources={c.sources}
-        />
+        <SourceNote sources={c.sources} />
       </>
     ),
   };
@@ -178,7 +161,7 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
             </KTableBody>
           </KTable>
         </div>
-        <Provenance gold={`gold.consensus ${symbol} · ${metric} (${rows.length} periods)`} silver={`silver.facts dimension consensus, subject ${symbol}|<period>|${metric}`} sources={sources} />
+        <SourceNote sources={sources} />
       </>
     ),
   };
@@ -199,7 +182,7 @@ async function priceItem(symbol: string): Promise<ItemView | null> {
         <p className="text-base text-kumo-subtle">
           {bars.length} trading days. {disagreements === 0 ? "Every source agrees on every close." : `${disagreements} day${disagreements === 1 ? "" : "s"} where a source's close differs by more than 0.5%.`}
         </p>
-        <Provenance gold={`gold.price_bars ${symbol} (${bars.length} days), gold.quotes ${symbol}`} silver={`silver.price_bars ${symbol}: every source's bar per day`} sources={sources} />
+        <SourceNote sources={sources} />
       </>
     ),
   };
@@ -227,7 +210,7 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
         <Section title={`News that bear on it · ${d.evidence.length}`}>
           {d.evidence.length ? <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} gapPct={d.gapPct} /> : <p className="text-base text-kumo-subtle">No news has touched this driver yet.</p>}
         </Section>
-        <Provenance gold={`gold.narrative_drivers ${d.driver.id}, gold.exhibits ${d.exhibits.map((x) => x.id).join(", ") || "none"}`} silver={`silver.analyses version ${d.driver.version} (Claude's analysis, figures read from gold)`} sources={sources} />
+        <SourceNote sources={sources} />
       </>
     ),
   };
@@ -281,7 +264,7 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
             ))}
           </ul>
         </Section>
-        <Provenance gold={`gold.exhibits ${x.id} (numbers read from gold at rebuild, never from the model)`} silver="silver.facts / financial lines behind each series key" sources={x.sources} />
+        <SourceNote sources={x.sources} />
       </>
     ),
   };
@@ -313,11 +296,7 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
             </article>
           </Section>
         )}
-        <Provenance
-          gold={`gold.fair_values ${symbol} (${f.author === "thierry" ? "your console value wins" : "weighted methods"})${r ? `, gold.valuation_reports ${symbol}, gold.method_valuations ${symbol}:*` : ""}`}
-          silver={r ? `silver.valuation_syntheses version ${r.version}; silver.method_valuations (one per method and input set)` : "silver.facts thesis fairValue (your console edit)"}
-          sources={f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]}
-        />
+        <SourceNote sources={f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]} />
       </>
     ),
   };
@@ -456,7 +435,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
             </article>
           </Section>
         )}
-        <Provenance gold={`gold.method_valuations ${m.id}`} silver={`silver.method_valuations version ${m.version} (Claude picked the assumptions, the code did the arithmetic)`} sources={["claude", ...new Set(m.inputs.flatMap((i) => i.sources))]} />
+        <SourceNote sources={["claude", ...new Set(m.inputs.flatMap((i) => i.sources))]} />
       </>
     ),
   };
@@ -513,11 +492,7 @@ async function narrativeItem(symbol: string): Promise<ItemView | null> {
         {(r?.exhibits ?? []).map((x) => (
           <Exhibit key={x.id} symbol={symbol} exhibit={x} />
         ))}
-        <Provenance
-          gold={`gold.narratives ${symbol}${r ? `, gold.narrative_rationales ${symbol}, gold.exhibits ${r.exhibitIds.join(", ") || "none"}` : ""}`}
-          silver={`silver.analyses version ${r?.version ?? "of the narrative"} (Claude, figures read from gold)`}
-          sources={sources.length ? sources : ["claude"]}
-        />
+        <SourceNote sources={sources.length ? sources : ["claude"]} />
       </>
     ),
   };

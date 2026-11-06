@@ -209,8 +209,9 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     for (const m of p.methods) pointed.set(`${f.subject}|${m.method}`, m.inputHash);
     pointed.set(`${f.subject}|synthesis`, p.synthesis?.inputHash ?? "none");
   }
-  const mv = symbols.length ? await db.select().from(methodValuations).where(inArray(methodValuations.symbol, symbols)) : [];
-  const sy = symbols.length ? await db.select().from(valuationSyntheses).where(inArray(valuationSyntheses.symbol, symbols)) : [];
+  // Egress budget (CLAUDE.md): the keys first, then only the rows gold keeps (silver is append-only and grows).
+  const mvKeys = symbols.length ? await db.select({ id: methodValuations.id, symbol: methodValuations.symbol, method: methodValuations.method, inputHash: methodValuations.inputHash, createdAt: methodValuations.createdAt }).from(methodValuations).where(inArray(methodValuations.symbol, symbols)) : [];
+  const syKeys = symbols.length ? await db.select({ id: valuationSyntheses.id, symbol: valuationSyntheses.symbol, inputHash: valuationSyntheses.inputHash, createdAt: valuationSyntheses.createdAt }).from(valuationSyntheses).where(inArray(valuationSyntheses.symbol, symbols)) : [];
   const pick = <T extends { symbol: string; inputHash: string; createdAt: Date }>(rows: T[], key: (r: T) => string): Map<string, T> => {
     const out = new Map<string, T>();
     for (const r of [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
@@ -221,8 +222,12 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     for (const [k, h] of pointed) if (h === "none") out.delete(k);
     return out;
   };
-  const methods = pick(mv, (r) => `${r.symbol}|${r.method}`);
-  const synth = pick(sy, (r) => `${r.symbol}|synthesis`);
+  const mIds = [...pick(mvKeys, (r) => `${r.symbol}|${r.method}`).values()].map((r) => r.id);
+  const sIds = [...pick(syKeys, (r) => `${r.symbol}|synthesis`).values()].map((r) => r.id);
+  const mv = mIds.length ? await db.select().from(methodValuations).where(inArray(methodValuations.id, mIds)) : [];
+  const sy = sIds.length ? await db.select().from(valuationSyntheses).where(inArray(valuationSyntheses.id, sIds)) : [];
+  const methods = new Map(mv.map((r) => [`${r.symbol}|${r.method}`, r]));
+  const synth = new Map(sy.map((r) => [`${r.symbol}|synthesis`, r]));
   const thesisRows = new Map((await db.select().from(theses)).map((t) => [t.symbol, t]));
   const name = (id: ValuationMethodId) => methodSpec(id).name;
 
