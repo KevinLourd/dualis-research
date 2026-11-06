@@ -6,6 +6,7 @@ import { listTickers } from "@/console/queries";
 import { StateBadge } from "@/console/signal";
 import { signalStates } from "@/console/signal-queries";
 import { Missing, PageHeader, PositionTags } from "@/console/ui";
+import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Tickers" };
 
@@ -16,6 +17,7 @@ export default async function TickersPage() {
   return (
     <>
       <PageHeader title="Tickers" description={`${rows.length} companies on the watchlist. Open one to see its narrative and the news judged against it.`} />
+      <TableSearch placeholder="Search a company or ticker">
       <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
         <KTable>
           <KTableHeader>
@@ -53,6 +55,7 @@ export default async function TickersPage() {
           </KTableBody>
         </KTable>
       </div>
+      </TableSearch>
     </>
   );
 }

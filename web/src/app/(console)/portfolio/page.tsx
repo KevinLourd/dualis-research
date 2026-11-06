@@ -9,6 +9,7 @@ import { PositionForm } from "@/console/position-form";
 import { ReturnChart } from "@/console/return-chart";
 import { SlideOver } from "@/console/slide-over";
 import { Card, ComingNext, PageHeader } from "@/console/ui";
+import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Portfolio" };
 
@@ -73,6 +74,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
         </div>
       </Card>
 
+      <TableSearch placeholder="Search a position">
       <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
         <KTable>
           <KTableHeader>
@@ -157,6 +159,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
           </KTableBody>
         </KTable>
       </div>
+      </TableSearch>
 
       {editing && (
         <SlideOver title={editing.name ?? editing.symbol} subtitle={`${editing.symbol}, your position`} closeHref="/portfolio">
