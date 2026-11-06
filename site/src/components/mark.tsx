@@ -1,15 +1,14 @@
 /**
- * The Dualis mark (Kevin 2026-11-05): the D of Dualis, split by a price line that dips, then turns up. Two sides in
- * one letter, and the moment a narrative turns. Master: design/assets/Logos/dualis-mark.svg.
+ * The Dualis mark (Kevin 2026-11-06, option C "split seal"): a square frame cut on the diagonal, one half filled, the
+ * D in the open half. Two sides of one name: long and short, price and value. Master: design/assets/Logos/dualis-mark.svg.
  */
 export function Mark({ title }: { title?: string }) {
   return (
     <svg viewBox="0 0 256 256" aria-hidden={title ? undefined : true} role={title ? "img" : undefined}>
       {title && <title>{title}</title>}
-      <g transform="translate(-8 0)">
-        <path d="M60 44 H128 A84 84 0 0 1 128 212 H60 Z" fill="none" stroke="currentColor" strokeWidth="26" strokeLinejoin="miter" />
-        <path d="M60 212 L108 164 L123.42 179.42 L187.4 68.6 A84 84 0 0 1 128 212 Z" fill="currentColor" />
-      </g>
+      <rect x="12" y="12" width="232" height="232" fill="none" stroke="currentColor" strokeWidth="24" />
+      <path d="M0 256 L256 0 L256 256 Z" fill="currentColor" />
+      <path d="M54 48 V128 M54 48 H74 A40 40 0 0 1 74 128 H54" fill="none" stroke="currentColor" strokeWidth="17" strokeLinejoin="miter" />
     </svg>
   );
 }

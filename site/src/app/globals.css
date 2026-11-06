@@ -184,13 +184,19 @@ p {
   line-height: 1;
   letter-spacing: 0.04em;
 }
+/* Wordmark of the seal logo: wide-tracked sans caps (Kevin 2026-11-06, option C). */
 .wordmark span:first-child {
-  font-size: 21px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: 0.34em;
 }
 .wordmark span:last-child {
-  font-size: 13px;
-  letter-spacing: 0.18em;
-  margin-top: 3px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 9.5px;
+  letter-spacing: 0.62em;
+  margin-top: 6px;
 }
 .nav {
   display: flex;
