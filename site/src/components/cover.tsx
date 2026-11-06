@@ -21,7 +21,7 @@ export function Cover({ post, className = "" }: { post: Pick<Publication, "title
         <p className="cv-date">{formatDate(post.publishedAt) ?? ""}</p>
       </div>
       <div className="cv-brand">
-        <Mark />
+        <Mark tone="white" />
         <span>{BRAND}</span>
       </div>
     </div>

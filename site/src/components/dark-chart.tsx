@@ -1,3 +1,5 @@
+import { SealWatermark } from "./mark";
+
 /**
  * Thierry's Note chart style (docs/screenshots/thierry-note-cpng-2026-11-03.png): near-black ground, faint gridlines,
  * legend on top, a value on every bar, an "E" suffix on estimate periods. Bars are the Dualis purple.
@@ -35,6 +37,7 @@ export function DarkChart({
       {title && <figcaption className="dc-title">{title}</figcaption>}
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${legend}: ${bars.map((b) => `${b.label} ${format(b.value)}`).join(", ")}`}>
         <rect width={W} height={H} className="dc-bg" />
+        <SealWatermark w={W} h={H} />
         <g transform={`translate(${left} 26)`}>
           <rect width="12" height="12" y="-10" rx="2" className="dc-bar" />
           <text x="20" className="dc-legend">

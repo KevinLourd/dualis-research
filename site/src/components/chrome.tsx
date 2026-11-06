@@ -57,7 +57,7 @@ export function Footer({ substackUrl }: { substackUrl: string | null }) {
       <div className="wrap footer-grid">
         <div className="footer-brand">
           <Link href="/" className="brand" aria-label={`${BRAND}, home`}>
-            <Mark />
+            <Mark tone="white" />
             <span className="wordmark">
               <span>Dualis</span>
               <span>Research</span>

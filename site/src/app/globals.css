@@ -173,7 +173,7 @@ p {
   text-decoration: none;
   color: var(--brand);
 }
-.brand svg {
+.brand .mark {
   width: 30px;
   height: 30px;
 }
@@ -682,7 +682,7 @@ body:has(.hero) .site-footer {
   font-size: max(8px, 4cqi);
   letter-spacing: 0.08em;
 }
-.cv-brand svg {
+.cv-brand .mark {
   width: 9cqi;
   height: 9cqi;
 }

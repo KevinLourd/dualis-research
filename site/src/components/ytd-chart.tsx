@@ -1,4 +1,5 @@
 import { YTD_SERIES } from "@/lib/track-record";
+import { SealWatermark } from "./mark";
 
 /**
  * The portfolio vs the S&P 500 since January 1, in Thierry's Note chart style (near-black ground, faint gridlines):
@@ -27,6 +28,7 @@ export function YtdChart({ source }: { source: string }) {
     <figure className="dark-chart">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Return since January 1, 2026: portfolio ${pct(last[1])}, S&P 500 ${pct(last[2])}`}>
         <rect width={W} height={H} className="dc-bg" />
+        <SealWatermark w={W} h={H} />
         <g transform={`translate(${left} 26)`} className="dc-legend">
           <rect width="14" height="3" y="-6" fill="#fff" />
           <text x="22">Portfolio</text>
