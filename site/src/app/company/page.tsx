@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { CallsBoard, CtaBand, Portrait } from "@/components/blocks";
+import Link from "next/link";
+import { CallsBoard, CtaBand } from "@/components/blocks";
 import { NarrativeFigure } from "@/components/figures";
 import { BEST_CALLS_MIN_RETURN, MARKETS } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
@@ -8,8 +9,8 @@ export const metadata: Metadata = { title: "Company" };
 
 /**
  * Company (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
- * Altas's photo hero, statement with three columns and founder split with a pull quote; the four idea types from
- * Thierry's own fund site, as cards; the calls scoreboard; the price vs value figure.
+ * Altas's photo hero and statement with three columns; the four idea types from
+ * Thierry's own fund site, as cards; the calls scoreboard; Thierry's line (his photo lives on About); the price vs value figure.
  */
 const PILLARS = [
   { key: "Under-covered", body: "markets and small caps that few analysts follow and big funds cannot buy." },
@@ -77,19 +78,14 @@ export default async function Company() {
         </div>
       </section>
 
+      {/* Thierry's photo and bio live on About only (Kevin 2026-11-06: no duplicate); here, his line and a link. */}
       <section className="section">
-        <div className="wrap founder">
-          <div className="founder-photo">
-            <Portrait />
-          </div>
-          <div className="founder-text">
-            <p className="band-label dark">Founder and Lead Analyst</p>
-            <h2>Thierry Matin</h2>
-            <p>He trained in small cap and macro research at CI Global, Fiera Capital and BCA Research, then in private equity at Novacap.</p>
-            <p>He founded Dualis Research to publish the work in full: the thesis, the numbers, and the exit.</p>
-            <blockquote>Play winnable games. The best odds sit where fewer eyes look.</blockquote>
-          </div>
-        </div>
+        <figure className="wrap founder-quote">
+          <blockquote>Play winnable games. The best odds sit where fewer eyes look.</blockquote>
+          <figcaption>
+            Thierry Matin, Founder and Lead Analyst · <Link href="/about">About Thierry ›</Link>
+          </figcaption>
+        </figure>
       </section>
 
       <section className="section grey split">
