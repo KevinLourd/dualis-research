@@ -204,6 +204,13 @@
       "when": 1793945015450,
       "tag": "0028_outreach-recommends",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793945432571,
+      "tag": "0029_content_library_cover_photo",
+      "breakpoints": true
     }
   ]
 }
