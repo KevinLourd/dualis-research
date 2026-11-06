@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mergeSightings } from "@/bsg/entities";
 import * as gold from "@/db/schema/gold";
@@ -152,6 +152,19 @@ describe("price dimension", () => {
     const rows = await db.select().from(silver.priceBars).where(eq(silver.priceBars.symbol, "MNRO"));
     expect(rows).toHaveLength(3);
     expect(Object.keys(rows[0].observations).sort()).toEqual(["cnbc", "nasdaq", "yahoo"]);
+  });
+
+  it("a later run leaves stored history alone: only the last PRICE_REWRITE_DAYS are read back and rewritten", async () => {
+    await runDimension(db, price, { trigger: "test", ctx: ctx() });
+    // An old stored bar a refetch must not touch (a month before the last bar).
+    await db.insert(silver.priceBars).values({ symbol: "MNRO", date: "2026-09-01", open: 1, high: 1, low: 1, close: 1, volume: 1, currency: "USD", sources: ["old"], bronzeIds: [], observations: { old: { open: 1, high: 1, low: 1, close: 1, volume: 1, bronzeId: "x" } } });
+    await runDimension(db, price, { trigger: "test", ctx: ctx() });
+    const [old] = await db.select().from(silver.priceBars).where(and(eq(silver.priceBars.symbol, "MNRO"), eq(silver.priceBars.date, "2026-09-01")));
+    expect(old.sources).toEqual(["old"]);
+    const bars = await db.select().from(gold.priceBars).where(eq(gold.priceBars.symbol, "MNRO"));
+    expect(bars).toHaveLength(3);
+    const [quote] = await db.select().from(gold.quotes).where(eq(gold.quotes.symbol, "MNRO"));
+    expect(quote).toMatchObject({ date: "2026-11-03", close: 11.63, previousClose: 12.06, currency: "USD" });
   });
 });
 

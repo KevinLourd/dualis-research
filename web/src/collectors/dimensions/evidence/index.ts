@@ -99,6 +99,16 @@ async function pendingSubjects(db: Db): Promise<string[]> {
   return out;
 }
 
+/** One read of a ticker's items per run (keyed on the run's fetch function), not one per judged (item, driver). */
+const runItems = new WeakMap<typeof fetch, Map<string, Promise<EvidenceItem[]>>>();
+function itemsThisRun(ctx: SourceContext, symbol: string): Promise<EvidenceItem[]> {
+  let cache = runItems.get(ctx.fetch);
+  if (!cache) runItems.set(ctx.fetch, (cache = new Map()));
+  let items = cache.get(symbol);
+  if (!items) cache.set(symbol, (items = itemsOf(ctx.db!, symbol)));
+  return items;
+}
+
 export const evidenceSource: Source = {
   name: "claude",
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
@@ -111,7 +121,7 @@ export const evidenceSource: Source = {
     const { judge } = (await nodeImport(new URL("../../../llm/judge.ts", import.meta.url).href)) as typeof import("@/llm/judge");
     const { symbol, kind, id, rank } = parseEvidenceSubject(subject);
     const d = await driversOf(ctx.db, symbol);
-    const item = (await itemsOf(ctx.db, symbol)).find((x) => x.kind === kind && x.id === id);
+    const item = (await itemsThisRun(ctx, symbol)).find((x) => x.kind === kind && x.id === id);
     if (!d || !item || !d.drivers.some((x) => x.rank === rank)) return { request: { subject }, httpStatus: null, error: "no drivers or no item for this subject any more" };
     const req = evidenceRequest(symbol, d, rank, item);
     const key = { subjectKind: EVIDENCE_SUBJECT_KIND, subjectId: subject, questionKey: evidenceKey(d.version) };
