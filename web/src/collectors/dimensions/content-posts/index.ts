@@ -8,6 +8,7 @@ import { getJson, getText } from "../../http";
 import { GATEWAYS } from "../substack-network/seeds";
 import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
 import { categorizeOwnArticles, categoriesByPost } from "./category";
+import { coverPhotosByPost } from "./cover";
 import { mergePost, type PostState } from "./merge";
 import { mentionedTickers, parseArchive, parseRss, type FeedMeta, type PostObservation, type TickerRef } from "./parse";
 
@@ -233,6 +234,7 @@ export async function rebuildGoldContent(db: Db) {
   const posts = await db.select().from(content.contentPosts);
   const pubOf = new Map(pubs.map((p) => [p.host, p]));
   const categoryOf = await categoriesByPost(db);
+  const photoOf = await coverPhotosByPost(db);
 
   const latest = await db
     .selectDistinctOn([fetches.source, fetches.subject], {
@@ -269,6 +271,9 @@ export async function rebuildGoldContent(db: Db) {
             tickers: p.tickers,
             sources: p.sources,
             researchCategory: categoryOf.get(p.id) ?? null,
+            coverPhotoUrl: photoOf.get(p.id)?.url ?? null,
+            coverPhotoCredit: photoOf.get(p.id)?.credit ?? null,
+            coverPhotoLink: photoOf.get(p.id)?.link ?? null,
           };
         }),
       );

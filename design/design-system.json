@@ -19,7 +19,6 @@
       "order": [
         "dualis-mark.svg",
         "dualis-mark-white.svg",
-        "dualis-mark-mono-5b3fd6.svg",
         "dualis-avatar.svg"
       ],
       "files": {
@@ -32,12 +31,6 @@
         "dualis-mark-white.svg": {
           "name": "dualis-mark-white.svg",
           "blob": "f6e17f08465729e51ca1f7f110d591d0",
-          "size": 363,
-          "type": "image/svg+xml"
-        },
-        "dualis-mark-mono-5b3fd6.svg": {
-          "name": "dualis-mark-mono-5b3fd6.svg",
-          "blob": "8062d19ad06e3ec248463a92f635b4fb",
           "size": 363,
           "type": "image/svg+xml"
         },
@@ -57,8 +50,8 @@
   },
   "lastChange": {
     "by": "Kevin Lourd",
-    "at": "2026-11-05T12:00:00Z",
+    "at": "2026-11-06T12:00:00Z",
     "via": "Claude Code",
-    "note": "Logo: the split D"
+    "note": "One colour: Dualis indigo #2B2463"
   }
 }

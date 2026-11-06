@@ -68,7 +68,7 @@ Dashboard > Settings. Substack shows the exact upload size in each dialog.
 
 | Setting | Value |
 |---|---|
-| Accent / theme colour | `#0B2A5B` (Dualis navy) |
+| Accent / theme colour | `#2B2463` (Dualis indigo) |
 | Background | White |
 | Heading font | Closest serif offered (Newsreader is not offered: pick a book serif, never a display or slab serif) |
 | Body font | Closest clean sans offered (IBM Plex Sans is not offered) |

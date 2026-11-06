@@ -201,6 +201,10 @@ export const goldContentLibrary = gold.table(
     sources: text("sources").array().notNull(),
     /** Own articles only: where the website's research portal files it ("coverage" | "primer" | "memo"), judged once. */
     researchCategory: text("research_category"),
+    /** Own articles only: the photo behind the website's report cover (cover-photos dimension), its credit line and Commons page. */
+    coverPhotoUrl: text("cover_photo_url"),
+    coverPhotoCredit: text("cover_photo_credit"),
+    coverPhotoLink: text("cover_photo_link"),
     rebuiltAt,
   },
   (t) => [index("gold_content_library_published").on(t.publishedAt)],
