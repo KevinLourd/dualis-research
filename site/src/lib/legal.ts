@@ -169,7 +169,7 @@ export const PRIVACY: LegalPage = {
         "It has no accounts, no login and no forms that store your data.",
         "It has no mailing list of its own.",
         "We set no advertising cookies and no analytics cookies.",
-        "Your subscriber data lives with Substack, not with us on this website.",
+        "Substack holds your subscriber data.",
       ],
     },
     {

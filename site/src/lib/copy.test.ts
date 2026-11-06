@@ -20,6 +20,13 @@ describe("site copy and colours", () => {
     expect(files.filter((f) => banned.test(f.text)).map((f) => f.path)).toEqual([]);
   });
 
+  // Kevin 2026-11-06: "Written for investors, never for the companies we cover" = AI-slop structure. No "X, never Y"
+  // in any copy string (comments aside).
+  it("never writes the contrast template \"X, never Y\"", () => {
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(files.filter((f) => /"[^"\n]*, never [^"\n]*"|>[^<\n]*, never [^<\n]*</.test(strip(f.text))).map((f) => f.path)).toEqual([]);
+  });
+
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.
   it.each(["#eceaf5", "#f5f4f9", "#b9b2ea", "#8c82d8", "#e3e1ec"])("never paints the light purple %s", (hex) => {
     expect(files.filter((f) => f.text.toLowerCase().includes(hex)).map((f) => f.path)).toEqual([]);
