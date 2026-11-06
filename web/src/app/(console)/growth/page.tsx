@@ -12,6 +12,7 @@ import { Card, ComingNext, Fact, FactList, Missing, PageHeader } from "@/console
 import { saveOutreachMessage, updateOutreachStatus } from "@/growth/actions";
 import { GOAL, planned, progress } from "@/growth/goal";
 import { dailyOutreach } from "@/growth/daily";
+import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Growth" };
 
@@ -108,7 +109,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
           }
         />
       ) : (
-        <>
+        <TableSearch placeholder="Search a writer or publication">
           <Card
             title="Recommending you"
             action={<span className="text-sm text-kumo-subtle">{recommending.length} of {sent} contacted. Checked every morning on Substack.</span>}
@@ -151,7 +152,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
               <TargetTable rows={bench} selectedKey={key} />
             </Card>
           )}
-        </>
+        </TableSearch>
       )}
 
       {selected && <TargetPanel row={selected} />}

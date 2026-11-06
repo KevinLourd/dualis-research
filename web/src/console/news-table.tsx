@@ -4,6 +4,7 @@ import { Tabs } from "@cloudflare/kumo";
 import { useState } from "react";
 import Link from "@/console/link";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
+import { TableSearch } from "./table-search";
 import { TagBadge } from "./tag-badge";
 
 /**
@@ -31,6 +32,7 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
           { value: "noise", label: `Noise · ${count("noise")}` },
         ]}
       />
+      <TableSearch placeholder="Search news">
       {shown.length === 0 ? (
         <p className="text-base text-kumo-subtle">No {tab} news.</p>
       ) : (
@@ -68,6 +70,7 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
           </KTable>
         </div>
       )}
+      </TableSearch>
     </div>
   );
 }

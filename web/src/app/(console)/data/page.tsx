@@ -6,6 +6,7 @@ import { ConsensusCoverageCard } from "@/console/consensus";
 import { getRun, listConsensusCoverage, listRuns, sourcesOfRuns } from "@/console/queries";
 import { SlideOver } from "@/console/slide-over";
 import { Card, PageHeader, RunStatus } from "@/console/ui";
+import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Data" };
 
@@ -70,6 +71,8 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
         {runs.length === 0 ? (
           <p className="p-4 text-base text-kumo-subtle">No run yet. Start the Collect workflow in GitHub Actions.</p>
         ) : (
+          <div className="p-4">
+          <TableSearch placeholder="Search runs by dimension, status or source">
           <KTable>
             <KTableHeader>
               <KTableRow>
@@ -105,6 +108,8 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
               })}
             </KTableBody>
           </KTable>
+          </TableSearch>
+          </div>
         )}
       </Card>
 

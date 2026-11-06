@@ -5,6 +5,7 @@ import { inactiveBoard, signalBoard } from "@/console/board-queries";
 import { BoardTabs } from "@/console/board-tabs";
 import { SlideOver } from "@/console/slide-over";
 import { ComingNext, PageHeader } from "@/console/ui";
+import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Signals" };
 
@@ -26,6 +27,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Signals" description="Where the market's story on a stock is cracking or turning, strongest first. Open a row to see why." />
+      <TableSearch placeholder="Search a company or ticker">
       {strong.length === 0 ? (
         <ComingNext
           icon={<LightningIcon size={40} className="text-kumo-inactive" />}
@@ -45,6 +47,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
           <SignalTable rows={below} panelHref={panelHref} />
         )}
       </div>
+      </TableSearch>
       {analysis && (
         <SlideOver title={analysisTitle(analysis.row)} subtitle={analysis.row.symbol} closeHref={base} size="lg">
           <AnalysisBody analysis={analysis} variant="panel" />
