@@ -5,8 +5,8 @@ import { Social } from "./social";
 import { SubscribeButton } from "./subscribe-button";
 
 const NAV = [
-  { href: "/company", label: "Company" },
   { href: "/research", label: "Research" },
+  { href: "/company", label: "Company" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
