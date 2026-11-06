@@ -13,7 +13,10 @@ export function relativeTime(date: Date, now: Date = new Date()): string {
   if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
   if (h < 48) return `${h} h ago`;
-  return `${Math.round(h / 24)} days ago`;
+  const d = Math.round(h / 24);
+  if (d < 60) return `${d} days ago`;
+  const mo = Math.round(d / 30.4);
+  return mo < 24 ? `${mo} months ago` : `${Math.round(mo / 12)} years ago`;
 }
 
 export function utc(date: Date): string {

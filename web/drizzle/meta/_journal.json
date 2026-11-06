@@ -225,6 +225,13 @@
       "when": 1793952166526,
       "tag": "0031_fair-value-pyramid",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793959070529,
+      "tag": "0032_method-data-as-of",
+      "breakpoints": true
     }
   ]
 }

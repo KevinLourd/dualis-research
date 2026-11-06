@@ -281,3 +281,19 @@ export function weighted(values: { method: ValuationMethodId; low: number; base:
   const sum = (k: "low" | "base" | "high") => used.reduce((s, x) => s + w[x.method] * x[k], 0);
   return { low: sum("low"), base: sum("base"), high: sum("high"), weights: w };
 }
+
+/**
+ * How fresh a method's data is: the latest date its inputs carry (a period end "2026-09" = the end of that month, a quote
+ * day "2026-11-05"), never when the valuation ran (Kevin 2026-11-06). An input with no date (analyst targets: "today")
+ * falls back to when it was read.
+ */
+export function dataAsOf(inputs: readonly Pick<ValuationInput, "period">[], readAt: Date): Date {
+  let latest: Date | null = null;
+  for (const i of inputs) {
+    for (const m of i.period.matchAll(/(\d{4})-(\d{2})(?:-(\d{2}))?/g)) {
+      const d = m[3] ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : new Date(Date.UTC(+m[1], +m[2], 0));
+      if (!latest || d > latest) latest = d;
+    }
+  }
+  return latest ?? readAt;
+}
