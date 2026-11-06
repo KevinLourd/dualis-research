@@ -139,6 +139,11 @@ export const whatsappLink = ops.table("whatsapp_link", {
   qrSvg: text("qr_svg"),
   /** Number the device is linked to, digits. */
   phone: text("phone"),
+  /** Link with a code instead of the QR: the number typed in Settings (digits), the service asks WhatsApp for a code. */
+  pairingPhone: text("pairing_phone"),
+  pairingRequestedAt: timestamp("pairing_requested_at", { withTimezone: true }),
+  /** The 8-character code to type on the phone (Linked devices > Link with phone number instead); null once linked. */
+  pairingCode: text("pairing_code"),
   error: text("error"),
   /** Last time the service was alive (written on its idle poll, so up to that interval old). */
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
