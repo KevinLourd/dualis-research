@@ -301,3 +301,36 @@ export function CallsBoard({ posts }: { posts: Publication[] }) {
     </>
   );
 }
+
+const FRAMEWORK = [
+  { title: "Narrative", line: "What the price believes" },
+  { title: "Fair value", line: "What the business is worth" },
+  { title: "The gap", line: "Long below, short above" },
+  { title: "Catalyst", line: "The news that turns the story" },
+  { title: "Exit", line: "Closed and reported" },
+] as const;
+
+/**
+ * How a call is made, drawn on the logo (Kevin 2026-11-06: « dans la structure des composants comme Citrini »): the
+ * engraved knot faint behind, one vertical line through it, five steps alternating left and right. The middle step,
+ * the gap between price and value, sits on the knot's centre square, where the two loops cross.
+ */
+export function Framework() {
+  return (
+    <div className="framework">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="fw-knot" src="/brand/seal.svg" alt="" aria-hidden="true" width={256} height={256} />
+      <ol className="fw-steps">
+        {FRAMEWORK.map((s, i) => (
+          <li key={s.title} className={i % 2 ? "right" : "left"}>
+            <div className="fw-text">
+              <h3>{s.title}</h3>
+              <p>{s.line}</p>
+            </div>
+            <span className="fw-dot" aria-hidden="true" />
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}

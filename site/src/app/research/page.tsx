@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CoverStrip, CtaBand, Faq, LatestResearch, Proof } from "@/components/blocks";
+import { CoverStrip, CtaBand, Faq, Framework, LatestResearch, Proof } from "@/components/blocks";
 import { PageBand } from "@/components/page-band";
 import { Portal } from "@/components/portal";
 import { DISCLAIMER, subscribeHref } from "@/lib/model";
@@ -44,6 +44,13 @@ export default async function Research() {
           </div>
         </section>
       )}
+
+      <section className="section">
+        <div className="wrap">
+          <h2 className="fw-head">How a call is made</h2>
+          <Framework />
+        </div>
+      </section>
 
       <Proof />
 
