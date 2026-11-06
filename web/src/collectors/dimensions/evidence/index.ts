@@ -1,4 +1,4 @@
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { evidence, exhibits, fairValues, NARRATIVE_TAGS, narrativeDrivers, narratives, parseTag, type EvidenceVerdict, type Strength } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import * as silver from "@/db/schema/silver";
@@ -190,7 +190,15 @@ export function verdictRank(v: Pick<EvidenceVerdict, "effect" | "strength">): nu
 export async function rebuildEvidence(db: Db): Promise<number> {
   const versions = new Map((await db.select({ symbol: narratives.symbol, version: narratives.version }).from(narratives)).map((n) => [n.symbol, n.version]));
   const symbols = (await analysedSymbols(db)).filter((s) => versions.has(s));
-  const js = symbols.length ? await db.select().from(silver.judgments).where(and(eq(silver.judgments.subjectKind, EVIDENCE_SUBJECT_KIND), like(silver.judgments.questionKey, `${EVIDENCE_QUESTION}:%`))) : [];
+  // Egress: only the current narrative versions' judgments and only the columns read here (never `raw` or `question`).
+  const keys = [...new Set(symbols.map((s) => evidenceKey(versions.get(s)!)))];
+  const j = silver.judgments;
+  const js = keys.length
+    ? await db
+        .select({ id: j.id, subjectId: j.subjectId, questionKey: j.questionKey, verdict: j.verdict, probability: j.probability, reason: j.reason, citedSentence: j.citedSentence })
+        .from(j)
+        .where(and(eq(j.subjectKind, EVIDENCE_SUBJECT_KIND), inArray(j.questionKey, keys)))
+    : [];
   const byKey = new Map(js.map((j) => [`${j.subjectId}\u0000${j.questionKey}`, j]));
   const firstExhibit = new Map<string, string>();
   if (symbols.length) for (const e of (await db.select().from(exhibits).where(inArray(exhibits.symbol, symbols))).sort((a, b) => a.rank - b.rank)) if (!firstExhibit.has(e.driverId)) firstExhibit.set(e.driverId, e.id);
