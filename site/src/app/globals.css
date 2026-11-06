@@ -378,12 +378,16 @@ body:has(.hero) .site-footer {
 .hero-veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(20, 16, 52, 0.92) 0%, rgba(20, 16, 52, 0.78) 45%, rgba(20, 16, 52, 0.55) 100%);
+  background: linear-gradient(90deg, rgba(20, 16, 52, 0.72) 0%, rgba(20, 16, 52, 0.45) 45%, rgba(20, 16, 52, 0.08) 100%);
 }
 .hero-inner {
   position: relative;
   width: 100%;
   padding-bottom: 8vh;
+}
+.hero h1,
+.hero-sub {
+  text-shadow: 0 2px 24px rgba(10, 8, 30, 0.55);
 }
 .hero h1 {
   color: #fff;
@@ -1540,6 +1544,94 @@ a.call-card:hover {
   font-size: 18px;
 }
 
+/* Framework drawn on the knot (Research), after Citrini's framework on its own logo. */
+.fw-head {
+  text-align: center;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.framework {
+  position: relative;
+  max-width: 860px;
+  margin: 40px auto 0;
+}
+.fw-knot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(560px, 90%);
+  height: auto;
+  transform: translate(-50%, -50%);
+  filter: grayscale(1);
+  opacity: 0.11;
+  pointer-events: none;
+}
+.fw-steps {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fw-steps::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(var(--rule), var(--ink) 50%, var(--rule));
+}
+.fw-steps li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  height: 118px;
+}
+.fw-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px var(--ink);
+}
+.fw-steps li:nth-child(3) .fw-dot {
+  background: var(--brand);
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+}
+.fw-steps li.left .fw-text {
+  grid-column: 1;
+  text-align: right;
+  padding-right: 44px;
+}
+.fw-steps li.right .fw-text {
+  grid-column: 2;
+  padding-left: 44px;
+}
+.fw-text h3 {
+  font-weight: 400;
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.1;
+  color: var(--ink);
+}
+.fw-text p {
+  margin-top: 6px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--muted);
+}
+
 /* Small screens */
 @media (max-width: 960px) {
   .nav {
@@ -1569,6 +1661,15 @@ a.call-card:hover {
   }
   .portal-preview {
     display: none;
+  }
+  .fw-steps li {
+    height: 96px;
+  }
+  .fw-steps li.left .fw-text {
+    padding-right: 28px;
+  }
+  .fw-steps li.right .fw-text {
+    padding-left: 28px;
   }
   .latest a {
     grid-template-columns: 1fr;
