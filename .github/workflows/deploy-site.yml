@@ -52,6 +52,7 @@ jobs:
       - name: Deploy to Cloudflare Workers (runtime secret uploaded with the version)
         run: |
           node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/site-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL }))'
+          set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
           pnpm cf:deploy -- --secrets-file "$RUNNER_TEMP/site-secrets.json" | tee deploy.log
           rm -f "$RUNNER_TEMP/site-secrets.json"
           url=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)
