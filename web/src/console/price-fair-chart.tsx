@@ -78,7 +78,7 @@ export function PriceFairValueChart({
         ...(fvRange
           ? [
               { yAxis: fvRange.high, lineStyle: { color: ink.navy, width: 1, type: "dotted" }, label: { show: true, position: "insideEndTop", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `High ${fmtNum(fvRange.high)}` } },
-              { yAxis: fvRange.low, lineStyle: { color: ink.navy, width: 1, type: "dotted" }, label: { show: true, position: "insideEndBottom", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `Low ${fmtNum(fvRange.low)}` } },
+              { yAxis: fvRange.low, lineStyle: { color: ink.navy, width: 1, type: "dotted" }, label: { show: true, position: "insideMiddleBottom", fontFamily: FONT, fontSize: 10, color: ink.muted, formatter: `Low ${fmtNum(fvRange.low)}` } },
             ]
           : []),
         ...(fair.claudeValue
