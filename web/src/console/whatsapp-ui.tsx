@@ -1,7 +1,9 @@
-import { Badge } from "@cloudflare/kumo";
+import { Badge, Button, Input } from "@cloudflare/kumo";
 import type { GoldWhatsappMessage, WhatsappLink } from "@/db/schema/whatsapp";
 import { relativeTime, utc } from "./format";
 import { Card } from "./ui";
+import { requestPairingCode } from "@/whatsapp/actions";
+import { formatPairingCode, PAIRING_FRESH_MS } from "@/whatsapp/pairing";
 import { AutoRefresh } from "./whatsapp-refresh";
 
 /** Before the first link the number is unknown here (personal: never in the public repo). */
@@ -61,6 +63,7 @@ export function WhatsappCard({ link, messages, now = new Date() }: { link: Whats
                 <li>Tap Link a device and scan this code.</li>
               </ol>
               <p className="text-sm text-kumo-subtle">The code changes every 20 seconds. This page refreshes by itself.</p>
+              <PairingByCode link={link} now={now} />
             </div>
             <AutoRefresh seconds={10} />
           </div>
@@ -86,5 +89,28 @@ export function WhatsappCard({ link, messages, now = new Date() }: { link: Whats
         )}
       </div>
     </Card>
+  );
+}
+
+/** Link with a code instead of the QR (WhatsApp: Linked devices > Link a device > Link with phone number instead). */
+function PairingByCode({ link, now }: { link: WhatsappLink; now: Date }) {
+  const asked = link.pairingRequestedAt && now.getTime() - link.pairingRequestedAt.getTime() < PAIRING_FRESH_MS;
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-kumo-hairline pt-4">
+      <p className="font-medium text-kumo-strong">Or link with a code</p>
+      <form action={requestPairingCode} className="flex flex-wrap items-end gap-3">
+        <Input name="phone" label="Phone number of the Dualis WhatsApp" placeholder="+7 701 000 0000" inputMode="tel" required className="w-64" />
+        <Button type="submit" variant="secondary">Get code</Button>
+      </form>
+      {link.pairingCode ? (
+        <div className="flex flex-col gap-1">
+          <p className="font-mono text-3xl font-semibold tracking-widest text-kumo-strong">{formatPairingCode(link.pairingCode)}</p>
+          <p>On that phone: Settings, Linked devices, Link a device, then Link with phone number instead. Type this code.</p>
+          <p className="text-sm text-kumo-subtle">A new code shows here about every minute until the phone is linked.</p>
+        </div>
+      ) : (
+        asked && <p className="text-sm text-kumo-subtle">Asking WhatsApp for a code. It shows here in a few seconds.</p>
+      )}
+    </div>
   );
 }
