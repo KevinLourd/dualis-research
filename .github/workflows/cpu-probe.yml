@@ -11,9 +11,6 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: web
     env:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
