@@ -6,6 +6,7 @@ import * as growth from "@/db/schema/growth";
 import { judgments } from "@/db/schema/silver";
 import type { Db } from "@/db/types";
 import { rebuildGoldAudience } from "@/growth/audience";
+import { rebuildGoldOutreach } from "../growth-outreach";
 import type { Complete } from "@/llm/complete";
 import { judge } from "@/llm/judge";
 import { getJson } from "../../http";
@@ -102,15 +103,18 @@ async function networkSubjects(db: Db): Promise<string[]> {
 }
 
 /**
- * Crawl rounds: 1 = the recommendations of what the seeds recommend (2nd hop), 2 = public profile of the ranking
+ * Crawl rounds: 1 = the recommendations of what the seeds recommend (2nd hop) + of every drafted author's publication
+ * (daily check: does it recommend Analysis Paralysis now?), 2 = public profile of the ranking
  * candidates, 3 = latest posts of every author profiled. Then done.
  */
 async function expandNetwork(db: Db, soFar: BronzeFetch[], round: number): Promise<string[]> {
   const graph = graphOf(soFar);
-  if (round === 1) {
-    return [...graph.pubs.keys()].filter((id) => !SEED_IDS.has(id)).slice(0, MAX_RECOMMENDATION_FETCHES - SEED_IDS.size).map((id) => subject("recs", id));
-  }
   const profiles = fetchesOf(soFar, "profile").map((f) => parseProfile(f.payload));
+  if (round === 1) {
+    const hop = [...graph.pubs.keys()].filter((id) => !SEED_IDS.has(id)).slice(0, MAX_RECOMMENDATION_FETCHES - SEED_IDS.size);
+    const drafted = profiles.filter((p) => p.handle !== OWN.handle).flatMap((p) => p.publications.map((x) => x.id));
+    return [...new Set([...hop, ...drafted])].filter((id) => !SEED_IDS.has(id) && id !== OWN.publicationId).map((id) => subject("recs", id));
+  }
   if (round === 2) {
     const pubs = new Map(graph.pubs);
     for (const prof of profiles) for (const p of prof.publications) if (!pubs.has(p.id)) pubs.set(p.id, p);
@@ -373,4 +377,5 @@ export async function rebuildGoldGrowth(db: Db, now: Date = new Date()): Promise
   for (const chunk of chunks(rows, 200)) await db.insert(growth.goldGrowthTargets).values(chunk);
 
   await rebuildGoldAudience(db);
+  await rebuildGoldOutreach(db);
 }

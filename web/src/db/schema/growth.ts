@@ -139,6 +139,8 @@ export const goldGrowthOutreach = gold.table("growth_outreach", {
   /** Substack DM first (always, from the handle), then what the targets doc lists. */
   contacts: jsonb("contacts").$type<OutreachContact[]>().notNull(),
   rank: integer("rank"),
+  /** First crawl that saw the author's publication recommend Analysis Paralysis (substack-network); null = not (yet). */
+  recommendsUsSince: timestamp("recommends_us_since", { withTimezone: true }),
   sources: text("sources").array().notNull(),
   rebuiltAt,
 });

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as growth from "@/db/schema/growth";
 import type { Db } from "@/db/types";
@@ -8,7 +8,7 @@ import type { Assertion } from "@/bsg/provenance";
 import { rebuildGoldAudience } from "@/growth/audience";
 import { listPrivateFiles, readPrivateFile } from "@/private/files";
 import { OWN } from "../substack-network/seeds";
-import { parseOutreachMarkdown, parseReadings, parseTargetContacts } from "./parse";
+import { parseOutreachLog, parseOutreachMarkdown, parseReadings, parseTargetContacts } from "./parse";
 
 export const OUTREACH_DIMENSION = "growth-outreach";
 /** Claude's drafts in data/outreach/*.md. */
@@ -22,6 +22,9 @@ export const TARGETS_DOC = "docs/acquisition-targets.md";
 /** Kevin's readings of Thierry's count on the Substack dashboard (the public profile lags it). */
 export const READINGS_SOURCE = "dashboard-reading";
 export const READINGS_FILE = "data/growth/audience-readings.json";
+/** What Thierry said he sent (WhatsApp), relayed by Kevin: who, when, which status, his words. */
+export const LOG_SOURCE = "outreach-log";
+export const LOG_FILE = "data/growth/outreach-log.json";
 
 /** One bronze row per private file a source reads, raw text kept (JSON parsed). */
 function repoFile(name: string, covers: (file: string) => boolean): Source {
@@ -39,14 +42,15 @@ function repoFile(name: string, covers: (file: string) => boolean): Source {
 export const claudeDrafts = repoFile(DRAFT_SOURCE, (f) => f.startsWith(`${OUTREACH_DIR}/`));
 export const targetsDoc = repoFile(TARGETS_SOURCE, (f) => f === TARGETS_DOC);
 export const dashboardReadings = repoFile(READINGS_SOURCE, (f) => f === READINGS_FILE);
+export const outreachLog = repoFile(LOG_SOURCE, (f) => f === LOG_FILE);
 
 export const growthOutreach: Dimension = {
   name: OUTREACH_DIMENSION,
-  description: "Messages to the Substack authors we target (Claude's drafts, contacts, Thierry's edits and statuses) and Kevin's dashboard readings of Thierry's count.",
-  sources: [claudeDrafts, targetsDoc, dashboardReadings],
+  description: "Messages to the Substack authors we target (Claude's drafts, contacts, Thierry's edits and statuses, what he said he sent) and Kevin's dashboard readings of Thierry's count.",
+  sources: [claudeDrafts, targetsDoc, dashboardReadings, outreachLog],
   async subjects(db) {
     const files = await listPrivateFiles(db, OUTREACH_DIR);
-    return [...files.filter((f) => f.endsWith(".md")), TARGETS_DOC, READINGS_FILE];
+    return [...files.filter((f) => f.endsWith(".md")), TARGETS_DOC, READINGS_FILE, LOG_FILE];
   },
   promote: promoteOutreach,
 };
@@ -58,6 +62,7 @@ export async function promoteOutreach(db: Db, rows: BronzeFetch[]): Promise<Prom
   let drafts = 0;
   let edits = 0;
   let contactRows = 0;
+  let logRows = 0;
   const readings: Assertion[] = [];
   for (const f of [...rows].sort((a, b) => a.fetchedAt.getTime() - b.fetchedAt.getTime())) {
     if (f.error) continue;
@@ -72,6 +77,15 @@ export async function promoteOutreach(db: Db, rows: BronzeFetch[]): Promise<Prom
         const row = { handle, source: TARGETS_SOURCE, contacts, bronzeIds: [f.id], updatedAt: f.fetchedAt };
         await db.insert(growth.outreachMessages).values(row).onConflictDoUpdate({ target: [growth.outreachMessages.handle, growth.outreachMessages.source], set: row });
         contactRows += 1;
+      }
+    } else if (f.source === LOG_SOURCE) {
+      // The file is the whole log: each handle keeps its latest entry.
+      const latest = new Map<string, { status: growth.OutreachStatus; at: Date }>();
+      for (const e of parseOutreachLog(f.payload)) for (const h of e.handles) if (!latest.has(h) || latest.get(h)!.at <= e.at) latest.set(h, e);
+      await db.delete(growth.outreachMessages).where(eq(growth.outreachMessages.source, LOG_SOURCE));
+      for (const [handle, e] of latest) {
+        await db.insert(growth.outreachMessages).values({ handle, source: LOG_SOURCE, status: e.status, statusAt: e.at, bronzeIds: [f.id], updatedAt: f.fetchedAt });
+        logRows += 1;
       }
     } else if (f.source === READINGS_SOURCE) {
       for (const r of parseReadings(f.payload)) readings.push({ source: READINGS_SOURCE, field: `subscribers@${r.date}`, value: r.subscribers, bronzeId: f.id });
@@ -98,17 +112,42 @@ export async function promoteOutreach(db: Db, rows: BronzeFetch[]): Promise<Prom
   const readingRows = readings.length ? await promoteFacts(db, OUTREACH_DIMENSION, new Map([[`pub:${OWN.publicationId}`, readings]])) : 0;
   await rebuildGoldOutreach(db);
   if (readings.length) await rebuildGoldAudience(db);
-  return { silverRowsBySource: { [DRAFT_SOURCE]: drafts, [TARGETS_SOURCE]: contactRows, [READINGS_SOURCE]: readingRows, [CONSOLE_SOURCE]: edits } };
+  return { silverRowsBySource: { [DRAFT_SOURCE]: drafts, [TARGETS_SOURCE]: contactRows, [READINGS_SOURCE]: readingRows, [CONSOLE_SOURCE]: edits, [LOG_SOURCE]: logRows } };
 }
 
+/** Since when each author's publication recommends Analysis Paralysis (substack-network edges, first seen). */
+async function recommendsUsSince(db: Db): Promise<Map<string, Date>> {
+  const edges = await db.select().from(growth.substackRecommendations).where(eq(growth.substackRecommendations.toId, OWN.publicationId));
+  if (edges.length === 0) return new Map();
+  const pubs = await db
+    .select({ id: growth.substackPublications.id, handle: growth.substackPublications.authorHandle })
+    .from(growth.substackPublications)
+    .where(inArray(growth.substackPublications.id, edges.map((e) => e.fromId)));
+  const handleOf = new Map(pubs.map((p) => [p.id, p.handle]));
+  const out = new Map<string, Date>();
+  for (const e of edges) {
+    const h = handleOf.get(e.fromId);
+    if (h && (!out.has(h) || e.firstSeenAt < out.get(h)!)) out.set(h, e.firstSeenAt);
+  }
+  return out;
+}
+
+/**
+ * gold.growth_outreach: Thierry's body wins over Claude's; the status is his latest word (console click or what he
+ * said on WhatsApp, latest wins); `recommendsUsSince` comes from the Substack crawl. Rebuilt by both dimensions.
+ */
 export async function rebuildGoldOutreach(db: Db): Promise<void> {
   const rows = await db.select().from(growth.outreachMessages);
+  const recommends = await recommendsUsSince(db);
   const byHandle = new Map<string, growth.SilverOutreachMessage[]>();
   for (const r of rows) byHandle.set(r.handle, [...(byHandle.get(r.handle) ?? []), r]);
   const gold = [...byHandle].flatMap(([handle, list]) => {
     const claude = list.find((r) => r.source === DRAFT_SOURCE);
     const mine = list.find((r) => r.source === CONSOLE_SOURCE);
     const doc = list.find((r) => r.source === TARGETS_SOURCE);
+    const said = list
+      .filter((r) => (r.source === CONSOLE_SOURCE || r.source === LOG_SOURCE) && r.status)
+      .sort((a, b) => (b.statusAt?.getTime() ?? 0) - (a.statusAt?.getTime() ?? 0))[0];
     const dm = { label: "Substack DM", href: `https://substack.com/@${handle}` };
     const body = mine?.body ?? claude?.body;
     if (!body) return [];
@@ -121,8 +160,9 @@ export async function rebuildGoldOutreach(db: Db): Promise<void> {
         body,
         bodySource: mine?.body ? CONSOLE_SOURCE : DRAFT_SOURCE,
         claudeBody: claude?.body ?? null,
-        status: mine?.status ?? claude?.status ?? "draft",
-        statusAt: mine?.status ? mine.statusAt : null,
+        status: said?.status ?? claude?.status ?? "draft",
+        statusAt: said?.statusAt ?? null,
+        recommendsUsSince: recommends.get(handle) ?? null,
         contacts: [dm, ...(doc?.contacts ?? []).filter((c) => c.href !== dm.href)],
         rank: claude?.rank ?? null,
         sources: list.filter((r) => r.source !== TARGETS_SOURCE || r.contacts?.length).map((r) => r.source).sort(),

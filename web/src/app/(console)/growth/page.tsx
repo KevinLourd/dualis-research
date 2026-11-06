@@ -36,7 +36,23 @@ const STATUS_ACTIONS = [
 ] as const;
 const FIT: Record<string, string> = { yes: "Same reader", partly: "Overlaps", no: "Other reader" };
 
-function StatusBadge({ status }: { status: string }) {
+/** Day by day since the goal started (Astana days): contacts (status set that day), recommendations first seen, subscribers. */
+function dailyOutreach(live: GrowthRow[], audience: { date: string; subscribers: number }[], today: string) {
+  const astanaDay = (d: Date) => isoDate(new Date(d.getTime() + 5 * 3_600_000));
+  const out: { date: string; contacted: number; recommended: number; subscribers: number | null }[] = [];
+  for (let d: string = GOAL.startDate; d <= today && d <= GOAL.endDate; d = isoDate(new Date(Date.parse(`${d}T00:00:00Z`) + 86_400_000))) {
+    out.push({
+      date: d,
+      contacted: live.filter((r) => r.outreach && r.outreach.status !== "draft" && r.outreach.status !== "dropped" && r.outreach.statusAt && astanaDay(r.outreach.statusAt) === d).length,
+      recommended: live.filter((r) => r.outreach?.recommendsUsSince && astanaDay(r.outreach.recommendsUsSince) === d).length,
+      subscribers: audience.find((a) => a.date === d)?.subscribers ?? null,
+    });
+  }
+  return out.reverse();
+}
+
+function StatusBadge({ status, recommends = false }: { status: string; recommends?: boolean }) {
+  if (recommends) return <Badge variant="success">Recommends you</Badge>;
   const s = STATUS[status] ?? { text: status, variant: "neutral" as const };
   return <Badge variant={s.variant}>{s.text}</Badge>;
 }
@@ -52,6 +68,10 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
     .filter((d, i, all) => all.indexOf(d) === i && d >= GOAL.startDate)
     .map((date) => ({ date, value: planned(date) }));
   const sent = live.filter((r) => r.outreach && r.outreach.status !== "draft" && r.outreach.status !== "dropped").length;
+  const recommending = live
+    .filter((r) => r.outreach?.recommendsUsSince)
+    .sort((a, b) => a.outreach!.recommendsUsSince!.getTime() - b.outreach!.recommendsUsSince!.getTime());
+  const days = dailyOutreach(live, audience, today);
 
   const tiles = [
     { label: "Subscribers now", value: fmt(p.current), note: latest ? `Counted ${dayLabel(latest.date)}` : "Not counted yet" },
@@ -103,6 +123,40 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
         />
       ) : (
         <>
+          <Card
+            title="Recommending you"
+            action={<span className="text-sm text-kumo-subtle">{recommending.length} of {sent} contacted. Checked every morning on Substack.</span>}
+          >
+            {recommending.length === 0 ? (
+              <p className="p-4 text-base text-kumo-subtle">No writer you contacted recommends you yet. The next morning check will show the first ones.</p>
+            ) : (
+              <TargetTable rows={recommending} selectedKey={key} withStatus />
+            )}
+          </Card>
+
+          <Card title="Every day" action={<span className="text-sm text-kumo-subtle">Writers contacted and recommendations won, day by day</span>}>
+            <KTable>
+              <KTableHeader>
+                <KTableRow>
+                  <KTableHead>Day</KTableHead>
+                  <KTableHead className="text-right">Contacted</KTableHead>
+                  <KTableHead className="text-right">New recommendations</KTableHead>
+                  <KTableHead className="text-right">Subscribers</KTableHead>
+                </KTableRow>
+              </KTableHeader>
+              <KTableBody>
+                {days.map((d) => (
+                  <KTableRow key={d.date}>
+                    <KTableCell>{dayLabel(d.date)}</KTableCell>
+                    <KTableCell className="text-right font-mono tabular">{d.contacted}</KTableCell>
+                    <KTableCell className="text-right font-mono tabular">{d.recommended}</KTableCell>
+                    <KTableCell className="text-right font-mono tabular">{d.subscribers === null ? <Missing>–</Missing> : fmt(d.subscribers)}</KTableCell>
+                  </KTableRow>
+                ))}
+              </KTableBody>
+            </KTable>
+          </Card>
+
           <Card title="Writers to contact" action={<span className="text-sm text-kumo-subtle">{sent} of {live.length} contacted</span>}>
             <TargetTable rows={live} selectedKey={key} withStatus />
           </Card>
@@ -154,7 +208,7 @@ function TargetTable({ rows, selectedKey, withStatus = false }: { rows: GrowthRo
               )}
             </KTableCell>
             <KTableCell>{t?.fit ? FIT[t.fit] ?? t.fit : <Missing>Not judged</Missing>}</KTableCell>
-            {withStatus && <KTableCell>{o ? <StatusBadge status={o.status} /> : null}</KTableCell>}
+            {withStatus && <KTableCell>{o ? <StatusBadge status={o.status} recommends={!!o.recommendsUsSince} /> : null}</KTableCell>}
           </KTableRow>
         ))}
       </KTableBody>
@@ -169,7 +223,7 @@ function TargetPanel({ row: { target: t, outreach: o } }: { row: GrowthRow }) {
       title={t?.name ?? o?.publicationName ?? "Target"}
       subtitle={
         <span className="flex flex-wrap items-center gap-2">
-          {o && <StatusBadge status={o.status} />}
+          {o && <StatusBadge status={o.status} recommends={!!o.recommendsUsSince} />}
           {t?.authorName ?? (o ? `@${o.handle}` : null)}
           {t && (
             <a href={t.url} target="_blank" rel="noreferrer" className="text-kumo-link hover:underline">

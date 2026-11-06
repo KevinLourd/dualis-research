@@ -1,0 +1,1 @@
+ALTER TABLE "gold"."growth_outreach" ADD COLUMN "recommends_us_since" timestamp with time zone;
