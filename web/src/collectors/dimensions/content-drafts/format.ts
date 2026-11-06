@@ -12,13 +12,13 @@ export const ARTICLE_DISCLAIMER =
 
 export const X_LIMIT = 280;
 
-export const PROMPT_VERSION = "drafts-v3";
+export const PROMPT_VERSION = "drafts-v4";
 
 const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
   "The game: grow paid Substack subscribers. The reader is a self-directed, experienced small-cap investor who reads filings and pays for ideas the big funds miss.",
   "A post earns a follow when it gives one sharp, dated, sourced fact and says what it means for the thesis, so readers feel they learned something only this writer tells them. Numbers first, the view right after.",
-  "This news CONTRADICTS the story the market tells about the company, which is what the thesis needs: say what the market believes and why this fact cracks it, in plain words. Stay honest about what is not proven yet.",
+  "The post tells ONE Idea, given below with the evidence behind it: the fact first, then what it means for the story the market tells about the company, in plain words. Stay honest about what is not proven yet.",
   "Never write a disclaimer, it is added after you. Never invent a figure that is not in the inputs. Never an em dash or en dash, no emojis, no hashtags, no hype words.",
   "Write in the voice of the account below, following its style guide. When the guide and these rules disagree, these rules win.",
 ].join("\n");
@@ -28,7 +28,7 @@ const FORMAT_RULES: Record<DraftFormat, string> = {
   "linkedin-post": "Format: one LinkedIn post, 600 to 1200 characters, short paragraphs, ends with one question to the reader. Answer with the post text only.",
   "substack-note": "Format: one Substack Note, 300 to 700 characters, conversational, like a note to subscribers. Answer with the note text only.",
   "substack-article": [
-    "Format: one full Substack article, 900 to 1500 words, in this section order with these exact headings: ## 1. The business, ## 2. What the market believes, ## 3. Why the story is cracking, ## 4. Bull vs Bear, ## 5. What would prove us wrong.",
+    "Format: one full Substack article, 900 to 1500 words, in this section order with these exact headings: ## 1. The business, ## 2. What the market believes, ## 3. What changed, ## 4. Bull vs Bear, ## 5. What would prove us wrong.",
     "Title states a view (a claim, never a topic). Subtitle in one line.",
     "Use the exhibits offered: put [EXHIBIT <id>] on its own line where a chart helps, at most 3, each one an id from the list. The id is for that marker only: in the text call them Exhibit 1, 2, 3 in order of appearance. Each exhibit prints its own title and source line under it, so never write a source line for it.",
     "Where a figure is missing, write what we would need to know, never a guess.",
@@ -47,25 +47,32 @@ export function draftSystem(format: DraftFormat, voiceGuide: string | null, acco
   ].join("\n");
 }
 
-export function draftPrompt(
-  inputs: DraftInputs,
-  narrative: string | null,
-  newsSummary: string | null,
-  exhibits: { id: string; label: string }[] = [],
-): string {
-  const c = inputs.catalyst;
+/** What the writer gets beside the Idea: the ticker's story and the evidence the Idea rests on, in words. */
+export type IdeaContext = {
+  narrative: string | null;
+  signal: string | null;
+  fairValue: string | null;
+  evidence: { headline: string; publisher: string | null; day: string; why: string | null; url: string | null }[];
+  drivers: { title: string; summary: string | null }[];
+  signalChanges: { label: string; note: string | null }[];
+};
+
+export function draftPrompt(inputs: DraftInputs, ctx: IdeaContext, exhibits: { id: string; label: string }[] = []): string {
+  const idea = inputs.idea;
   const lines = [
     `Ticker: ${inputs.symbol}${inputs.companyName ? ` (${inputs.companyName})` : ""}`,
     "",
-    `Thesis (${inputs.thesis?.author === "draft" ? "draft prefilled by Claude, not yet reviewed by Thierry" : "approved by Thierry"}): ${inputs.thesis?.summary ?? "none"}`,
+    `Idea: ${idea?.title ?? ""}`,
+    `Why now: ${idea?.angle ?? ""}`,
     "",
-    `What the market believes: ${narrative ?? "not written yet"}`,
-    "",
-    `News (${inputs.news?.publisher ?? "unknown publisher"}, ${inputs.news?.publishedAt?.slice(0, 10) ?? "undated"}): ${inputs.news?.title ?? ""}`,
-    newsSummary ? `Summary: ${newsSummary}` : "",
-    inputs.news ? `Link: ${inputs.news.url}` : "",
-    c ? `Why it cracks that story (judged ${Math.round(c.probability * 100)}%): ${c.reason ?? ""}` : "",
-    inputs.worth?.citedSentence ? `Evidence: ${inputs.worth.citedSentence}` : "",
+    `What the market believes: ${ctx.narrative ?? "not written yet"}`,
+    ctx.signal ? `Signal: ${ctx.signal}` : "",
+    ctx.fairValue ? `Fair value: ${ctx.fairValue}` : "",
+    ...(ctx.signalChanges.length ? ["", "Signal changes:", ...ctx.signalChanges.map((c) => `- ${c.label}${c.note ? `: ${c.note}` : ""}`)] : []),
+    ...(ctx.evidence.length
+      ? ["", "Evidence:", ...ctx.evidence.map((e) => `- ${e.day} ${e.publisher ?? ""}: ${e.headline}${e.why ? `. ${e.why}` : ""}${e.url ? ` (${e.url})` : ""}`)]
+      : []),
+    ...(ctx.drivers.length ? ["", "Narrative drivers (why the market holds its story):", ...ctx.drivers.map((d) => `- ${d.title}${d.summary ? `: ${d.summary}` : ""}`)] : []),
     exhibits.length ? ["", "Exhibits you may use:", ...exhibits.map((x) => `- ${x.id}: ${x.label}`)].join("\n") : "",
   ];
   return lines.filter((l, i) => l !== "" || lines[i - 1] !== "").join("\n").trim();

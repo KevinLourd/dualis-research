@@ -1,278 +1,229 @@
-import { Badge, Button } from "@cloudflare/kumo";
-import { NotePencilIcon } from "@phosphor-icons/react/ssr";
+import { Badge } from "@cloudflare/kumo";
+import { LightbulbIcon } from "@phosphor-icons/react/ssr";
+import { DRAFT_FORMATS, FORMAT_LABEL } from "@/collectors/dimensions/content-drafts/format";
+import { requestDraftAction } from "@/content/actions";
+import { canDispatch } from "@/content/dispatch";
+import { lastContentRun, listIdeas } from "@/console/content-queries";
+import { PendingButton } from "@/console/content-ui";
+import { relativeTime } from "@/console/format";
+import { itemHref } from "@/console/analysis";
+import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import Link from "@/console/link";
-import { FORMAT_LABEL, publishLink, X_LIMIT } from "@/collectors/dimensions/content-drafts/format";
-import { updateDraftStatus } from "@/content/actions";
-import { getDraft, lastContentRun, listDrafts } from "@/console/content-queries";
-import { CopyButton } from "@/console/content-ui";
-import { relativeTime, utc } from "@/console/format";
+import { RowLink } from "@/console/row-link";
 import { SlideOver } from "@/console/slide-over";
-import { Chip } from "@/console/chip";
-import { Card, ComingNext, Fact, FactList, Missing, TickerLink } from "@/console/ui";
-import type { GoldContentDraft } from "@/db/schema/content";
+import { ComingNext } from "@/console/ui";
+import type { GoldContentIdea, IdeaRequest, IdeaSourceRef } from "@/db/schema/content";
 
 export const metadata = { title: "Content" };
 
-/** "Wed 14:30 UTC": the publishing slot of a draft. */
-function slotLabel(d: Date) {
-  return `${d.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${d.toISOString().slice(11, 16)} UTC`;
-}
-
-const STATUS_TABS = [
-  { value: "draft", label: "To review" },
-  { value: "approved", label: "Approved" },
-  { value: "posted", label: "Posted" },
-  { value: "dismissed", label: "Dismissed" },
-  { value: "all", label: "All" },
-] as const;
-
-const STATUS_BADGE: Record<string, { text: string; variant: "neutral" | "primary" | "success" | "outline" }> = {
-  draft: { text: "To review", variant: "neutral" },
-  approved: { text: "Approved", variant: "primary" },
-  posted: { text: "Posted", variant: "success" },
-  dismissed: { text: "Dismissed", variant: "outline" },
+const KIND_WORD: Record<IdeaSourceRef["kind"], string> = {
+  signal: "Signal",
+  change: "Signal change",
+  evidence: "Evidence",
+  driver: "Narrative driver",
+  "fair-value": "Fair value",
+  report: "Research report",
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_BADGE[status] ?? { text: status, variant: "neutral" as const };
-  return <Badge variant={s.variant}>{s.text}</Badge>;
+/** Where a source opens: the item panel of the Analysis page when it has one, else the page. */
+function sourceHref(s: IdeaSourceRef): string | null {
+  if (!s.symbol) return null;
+  const id = s.ref.slice(s.ref.indexOf(":") + 1);
+  if (s.kind === "evidence") return itemHref(s.symbol, `news:${id}`);
+  if (s.kind === "driver") return itemHref(s.symbol, `driver:${id}`);
+  if (s.kind === "fair-value") return itemHref(s.symbol, "fair-value");
+  return `/tickers/${encodeURIComponent(s.symbol)}`;
 }
 
-export default async function DraftsPage({ searchParams }: { searchParams: Promise<{ status?: string; draft?: string }> }) {
-  const { status = "draft", draft: draftId } = await searchParams;
-  const [all, run] = await Promise.all([listDrafts(), lastContentRun("content-drafts")]);
-  const rows = (status === "all" ? all : all.filter((d) => d.status === status)).sort(
-    (a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity) || b.createdAt.getTime() - a.createdAt.getTime(),
-  );
-  const selected = draftId ? await getDraft(draftId) : null;
-  const base = status === "draft" ? "/content" : `/content?status=${status}`;
-  const withDraft = (id: string) => `${base}${base.includes("?") ? "&" : "?"}draft=${id}`;
+function dayLabel(day: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (day === today) return "Today";
+  if (day === new Date(Date.now() - 86400_000).toISOString().slice(0, 10)) return "Yesterday";
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
 
-  // One card per (ticker, news): the formats written in the same generation sit together.
-  const groups = new Map<string, GoldContentDraft[]>();
-  for (const d of rows) {
-    const key = `${d.symbol}\u0000${d.inputKey}`;
-    groups.set(key, [...(groups.get(key) ?? []), d]);
+/** Score as a number with a colour: 70+ worth posting, 40-69 maybe, below quiet. */
+function Score({ value }: { value: number }) {
+  const variant = value >= 70 ? "success" : value >= 40 ? "warning" : "neutral";
+  return (
+    <Badge variant={variant === "neutral" ? "outline" : "secondary"} className={`font-mono tabular-nums ${variant === "success" ? "bg-dualis-long-soft text-dualis-long" : ""}`}>
+      {value}
+    </Badge>
+  );
+}
+
+/** Content > Ideas: what to publish next, best first. A row opens the Idea's panel, where each channel x format can be drafted. */
+export default async function IdeasPage({ searchParams }: { searchParams: Promise<{ idea?: string }> }) {
+  const { idea: ideaId } = await searchParams;
+  const [ideas, run] = await Promise.all([listIdeas(), lastContentRun("content-ideas")]);
+  const selected = ideaId ? (ideas.find((i) => i.id === ideaId) ?? null) : null;
+
+  if (ideas.length === 0) {
+    return (
+      <ComingNext
+        icon={<LightbulbIcon size={40} className="text-kumo-inactive" />}
+        title="No idea yet"
+        description={
+          run?.status === "failed"
+            ? `The last idea run (${relativeTime(run.startedAt)}) failed. The Data page shows why.`
+            : "Ideas are proposed every morning from the signals, evidence and fair values, and ranked for each channel."
+        }
+      />
+    );
   }
 
   return (
     <>
-      <nav className="flex flex-wrap gap-2" aria-label="Filter by status">
-        {STATUS_TABS.map((t) => (
-          <Chip
-            key={t.value}
-            href={t.value === "draft" ? "/content" : `/content?status=${t.value}`}
-            active={status === t.value}
-            label={t.label}
-            count={t.value === "all" ? all.length : all.filter((d) => d.status === t.value).length}
-          />
-        ))}
-      </nav>
-
-      {all.length === 0 ? (
-        <ComingNext
-          icon={<NotePencilIcon size={40} className="text-kumo-inactive" />}
-          title="No draft yet"
-          description={
-            run?.status === "failed"
-                ? `The last drafting run (${relativeTime(run.startedAt)}) failed. The Data page shows why.`
-                : run
-                ? `The last drafting run (${relativeTime(run.startedAt)}) found no fresh news worth a post. Two drafts a day are proposed when one is.`
-                : "Drafting has not run yet. It runs every morning after news is collected."
-          }
-        />
-      ) : groups.size === 0 ? (
-        <Card title={STATUS_TABS.find((t) => t.value === status)?.label ?? "Drafts"}>
-          <p className="p-4 text-base text-kumo-subtle">Nothing here.</p>
-        </Card>
-      ) : (
-        [...groups.values()].map((drafts) => {
-          const first = drafts[0];
-          const news = first.inputs.news;
-          return (
-            <Card
-              key={`${first.symbol}-${first.inputKey}`}
-              title={first.inputs.companyName ?? first.symbol}
-              action={
-                <span className="text-sm text-kumo-subtle">
-                  {first.scheduledAt ? `Slot ${slotLabel(first.scheduledAt)}` : `Drafted ${relativeTime(first.createdAt)}`}
-                </span>
-              }
-            >
-              <div className="flex flex-col gap-1 border-b border-kumo-hairline px-4 py-3">
-                <span className="flex items-center gap-2">
-                  <TickerLink symbol={first.symbol} />
-                  {first.inputs.driver && <Badge variant="outline">Driver: {first.inputs.driver.name}</Badge>}
-                </span>
-                {news && (
-                  <a href={news.url} target="_blank" rel="noreferrer" className="text-base text-kumo-link hover:underline">
-                    {news.title}
-                  </a>
-                )}
-              </div>
-              <ul className="divide-y divide-kumo-hairline">
-                {drafts.map((d) => (
-                  <li key={d.id}>
-                    <Link
-                      href={withDraft(d.id)}
-                      scroll={false}
-                      className={"grid grid-cols-[220px_1fr_auto] items-center gap-4 px-4 py-3 hover:bg-kumo-tint " + (draftId === d.id ? "bg-kumo-tint" : "")}
-                    >
-                      <span className="flex flex-col">
-                        <span className="text-sm font-medium text-kumo-default">{FORMAT_LABEL[d.format] ?? d.format}</span>
-                        <span className="text-xs text-kumo-subtle">{d.accountName ?? "No account yet"}</span>
-                      </span>
-                      <span className="truncate text-base text-kumo-subtle">{d.title ?? d.body.split("\n")[0]}</span>
-                      <StatusBadge status={d.status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          );
-        })
-      )}
-
-      {selected && <DraftPanel draft={selected} closeHref={base} />}
+      <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
+        <KTable className="table-fixed">
+          <KTableHeader>
+            <KTableRow>
+              <KTableHead className="pl-6">Idea</KTableHead>
+              <KTableHead className="w-36">Ticker</KTableHead>
+              <KTableHead className="w-52">Best for</KTableHead>
+              <KTableHead className="w-24 text-right">Drafts</KTableHead>
+              <KTableHead className="w-32 pr-6 text-right">Proposed</KTableHead>
+            </KTableRow>
+          </KTableHeader>
+          <KTableBody>
+            {ideas.map((i) => (
+              <RowLink key={i.id} href={`/content?idea=${i.id}`} label={`Open the idea: ${i.title}`}>
+                <KTableCell className="py-4 pl-6">
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="text-base font-medium text-kumo-strong">{i.title}</span>
+                    <span className="line-clamp-2 text-sm text-kumo-subtle">{i.angle}</span>
+                  </span>
+                </KTableCell>
+                <KTableCell className="py-4">
+                  {i.symbol ? (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm text-kumo-default">{i.companyName ?? i.symbol}</span>
+                      <span className="font-mono text-[12px] text-kumo-subtle">{i.symbol}</span>
+                    </span>
+                  ) : (
+                    <span className="text-sm text-kumo-subtle">Several</span>
+                  )}
+                </KTableCell>
+                <KTableCell className="py-4">
+                  {i.bestFormat && i.bestScore !== null ? (
+                    <span className="inline-flex items-center gap-2 text-sm text-kumo-default">
+                      <Score value={i.bestScore} /> {FORMAT_LABEL[i.bestFormat] ?? i.bestFormat}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-kumo-subtle">Not scored yet</span>
+                  )}
+                </KTableCell>
+                <KTableCell className="py-4 text-right font-mono tabular-nums text-kumo-default">{i.draftCount || <span className="text-kumo-subtle">0</span>}</KTableCell>
+                <KTableCell className="py-4 pr-6 text-right text-sm text-kumo-subtle">{dayLabel(i.day)}</KTableCell>
+              </RowLink>
+            ))}
+          </KTableBody>
+        </KTable>
+      </div>
+      {selected && <IdeaPanel idea={selected} />}
     </>
   );
 }
 
-function DraftPanel({ draft, closeHref }: { draft: GoldContentDraft; closeHref: string }) {
-  const text = draft.title ? `${draft.title}\n\n${draft.body}` : draft.body;
-  const link = publishLink(draft.format, draft.body);
-  const over = draft.format === "x-post" && draft.body.length > X_LIMIT;
-  const { news, thesis, driver, worth } = draft.inputs;
+function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
+  const scoreOf = new Map(idea.scores.map((s) => [s.format, s]));
+  const formats = [...DRAFT_FORMATS].sort((a, b) => (scoreOf.get(b)?.score ?? -1) - (scoreOf.get(a)?.score ?? -1));
+  const latest = (format: string): IdeaRequest | undefined => idea.requests.find((r) => r.format === format);
   return (
     <SlideOver
-      closeHref={closeHref}
-      title={`${FORMAT_LABEL[draft.format] ?? draft.format} · ${draft.symbol}`}
-      subtitle={
-        <span className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={draft.status} /> {draft.accountName ?? "No account yet"} · Version {draft.version}
-          {draft.scheduledAt ? ` · Slot ${slotLabel(draft.scheduledAt)}` : ` · ${utc(draft.createdAt)}`}
-        </span>
-      }
+      closeHref="/content"
+      size="lg"
+      title="Idea"
+      subtitle={`${idea.companyName ?? idea.symbol ?? "Several tickers"} · proposed ${dayLabel(idea.day).toLowerCase()}`}
     >
       <section className="flex flex-col gap-2">
-        {draft.title && <h3 className="text-lg font-semibold text-kumo-strong">{draft.title}</h3>}
-        <p className="rounded-lg bg-kumo-recessed p-4 text-base whitespace-pre-wrap text-kumo-default">{draft.body}</p>
-        <p className={"text-sm " + (over ? "text-dualis-short" : "text-kumo-subtle")}>
-          {draft.body.length} characters{draft.format === "x-post" && (over ? `, over the ${X_LIMIT} character X limit: shorten before posting` : ` of ${X_LIMIT}`)}
-        </p>
+        <h3 className="text-xl font-semibold text-kumo-strong">{idea.title}</h3>
+        <p className="text-base text-kumo-default">{idea.angle}</p>
       </section>
 
-      <section className="flex flex-wrap gap-2">
-        {link && (
-          <a href={link.href} target="_blank" rel="noreferrer">
-            <Button variant="primary" tabIndex={-1}>
-              {link.label}
-            </Button>
-          </a>
-        )}
-        <CopyButton text={text} />
-        {draft.format === "substack-article" && (
-          <Link href={`/content/drafts/${draft.id}`}>
-            <Button variant="secondary" tabIndex={-1}>Open the Substack preview</Button>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-sm font-medium text-kumo-subtle">Draft it</h3>
+        <ul className="divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
+          {formats.map((format, n) => {
+            const s = scoreOf.get(format);
+            const r = latest(format);
+            return (
+              <li key={format} className="grid grid-cols-[48px_1fr_auto] items-start gap-4 px-4 py-3.5">
+                <span className="pt-0.5">{s ? <Score value={s.score} /> : <span className="text-sm text-kumo-subtle">–</span>}</span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-base font-medium text-kumo-strong">{FORMAT_LABEL[format]}</span>
+                  {s?.why && <span className="text-sm text-kumo-subtle">{s.why}</span>}
+                  {r?.status === "failed" && <span className="text-sm text-dualis-short">The last try failed: {r.error}</span>}
+                </span>
+                <RequestAction ideaId={idea.id} format={format} request={r} primary={n === 0} />
+              </li>
+            );
+          })}
+        </ul>
+        {idea.draftCount > 0 && (
+          <Link href={`/content/drafts?idea=${idea.id}`} className="self-start text-sm font-medium text-kumo-link hover:underline">
+            All drafts of this idea ›
           </Link>
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg p-4 ring-1 ring-kumo-hairline">
-        <h3 className="text-sm font-medium text-kumo-subtle">Status</h3>
-        <div className="flex flex-wrap gap-2">
-          {draft.status !== "approved" && draft.status !== "posted" && <StatusForm id={draft.id} status="approved" label="Approve" variant="primary" />}
-          {draft.status !== "dismissed" && draft.status !== "posted" && <StatusForm id={draft.id} status="dismissed" label="Dismiss" variant="secondary" />}
-          {draft.status !== "draft" && <StatusForm id={draft.id} status="draft" label="Back to review" variant="ghost" />}
-        </div>
-        {draft.status === "posted" ? (
-          <p className="text-base text-kumo-default">
-            Posted {relativeTime(draft.statusAt)}
-            {draft.postedUrl && (
+      <section className="flex flex-col gap-3">
+        <h3 className="text-sm font-medium text-kumo-subtle">Built from</h3>
+        <ul className="flex flex-col gap-1">
+          {idea.sourceRefs.map((s) => {
+            const href = sourceHref(s);
+            const body = (
               <>
-                {": "}
-                <a href={draft.postedUrl} target="_blank" rel="noreferrer" className="text-kumo-link hover:underline">
-                  open the post
-                </a>
+                <span className="text-xs font-medium tracking-wide text-kumo-subtle uppercase">{KIND_WORD[s.kind] ?? s.kind}</span>
+                <span className="text-base text-kumo-default">{s.label}</span>
               </>
-            )}
-          </p>
-        ) : (
-          <form action={updateDraftStatus} className="flex items-end gap-2">
-            <input type="hidden" name="id" value={draft.id} />
-            <input type="hidden" name="status" value="posted" />
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-kumo-subtle">
-              Link of the published post (optional)
-              <input
-                name="postedUrl"
-                type="url"
-                placeholder="https://"
-                className="h-9 rounded-lg bg-kumo-base px-3 text-base text-kumo-default ring-1 ring-kumo-line focus:ring-2 focus:ring-kumo-brand focus:outline-none"
-              />
-            </label>
-            <Button type="submit" variant="secondary">
-              Mark posted
-            </Button>
-          </form>
-        )}
-      </section>
-
-      <section className="rounded-lg ring-1 ring-kumo-hairline">
-        <h3 className="border-b border-kumo-hairline px-4 py-3 text-sm font-medium text-kumo-subtle">Built from</h3>
-        <FactList>
-          <Fact label="News">
-            {news ? (
-              <a href={news.url} target="_blank" rel="noreferrer" className="text-kumo-link hover:underline">
-                {news.title}
-              </a>
-            ) : (
-              <Missing>None</Missing>
-            )}
-          </Fact>
-          <Fact label="Why this news">
-            {worth ? (
-              <span>
-                {draft.inputs.catalyst
-                  ? `${draft.inputs.catalyst.direction === "contradicts" ? "Cracks the market's story" : "Supports the thesis"} (${Math.round(worth.probability * 100)}% sure)${draft.inputs.catalyst.reason ? `: ${draft.inputs.catalyst.reason}` : ""}`
-                  : `Judged worth a post (${Math.round(worth.probability * 100)}% sure)`}
-                {worth.citedSentence && <span className="block text-kumo-subtle">&ldquo;{worth.citedSentence}&rdquo;</span>}
-              </span>
-            ) : (
-              <Missing>Not judged</Missing>
-            )}
-          </Fact>
-          <Fact label="Thesis">
-            {thesis ? (
-              <span>
-                {thesis.summary}
-                <span className="block text-sm text-kumo-subtle">{thesis.author === "draft" ? "Draft thesis prefilled by Claude" : thesis.author === "accepted" ? "Claude's draft, accepted by you" : "Your thesis"}</span>
-              </span>
-            ) : (
-              <Missing>None</Missing>
-            )}
-          </Fact>
-          {driver && <Fact label="Driver">{driver.name}</Fact>}
-          <Fact label="Charts">
-            {draft.charts?.length ? (
-              draft.charts.map((c) => c.title).join(", ")
-            ) : (
-              <Missing>{draft.format === "substack-article" ? "No chart: no price collected for this ticker" : "Charts go in the Substack article"}</Missing>
-            )}
-          </Fact>
-        </FactList>
+            );
+            return (
+              <li key={s.ref}>
+                {href ? (
+                  <Link href={href} className="-mx-3 flex flex-col gap-0.5 rounded-lg px-3 py-2 transition-colors hover:bg-kumo-tint">
+                    {body}
+                  </Link>
+                ) : (
+                  <span className="flex flex-col gap-0.5 py-2">{body}</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </section>
     </SlideOver>
   );
 }
 
-function StatusForm({ id, status, label, variant }: { id: string; status: string; label: string; variant: "primary" | "secondary" | "ghost" }) {
-  return (
-    <form action={updateDraftStatus}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <Button type="submit" variant={variant}>
-        {label}
-      </Button>
+/** Per channel x format: Create draft, Drafting… (with when it starts), or Open draft + Draft again. */
+function RequestAction({ ideaId, format, request, primary }: { ideaId: string; format: string; request: IdeaRequest | undefined; primary: boolean }) {
+  const form = (label: string, variant: "primary" | "secondary") => (
+    <form action={requestDraftAction}>
+      <input type="hidden" name="ideaId" value={ideaId} />
+      <input type="hidden" name="format" value={format} />
+      <PendingButton label={label} pendingLabel="Asking…" variant={variant} />
     </form>
   );
+  if (request?.status === "pending") {
+    return (
+      <span className="flex flex-col items-end gap-0.5 text-right">
+        <Badge variant="neutral">Drafting…</Badge>
+        <span className="text-xs text-kumo-subtle">
+          {canDispatch() ? `asked ${relativeTime(new Date(request.requestedAt))}, about 3 min` : "starts with the next morning run"}
+        </span>
+      </span>
+    );
+  }
+  if (request?.status === "done" && request.draftId) {
+    return (
+      <span className="flex items-center gap-2">
+        <Link href={`/content/drafts?draft=${request.draftId}`} className="text-sm font-medium text-kumo-link hover:underline">
+          Open draft ›
+        </Link>
+        {form("Draft again", "secondary")}
+      </span>
+    );
+  }
+  return form(request?.status === "failed" ? "Try again" : "Create draft", primary ? "primary" : "secondary");
 }
