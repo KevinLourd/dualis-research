@@ -10,11 +10,11 @@ import { TagBadge } from "./tag-badge";
 /**
  * The Analysis page's News section (Kevin 2026-11-06): every judged news item and filing of the year in a table, one
  * column per Narrative Driver with its tag, tabs from the most important (a strong tag on any driver) to the least
- * (noise for every driver).
+ * (noise for every driver), then Too old: news from before the market adopted its current story, not judged.
  */
 
-export type NewsRow = { id: string; href: string; day: string; headline: string; publisher: string | null; strength: "strong" | "weak" | "noise"; tags: ({ effect: string; strength: string } | null)[] };
-type Tab = "strong" | "weak" | "noise";
+export type NewsRow = { id: string; href: string; day: string; headline: string; publisher: string | null; strength: "strong" | "weak" | "noise" | "too-old"; tags: ({ effect: string; strength: string } | null)[] };
+type Tab = "strong" | "weak" | "noise" | "too-old";
 
 export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers: { rank: number; title: string }[]; gapPct: number | null }) {
   const count = (t: Tab) => rows.filter((r) => r.strength === t).length;
@@ -32,12 +32,13 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
           { value: "strong", label: `Strong · ${count("strong")}` },
           { value: "weak", label: `Weak · ${count("weak")}` },
           { value: "noise", label: `Noise · ${count("noise")}` },
+          ...(count("too-old") ? [{ value: "too-old", label: `Too old · ${count("too-old")}` }] : []),
         ]}
       />
       }
     >
       {shown.length === 0 ? (
-        <p className="text-base text-kumo-subtle">No {tab} news.</p>
+        <p className="text-base text-kumo-subtle">No {tab === "too-old" ? "old" : tab} news.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>

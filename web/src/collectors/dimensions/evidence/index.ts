@@ -9,6 +9,7 @@ import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
 import { firstJsonObject } from "@/llm/judge";
 import { itemsOf, type EvidenceItem } from "./items";
+import { narrativeSinceOf, sinceCap } from "../narrative-since/since";
 
 export { EVIDENCE_WINDOW_DAYS, itemsOf, type EvidenceItem } from "./items";
 
@@ -80,11 +81,15 @@ async function pendingSubjects(db: Db): Promise<string[]> {
     (await db.select({ subjectId: silver.judgments.subjectId, questionKey: silver.judgments.questionKey }).from(silver.judgments).where(eq(silver.judgments.subjectKind, EVIDENCE_SUBJECT_KIND))).map((j) => `${j.subjectId}\u0000${j.questionKey}`),
   );
   const out: string[] = [];
-  for (const symbol of await analysedSymbols(db)) {
+  const symbols = await analysedSymbols(db);
+  const sinces = await narrativeSinceOf(db, symbols);
+  for (const symbol of symbols) {
     const v = versions.get(symbol);
     if (!v) continue;
+    // Too old items are never asked: before the month the current story took hold (or the cap, until it is judged).
+    const since = sinces.get(symbol)?.since ?? sinceCap();
     const ranks = (await db.select({ rank: narrativeDrivers.rank }).from(narrativeDrivers).where(eq(narrativeDrivers.symbol, symbol))).map((r) => r.rank);
-    const pending = (await itemsOf(db, symbol)).filter((item) => ranks.some((rank) => !done.has(`${evidenceSubject(symbol, item.kind, item.id, rank)}\u0000${evidenceKey(v)}`)));
+    const pending = (await itemsOf(db, symbol)).filter((item) => item.at >= since && ranks.some((rank) => !done.has(`${evidenceSubject(symbol, item.kind, item.id, rank)}\u0000${evidenceKey(v)}`)));
     for (let i = 0; i < pending.length; i += BATCH_ITEMS) out.push(batchSubject(symbol, pending.slice(i, i + BATCH_ITEMS)));
   }
   return out;
@@ -186,6 +191,33 @@ export function verdictRank(v: Pick<EvidenceVerdict, "effect" | "strength">): nu
   return S[v.strength] + (v.effect === "reversal" ? 0 : 1);
 }
 
+/** gold.evidence row of an item from before the current story: tag "Too old", no driver verdict. */
+export function tooOldRow(symbol: string, item: EvidenceItem, since: Date, judgmentId: string): typeof evidence.$inferInsert {
+  const month = since.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  return {
+    id: evidenceId(symbol, item.kind, item.id),
+    symbol,
+    driverId: null,
+    effect: "too-old",
+    strength: "noise",
+    probability: 1,
+    why: `Before ${month}, when the market adopted its current story: already in the price.`,
+    citedSentence: null,
+    exhibitId: null,
+    kind: item.kind,
+    headline: item.title,
+    url: item.url,
+    publisher: item.publisher,
+    eventDay: item.at.toISOString().slice(0, 10),
+    eventAt: item.at,
+    newsItemIds: item.kind === "news" ? [item.id] : [],
+    filingIds: item.kind === "filing" ? [item.id] : [],
+    sources: item.sources,
+    judgmentId,
+    verdicts: [],
+  };
+}
+
 /** gold.evidence: every item of an analysed ticker judged against every current driver (noise included); its top line = the strongest verdict. */
 export async function rebuildEvidence(db: Db): Promise<number> {
   const versions = new Map((await db.select({ symbol: narratives.symbol, version: narratives.version }).from(narratives)).map((n) => [n.symbol, n.version]));
@@ -203,9 +235,16 @@ export async function rebuildEvidence(db: Db): Promise<number> {
   const firstExhibit = new Map<string, string>();
   if (symbols.length) for (const e of (await db.select().from(exhibits).where(inArray(exhibits.symbol, symbols))).sort((a, b) => a.rank - b.rank)) if (!firstExhibit.has(e.driverId)) firstExhibit.set(e.driverId, e.id);
   const rows: (typeof evidence.$inferInsert)[] = [];
+  const sinces = await narrativeSinceOf(db, symbols);
   for (const symbol of symbols) {
     const ranks = (await db.select({ rank: narrativeDrivers.rank }).from(narrativeDrivers).where(eq(narrativeDrivers.symbol, symbol))).map((r) => r.rank).sort((a, b) => a - b);
+    const since = sinces.get(symbol);
     for (const item of await itemsOf(db, symbol)) {
+      if (item.at < (since?.since ?? sinceCap())) {
+        // Too old (Kevin 2026-11-06): already in the price, judged against no driver. Shown once its month is judged.
+        if (since) rows.push(tooOldRow(symbol, item, since.since, since.judgmentId));
+        continue;
+      }
       const verdicts: EvidenceVerdict[] = [];
       for (const rank of ranks) {
         const j = byKey.get(`${evidenceSubject(symbol, item.kind, item.id, rank)}\u0000${evidenceKey(versions.get(symbol)!)}`);

@@ -48,6 +48,7 @@ export function evidenceStrength(direction: string, probability: number): Signal
  * breaking, a short).
  */
 export function tagWord(effect: string, strength: string, gapPct: number | null): string {
+  if (effect === "too-old") return "Too old";
   if (effect === "noise" || strength === "noise") return "Noise";
   const s = strength === "strong" ? "Strong" : "Weak";
   if (effect === "continuation") return `${s} continuation`;
