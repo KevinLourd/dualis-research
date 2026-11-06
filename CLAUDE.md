@@ -1,10 +1,10 @@
 # Dualis Research
 
-**The brand is DUALIS Research, no T (Kevin 2026-11-05), infra ids included** (renamed 2026-11-05): repo `KevinLourd/dualis-research`, Workers `dualis-site` (https://dualis-site.dualis-research.workers.dev) and `dualis-console` (https://dualis-console.dualis-research.workers.dev), box compose project + container `dualis-wa` in `/root/dualis-wa` (volume `dualis-wa_data` = the WhatsApp session).
+**The brand is DUALIS Research, no T (Kevin 2026-11-05), infra ids included** (renamed 2026-11-05): repo `KevinLourd/dualis-research` (PUBLIC since 2026-11-06, restarted without history; the old history is the private `KevinLourd/dualis-research-archive`, Actions off), Workers `dualis-site` (https://dualis-site.dualis-research.workers.dev) and `dualis-console` (https://dualis-console.dualis-research.workers.dev), box compose project + container `dualis-wa` in `/root/dualis-wa` (volume `dualis-wa_data` = the WhatsApp session).
 
 Independent equity research brand for **Thierry Matin** (client, friend, product owner). Kevin Lourd builds it (Nov 2026).
 
-**This repo is PUBLIC (Kevin 2026-11-06).** Its Actions logs and artifacts are public too: anything showing Thierry's data (console screenshots: `screenshots.yml`) runs from the private repo. Private context (engagement, Thierry's contacts, WhatsApp numbers, working docs, his input files) lives in the private repo `KevinLourd/dualis-private`, checked out at `~/Business/dualis-private`: @~/Business/dualis-private/CLAUDE.md. Never commit a personal email, phone number, pay term, Thierry's notes or drafts here; his input files are rows of `app.private_files` (`web/src/private/files.ts`), tests use fakes in `web/src/test/fixtures/private/`.
+**This repo is PUBLIC (Kevin 2026-11-06).** Its Actions logs and artifacts are public too: anything showing Thierry's data (console screenshots: `screenshots.yml`) runs from the private repo. Private context (engagement, Thierry's contacts, WhatsApp numbers, working docs, his input files) lives in the private repo `KevinLourd/dualis-private`, checked out at `~/Business/dualis-private`: @~/Business/dualis-private/CLAUDE.md. Never commit a personal email, phone number, pay term, Thierry's notes or drafts here; his input files are rows of `app.private_files` (`web/src/private/files.ts`), pushed by the private repo's `push-files.yml` on every change to them (or `pnpm private:push <folder>` by hand); tests use fakes in `web/src/test/fixtures/private/`. A local `pre-push` hook refuses any branch built on the old private history (fix: `git rebase --onto origin/main 1d8c82b <branch>`).
 
 **Goal (the only metric): recurring revenue from equity-research subscriptions** (Substack paid + website). Every decision is judged by "does it grow paid subscribers?".
 
@@ -24,7 +24,7 @@ Independent equity research brand for **Thierry Matin** (client, friend, product
 - **Online from day 1** (Kevin 2026-11-04): hosted DB + public URL, every merge deploys; no local-only DB as the working setup.
 - **Ambition bar**: the product is a real admin console (Clerk login, sidebar, top bar, right slide-over panels, pages + sub-pages), never a single-page prototype.
 - **Everything is transferable to Thierry**: Kevin signs in with his own account and creates a **separate "Dualis Research" org/workspace/account** in each tool (Neon, Clerk, Cloudflare...), never inside his distribute.you orgs; at handover Thierry is invited as owner and Kevin leaves, never on Kevin's personal or distribute.you orgs; Thierry owns them from day 1. Repo lives at `KevinLourd/dualis-research` for now, transferred to Thierry's GitHub at the end.
-- Issues = GitHub Issues on this repo (transfer with the repo).
+- Issues = GitHub Issues on the private repo `KevinLourd/dualis-private` (they carry private context; GitHub refuses a private-to-public transfer).
 - Product data and all published content in **English**. Thierry writes in English.
 - Not investment advice: every published piece carries a disclaimer.
 - No secrets in git (`.env*` ignored).
