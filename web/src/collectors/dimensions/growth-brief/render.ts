@@ -7,8 +7,8 @@ import { dayLabel, type GrowthBrief } from "@/growth/daily";
 
 /**
  * The brief's chart as a PNG (Node only: loaded by URL from the dimension so the console bundle never sees resvg).
- * Dualis black chart style: subscribers in white, the goal line in grey, the seal small in the corner (never a
- * background watermark here: Kevin 2026-11-06).
+ * Dualis black chart style: subscribers in white, the goal line in grey, the mark (Solomon's knot, copied from
+ * `site/public/brand/mark-white.svg`) small in the corner, never a watermark (Kevin 2026-11-06).
  */
 
 const W = 1200;
@@ -76,9 +76,9 @@ export function briefChartSvg(b: GrowthBrief): string {
   });
   const svg = chart.renderToSVGString();
   chart.dispose();
-  const seal = readFileSync(asset("../../../../public/brand/seal-white.svg")).toString("base64");
+  const mark = readFileSync(asset("./mark-white.svg")).toString("base64");
   const size = 96;
-  return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${seal}" x="${W - 64 - size}" y="48" width="${size}" height="${size}"/></svg>`);
+  return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${mark}" x="${W - 64 - size}" y="48" width="${size}" height="${size}"/></svg>`);
 }
 
 export function briefChartPng(b: GrowthBrief): Buffer {
