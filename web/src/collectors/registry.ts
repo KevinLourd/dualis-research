@@ -15,6 +15,8 @@ import { onedriveFilings } from "./dimensions/onedrive-filings";
 import { earnings } from "./dimensions/earnings";
 import { financials } from "./dimensions/financials";
 import { analysis } from "./dimensions/analysis";
+import { peersDim } from "./dimensions/peers";
+import { valuationDim } from "./dimensions/valuation";
 import { evidenceDim } from "./dimensions/evidence";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { signalsDim } from "./dimensions/signals";
@@ -36,11 +38,11 @@ import type { Dimension } from "./types";
  * Consensus after earnings: analyst expectations vs actuals, read by the signal that says "above / below what the market expects".
  * Financials after price and filings: EV reads the quote, EDINET the fiscal year end, the PDF extraction the annual report link.
  * Portfolio right after watchlist: Thierry's positions (his posts + console edits); price also fetches the S&P 500 (`^GSPC`) the Portfolio page compares against.
- * Analysis after financials and consensus (it reads both); Evidence after catalysts (every item against each driver); Narrative State after it (each driver's tag, then the ticker's); Signals last (fair value x the ticker's tag).
+ * Peers (comparables + analyst targets) after consensus; Valuation (the fair value pyramid) after peers; Analysis after valuation (it reads the Fair Value); Evidence after catalysts (every item against each driver); Narrative State after it (each driver's tag, then the ticker's); Signals last (fair value x the ticker's tag).
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Thesis confidence right after catalysts: it weighs every judged item so far (narrative holds or cracks).
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, analysis, catalysts, thesisConfidenceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentDrafts, contentDispatch, contentReplies, growthOutreach, substackNetwork];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, catalysts, thesisConfidenceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentDrafts, contentDispatch, contentReplies, growthOutreach, substackNetwork];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's

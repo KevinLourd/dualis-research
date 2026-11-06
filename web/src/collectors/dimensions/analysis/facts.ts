@@ -1,7 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { goldCatalysts } from "@/db/schema/catalysts";
 import { consensus } from "@/db/schema/consensus";
+import { fairValues } from "@/db/schema/analysis";
 import { valuations } from "@/db/schema/financials";
+import { valuationReports } from "@/db/schema/valuation";
 import * as gold from "@/db/schema/gold";
 import { theses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
@@ -58,6 +60,8 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const [thesis] = await db.select().from(theses).where(eq(theses.symbol, symbol));
   const [valuation] = await db.select().from(valuations).where(eq(valuations.symbol, symbol));
   const cons = await db.select().from(consensus).where(eq(consensus.symbol, symbol));
+  const [fairValue] = await db.select().from(fairValues).where(eq(fairValues.symbol, symbol));
+  const [vreport] = await db.select({ summary: valuationReports.summary }).from(valuationReports).where(eq(valuationReports.symbol, symbol));
   const cats = await db.select().from(goldCatalysts).where(eq(goldCatalysts.symbol, symbol)).orderBy(desc(goldCatalysts.eventAt)).limit(12);
   const catalog = await seriesCatalog(db, symbol);
   const currency = valuation?.currency ?? profile?.currency ?? null;
@@ -74,7 +78,6 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     `Narrative on file (what the price tells): ${thesis?.narrative ?? "none"}`,
     `Analyst's view of it: ${thesis?.summary ?? "none"}`,
     ticker?.thesisNote ? `Analyst's note: ${ticker.thesisNote}` : null,
-    thesis?.fairValue ? `Analyst's own fair value: ${thesis.fairValue} ${thesis.currency ?? ""} (${thesis.fairValueBasis ?? "no basis given"}).` : null,
     "",
     `Reported financials, fiscal years (${currency ?? "currency unknown"}; B = billion, M = million):`,
     table(catalog, TABLE_LINES, 6),
@@ -104,12 +107,16 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     .join("\n");
 
   const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency } : null;
+  const fvLine = fairValue
+    ? `Fair value (${fairValue.author === "thierry" ? "the analyst's own number" : "weighted from several valuation methods"}): ${fmt(fairValue.value, "per-share")} ${fairValue.currency ?? ""}${fairValue.low !== null && fairValue.high !== null ? `, range ${fmt(fairValue.low, "per-share")} to ${fmt(fairValue.high, "per-share")}` : ""}; ${fairValue.method ?? ""}.${vreport ? ` ${vreport.summary}` : ""}`
+    : "Fair value: none yet (no valuation ran).";
+  const fvBucket = fairValue && fairValue.value > 0 ? Math.round(Math.log(fairValue.value) / Math.log(1.15)) : "none";
   const priceLine = q ? `Quote: ${fmt(q.close, "per-share")} ${q.currency ?? ""} on ${q.date}; market cap at that price ${valuation?.marketCap ? fmt(valuation.marketCap) : "n/a"}, EV/EBITDA now ${fmt(valuation?.evEbitda, "multiple")}.` : "Quote: none.";
   const bucket = q && q.close > 0 ? Math.round(Math.log(q.close) / Math.log(1.15)) : "none";
   return {
     symbol,
-    text: `${priceLine}\n${stable}`,
-    hash: fnv(`${stable}\nprice-bucket:${bucket}`),
+    text: `${priceLine}\n${fvLine}\n${stable}`,
+    hash: fnv(`${stable}\nprice-bucket:${bucket}\nfair-value-bucket:${fvBucket}`),
     catalog,
     quote: q,
     currency,
