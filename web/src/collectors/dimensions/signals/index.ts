@@ -57,18 +57,32 @@ export const signalsDim: Dimension = {
 
 const sameState = (a: { signal: string; strength: string }, b: { signal: string; strength: string }) => a.signal === b.signal && a.strength === b.strength;
 
-async function updateNote(db: Db, complete: Complete, symbol: string, from: { signal: string; strength: string }, to: SignalReading): Promise<{ text: string; model: string }> {
+/** Bump when the Update Note prompt changes: every past note is written again once (Kevin 2026-11-06: one sentence). */
+export const NOTE_VERSION = "note@v2";
+
+/** "BUY (weak inflection)": a BUY is a bad story inflecting, a SELL a loved one cracking. */
+export const signalWords = (signal: string, strength: string) =>
+  signal === "none" ? "no signal" : `${signal} (${strength} ${signal === "BUY" ? "inflection" : "crack"})`;
+
+export const NOTE_SYSTEM = "You write one-line signal notes for a small-cap long/short analyst. Plain English, subject verb complement, one sentence, at most 20 words. No em dash.";
+
+async function updateNote(db: Db, complete: Complete, symbol: string, from: { signal: string; strength: string }, to: { signal: string; strength: string; evidenceIds: string[] }): Promise<{ text: string; model: string }> {
   const items = to.evidenceIds.length ? (await db.select().from(evidence).where(eq(evidence.symbol, symbol))).filter((e) => to.evidenceIds.includes(e.id)) : [];
-  const [profile] = await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
+  const [[profile], [state]] = await Promise.all([
+    db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)),
+    db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "ticker"))),
+  ]);
   const prompt = [
-    `${profile?.name ?? symbol} (${symbol}): the signal moved from ${from.signal} (${from.strength}) to ${to.signal} (${to.strength}).`,
-    `Fair value ${to.fairValue ?? "n/a"} ${to.currency ?? ""} (${to.fairValueMethod ?? "no method"}); quote ${to.quote ?? "n/a"} on ${to.quoteDate ?? "n/a"}.`,
-    "The evidence behind it:",
-    ...(items.length ? items.map((e) => `- ${e.eventDay}: ${e.headline} (${e.effect}, ${e.strength}). ${e.why ?? ""}`) : ["- no reversal in the news"]),
+    `${profile?.name ?? symbol} (${symbol}): the signal moved from ${signalWords(from.signal, from.strength)} to ${signalWords(to.signal, to.strength)}.`,
+    state?.why ? `Where the narrative stands: ${state.why}` : null,
+    "The news behind it:",
+    ...(items.length ? items.slice(0, 5).map((e) => `- ${e.eventDay}: ${e.headline}`) : ["- none"]),
     "",
-    "Write the Update Note: 2 to 4 plain sentences for the analyst, what changed and why, the figures as given. No rating, no % upside, no horizon. No em dash.",
-  ].join("\n");
-  const r = await complete({ system: "You write short research update notes for a small-cap long/short analyst. Plain English, figures only as given.", prompt });
+    "Write the note: ONE short sentence saying what moved the signal, e.g. \"Q3 beat eases the doubt on the 2026 guide.\" No figures from the fair value, no calculation, no rating, no horizon.",
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+  const r = await complete({ system: NOTE_SYSTEM, prompt });
   return { text: stripDashes(r.text.trim()), model: r.model };
 }
 
@@ -90,7 +104,16 @@ export async function promoteSignals(db: Db, fetches: BronzeFetch[], complete: C
       note = await updateNote(db, complete, symbol, last, reading);
       changes++;
     }
-    await db.insert(signalStates).values({ symbol, signal: reading.signal, strength: reading.strength, evidenceIds: reading.evidenceIds, gapPct: reading.gapPct, at: now, baseline: last ? 0 : 1, updateNote: note?.text ?? null, model: note?.model ?? null });
+    await db.insert(signalStates).values({ symbol, signal: reading.signal, strength: reading.strength, evidenceIds: reading.evidenceIds, gapPct: reading.gapPct, at: now, baseline: last ? 0 : 1, updateNote: note?.text ?? null, model: note?.model ?? null, noteVersion: note ? NOTE_VERSION : null });
+  }
+  // Notes written by an older prompt are written again once, against the state they came from.
+  const history = await db.select().from(signalStates).orderBy(signalStates.symbol, signalStates.at);
+  for (let i = 1; i < history.length; i++) {
+    const [a, b] = [history[i - 1], history[i]];
+    if (a.symbol !== b.symbol || b.baseline === 1 || b.noteVersion === NOTE_VERSION) continue;
+    if (!complete) throw new Error("signals: rewriting an Update Note needs the LLM (cli.ts sets ctx.complete)");
+    const note = await updateNote(db, complete, b.symbol, a, b);
+    await db.update(signalStates).set({ updateNote: note.text, model: note.model, noteVersion: NOTE_VERSION }).where(eq(signalStates.id, b.id));
   }
   await rebuildSignalsGold(db, latest);
   return { silverRowsBySource: { rules: changes } };

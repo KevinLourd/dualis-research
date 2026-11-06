@@ -13,7 +13,7 @@ export default async function AnalysisPage({ params, searchParams }: { params: P
     <div className="flex max-w-4xl flex-col pt-6">
       <AnalysisBody analysis={analysis} variant="page" />
       {view && (
-        <SlideOver title={view.title} subtitle={view.subtitle} closeHref={`/tickers/${encodeURIComponent(symbol)}`} size="lg">
+        <SlideOver title={view.title} subtitle={view.subtitle} closeHref={`/tickers/${encodeURIComponent(symbol)}`} size="lg" back>
           {view.body}
         </SlideOver>
       )}

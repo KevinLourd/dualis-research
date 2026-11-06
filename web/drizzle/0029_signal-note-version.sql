@@ -1,0 +1,1 @@
+ALTER TABLE "silver"."signal_states" ADD COLUMN "note_version" text;

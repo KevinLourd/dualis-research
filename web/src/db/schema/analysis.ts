@@ -286,6 +286,8 @@ export const signalStates = silver.table(
     /** Update Note (Claude, once per change); null on the baseline. */
     updateNote: text("update_note"),
     model: text("model"),
+    /** Prompt version of the note (`NOTE_VERSION`): an older one is written again once. */
+    noteVersion: text("note_version"),
   },
   (t) => [index("signal_states_symbol").on(t.symbol, t.at)],
 );
