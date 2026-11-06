@@ -7,6 +7,7 @@ import { getJson } from "../../http";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { fnv } from "../analysis/facts";
 import { YAHOO_HEADERS, yahooSession } from "../consensus/sources";
+import { firstJsonObject } from "@/llm/judge";
 import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
 
@@ -33,8 +34,8 @@ export function peersPrompt(p: { symbol: string; name: string | null; market: st
 }
 
 export function parsePeers(text: string, self: string): PeerPick[] {
-  const start = text.indexOf("{");
-  const o = JSON.parse(text.slice(start, text.lastIndexOf("}") + 1)) as { peers?: { symbol?: unknown; name?: unknown; why?: unknown }[] };
+  // The first JSON object only: the model sometimes adds a line after it (2026-11-06, CCLD).
+  const o = JSON.parse(firstJsonObject(text)) as { peers?: { symbol?: unknown; name?: unknown; why?: unknown }[] };
   const list = (o.peers ?? []).filter((p) => typeof p.symbol === "string" && p.symbol.trim() && p.symbol.trim().toUpperCase() !== self.toUpperCase());
   if (list.length === 0) throw new Error("peers: no comparable company in the answer");
   return list.slice(0, 6).map((p) => ({ symbol: String(p.symbol).trim().toUpperCase(), name: stripDashes(String(p.name ?? p.symbol)), why: stripDashes(String(p.why ?? "")) }));

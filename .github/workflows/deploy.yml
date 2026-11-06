@@ -44,6 +44,8 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the merge diff decides what to collect
       - uses: pnpm/action-setup@v4
         with:
           version: 12.16.1
@@ -65,10 +67,18 @@ jobs:
           rm -f "$RUNNER_TEMP/worker-secrets.json"
           url=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)
           echo "### Console live at $url" >> "$GITHUB_STEP_SUMMARY"
+      # Only what this merge can move (Kevin 2026-11-06 « speeder x10 »): a dimension's folder -> it and every later
+      # one; shared collector / schema / LLM code -> core; console, site, docs -> nothing (registry.ts collectPlan).
       - name: Refresh data now
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run collect.yml -R "$GITHUB_REPOSITORY" -f dimension=core
+          BEFORE: ${{ github.event.before }}
+        run: |
+          files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || echo web/src/collectors/runner.ts)
+          plan=$(pnpm --silent collect plan $files | tail -1)
+          if [ -z "$plan" ]; then echo "### Nothing to collect: no collector code changed" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          echo "### Collect: $plan" >> "$GITHUB_STEP_SUMMARY"
+          gh workflow run collect.yml -R "$GITHUB_REPOSITORY" -f dimension="$plan"
 
   # Dualis's WhatsApp device (wa/) runs on a box, not on Workers. After migrations, ship the code + its database
   # URL and Claude token over SSH; the box key can only run wa/box/deploy-hook.sh, which rebuilds only when something changed.

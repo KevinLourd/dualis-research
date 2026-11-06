@@ -10,7 +10,7 @@ import type { Db } from "./types";
 export function connectNode(): { db: Db; close: () => Promise<void> } {
   const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL_UNPOOLED / DATABASE_URL is not set (Neon connection strings; see web/README.md)");
-  // One connection: enough for a sequential collector, and what a local PGlite dev server accepts.
-  const client = postgres(url, { max: 1, onnotice: () => {} });
+  // Neon: 4 connections, a collect stage runs its dimensions at once (registry STAGES). Locally one: what a PGlite dev server accepts.
+  const client = postgres(url, { max: url.includes("neon.tech") ? 4 : 1, onnotice: () => {} });
   return { db: drizzle(client), close: () => client.end() };
 }

@@ -133,20 +133,18 @@ export const valuationSource: Source = {
     const bucket = f.quote && f.quote.price > 0 ? Math.round(Math.log(f.quote.price) / Math.log(1.15)) : "none";
     const factsHash = fnv(JSON.stringify({ v: VALUATION_VERSION, inputs: f.inputs, history: f.history, peers: f.peers, targets: f.targets, bucket, context }));
 
-    const methods: MethodOut[] = [];
-    const results: { id: ValuationMethodId; name: string; r: MethodResult }[] = [];
-    for (const spec of VALUATION_METHODS) {
-      const inputHash = fnv(`${spec.id}\n${factsHash}`);
-      const [prior] = await db.select({ id: methodValuations.id, result: methodValuations.result }).from(methodValuations).where(and(eq(methodValuations.symbol, symbol), eq(methodValuations.method, spec.id), eq(methodValuations.inputHash, inputHash))).limit(1);
-      if (prior) {
-        methods.push({ method: spec.id, inputHash, reusedId: prior.id });
-        results.push({ id: spec.id, name: spec.name, r: prior.result });
-        continue;
-      }
-      const { result, model } = await methodResult(spec, f, context, ctx);
-      methods.push({ method: spec.id, inputHash, result, model });
-      results.push({ id: spec.id, name: spec.name, r: result });
-    }
+    // The 8 methods at once (Kevin 2026-11-06 « speeder »): each reads the same facts, none reads another.
+    const done = await Promise.all(
+      VALUATION_METHODS.map(async (spec) => {
+        const inputHash = fnv(`${spec.id}\n${factsHash}`);
+        const [prior] = await db.select({ id: methodValuations.id, result: methodValuations.result }).from(methodValuations).where(and(eq(methodValuations.symbol, symbol), eq(methodValuations.method, spec.id), eq(methodValuations.inputHash, inputHash))).limit(1);
+        if (prior) return { out: { method: spec.id, inputHash, reusedId: prior.id } as MethodOut, r: { id: spec.id, name: spec.name, r: prior.result } };
+        const { result, model } = await methodResult(spec, f, context, ctx);
+        return { out: { method: spec.id, inputHash, result, model } as MethodOut, r: { id: spec.id, name: spec.name, r: result } };
+      }),
+    );
+    const methods: MethodOut[] = done.map((x) => x.out);
+    const results: { id: ValuationMethodId; name: string; r: MethodResult }[] = done.map((x) => x.r);
 
     const live = results.filter((x) => x.r.applicable && x.r.base !== null);
     if (live.length === 0) return { request: { symbol, factsHash }, httpStatus: null, payload: { methods, synthesis: null } satisfies ValuationPayload };

@@ -5,12 +5,13 @@ import * as silver from "@/db/schema/silver";
 import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { majorUnit } from "../financials/derive";
+import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
+import { firstJsonObject } from "@/llm/judge";
 import { itemsOf, type EvidenceItem } from "./items";
 
 export { EVIDENCE_WINDOW_DAYS, itemsOf, type EvidenceItem } from "./items";
 
-const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
 
 export const EVIDENCE_DIMENSION = "evidence";
 export const EVIDENCE_SUBJECT_KIND = "evidence";
@@ -62,24 +63,17 @@ export function parseEvidenceSubject(subject: string): { symbol: string; kind: "
   return { symbol: subject.slice(0, i), kind: rest.slice(0, j) as "news" | "filing", id: rest.slice(j + 1), rank: Number(subject.slice(h + 1)) };
 }
 
-export function evidenceRequest(symbol: string, d: Drivers, rank: number, item: EvidenceItem): { question: string; input: string; choices: string[] } {
-  const driver = d.drivers.find((x) => x.rank === rank);
-  if (!driver) throw new Error(`evidence: ${symbol} has no driver ${rank}`);
-  const side = sideWords(d.gapPct);
-  const question = [
-    `${symbol}. The market's narrative, ${side.story}: ${d.narrative}`,
-    `ONE of the reasons the market holds it (Narrative Driver, ${driver.category}): ${driver.title}. ${driver.text}`,
-    "",
-    "What does this news item or filing do to THIS reason, and only this one?",
-    `reversal = it contradicts the reason: ${side.reversal}. continuation = it confirms the reason, the story gets stronger. noise = it does not bear on this reason (routine filings, meeting notices, small holdings reports, unrelated news).`,
-    "strong = a concrete, company-specific fact (results, guidance, a contract, a deal, insider or capital action); weak = indirect or loose (industry read-through, opinion, a recap).",
-    "Verdict: reversal:strong, reversal:weak, noise, continuation:weak or continuation:strong.",
-  ].join("\n");
-  const input = [`${item.at.toISOString().slice(0, 10)}, ${item.kind}${item.publisher ? ` (${item.publisher})` : ""}: ${item.title}`, item.summary ? `Summary: ${item.summary.slice(0, 1500)}` : null].filter(Boolean).join("\n");
-  return { question, input, choices: [...NARRATIVE_TAGS] };
+/** Items per LLM call (Kevin 2026-11-06 « speeder x10 »: 584 one-pair calls took 14 min; batches of 15 items x every driver take ~1). */
+export const BATCH_ITEMS = 15;
+
+/** Batch subject: `<symbol>|batch|<kind>:<item id>,<kind>:<item id>...`: the items of one call, each judged against every driver. */
+export const batchSubject = (symbol: string, items: { kind: string; id: string }[]) => `${symbol}|batch|${items.map((i) => `${i.kind}:${i.id}`).join(",")}`;
+export function parseBatchSubject(subject: string): { symbol: string; items: { kind: "news" | "filing"; id: string }[] } {
+  const [symbol, , list] = subject.split("|");
+  return { symbol, items: list.split(",").map((x) => ({ kind: x.slice(0, x.indexOf(":")) as "news" | "filing", id: x.slice(x.indexOf(":") + 1) })) };
 }
 
-/** Items of the analysed tickers not yet judged against their current drivers. */
+/** Items of the analysed tickers with a driver not yet judged under the current drivers, in batches. */
 async function pendingSubjects(db: Db): Promise<string[]> {
   const versions = new Map((await db.select({ symbol: narratives.symbol, version: narratives.version }).from(narratives)).map((n) => [n.symbol, n.version]));
   const done = new Set(
@@ -90,16 +84,13 @@ async function pendingSubjects(db: Db): Promise<string[]> {
     const v = versions.get(symbol);
     if (!v) continue;
     const ranks = (await db.select({ rank: narrativeDrivers.rank }).from(narrativeDrivers).where(eq(narrativeDrivers.symbol, symbol))).map((r) => r.rank);
-    for (const item of await itemsOf(db, symbol))
-      for (const rank of ranks) {
-        const subject = evidenceSubject(symbol, item.kind, item.id, rank);
-        if (!done.has(`${subject}\u0000${evidenceKey(v)}`)) out.push(subject);
-      }
+    const pending = (await itemsOf(db, symbol)).filter((item) => ranks.some((rank) => !done.has(`${evidenceSubject(symbol, item.kind, item.id, rank)}\u0000${evidenceKey(v)}`)));
+    for (let i = 0; i < pending.length; i += BATCH_ITEMS) out.push(batchSubject(symbol, pending.slice(i, i + BATCH_ITEMS)));
   }
   return out;
 }
 
-/** One read of a ticker's items per run (keyed on the run's fetch function), not one per judged (item, driver). */
+/** One read of a ticker's items per run (keyed on the run's fetch function), not one per batch. */
 const runItems = new WeakMap<typeof fetch, Map<string, Promise<EvidenceItem[]>>>();
 function itemsThisRun(ctx: SourceContext, symbol: string): Promise<EvidenceItem[]> {
   let cache = runItems.get(ctx.fetch);
@@ -107,6 +98,50 @@ function itemsThisRun(ctx: SourceContext, symbol: string): Promise<EvidenceItem[
   let items = cache.get(symbol);
   if (!items) cache.set(symbol, (items = itemsOf(ctx.db!, symbol)));
   return items;
+}
+
+const EVIDENCE_SYSTEM = [
+  "You tag news items and filings for a small-cap long/short analyst: for each item, what it does to EACH reason the market holds its story on the stock.",
+  "Answer with JSON only, no prose, no code fence. Plain English, no em dash.",
+].join(" ");
+
+/** One call: every item of the batch against every driver; the same contract as one judgment per (item, driver). */
+export function batchPrompt(symbol: string, d: Drivers, items: EvidenceItem[]): string {
+  const side = sideWords(d.gapPct);
+  return [
+    `${symbol}. The market's narrative, ${side.story}: ${d.narrative}`,
+    "The reasons the market holds it (Narrative Drivers):",
+    ...d.drivers.map((x) => `${x.rank}. [${x.category}] ${x.title}. ${x.text}`),
+    "",
+    "For EACH item below and EACH driver, judged on its own: what does the item do to THAT reason?",
+    `reversal = it contradicts the reason: ${side.reversal}. continuation = it confirms the reason, the story gets stronger. noise = it does not bear on this reason (routine filings, meeting notices, small holdings reports, unrelated news).`,
+    "strong = a concrete, company-specific fact (results, guidance, a contract, a deal, insider or capital action); weak = indirect or loose (industry read-through, opinion, a recap).",
+    "",
+    "Items:",
+    ...items.map((it, i) => [`[${i + 1}] ${it.at.toISOString().slice(0, 10)}, ${it.kind}${it.publisher ? ` (${it.publisher})` : ""}: ${it.title}`, it.summary ? `    Summary: ${it.summary.slice(0, 700)}` : null].filter(Boolean).join("\n")),
+    "",
+    `JSON: {"items": [{"n": <item number>, "drivers": {${d.drivers.map((x) => `"${x.rank}": {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "why": "<one short sentence>", "cited": "<the sentence of the item it rests on, verbatim, or null>"}`).join(", ")}}}]}`,
+    `Every item 1 to ${items.length}, every driver.`,
+  ].join("\n");
+}
+
+type BatchVerdict = { tag: string; p: number; why: string | null; cited: string | null };
+export function parseBatch(text: string, items: number, ranks: number[]): Map<string, BatchVerdict> {
+  const o = JSON.parse(firstJsonObject(text)) as { items?: { n?: unknown; drivers?: Record<string, { tag?: unknown; p?: unknown; why?: unknown; cited?: unknown }> }[] };
+  const out = new Map<string, BatchVerdict>();
+  for (const it of o.items ?? []) {
+    const n = Number(it.n);
+    for (const rank of ranks) {
+      const v = it.drivers?.[String(rank)];
+      if (!v || typeof v.tag !== "string" || !NARRATIVE_TAGS.includes(v.tag as never)) continue;
+      const p = Number(v.p);
+      out.set(`${n}#${rank}`, { tag: v.tag, p: p >= 0 && p <= 1 ? p : 0.5, why: typeof v.why === "string" && v.why.trim() ? stripDashes(v.why.trim()) : null, cited: typeof v.cited === "string" && v.cited.trim() ? v.cited : null });
+    }
+  }
+  const missing: string[] = [];
+  for (let n = 1; n <= items; n++) for (const rank of ranks) if (!out.has(`${n}#${rank}`)) missing.push(`${n}#${rank}`);
+  if (missing.length) throw new Error(`evidence batch: no valid verdict for ${missing.length} item x driver pairs (${missing.slice(0, 5).join(", ")})`);
+  return out;
 }
 
 export const evidenceSource: Source = {
@@ -117,16 +152,23 @@ export const evidenceSource: Source = {
   async fetch(subject: string, ctx: SourceContext): Promise<FetchOutcome> {
     if (!ctx.db) throw new Error("evidence: needs the database");
     if (!ctx.complete) throw new Error("evidence: no LLM in the collector context (cli.ts sets ctx.complete)");
-    // Node only, hidden from the bundler: the console Worker lists dimensions.
-    const { judge } = (await nodeImport(new URL("../../../llm/judge.ts", import.meta.url).href)) as typeof import("@/llm/judge");
-    const { symbol, kind, id, rank } = parseEvidenceSubject(subject);
+    const { symbol, items: wanted } = parseBatchSubject(subject);
     const d = await driversOf(ctx.db, symbol);
-    const item = (await itemsThisRun(ctx, symbol)).find((x) => x.kind === kind && x.id === id);
-    if (!d || !item || !d.drivers.some((x) => x.rank === rank)) return { request: { subject }, httpStatus: null, error: "no drivers or no item for this subject any more" };
-    const req = evidenceRequest(symbol, d, rank, item);
-    const key = { subjectKind: EVIDENCE_SUBJECT_KIND, subjectId: subject, questionKey: evidenceKey(d.version) };
-    const j = await judge(ctx.db, { ...key, ...req }, ctx.complete);
-    return { request: { ...key, choices: req.choices }, httpStatus: null, payload: { judgmentId: j.id, verdict: j.verdict, probability: j.probability, citedSentence: j.citedSentence, reason: j.reason } };
+    const all = await itemsThisRun(ctx, symbol);
+    const items = wanted.map((w) => all.find((x) => x.kind === w.kind && x.id === w.id)).filter((x): x is EvidenceItem => !!x);
+    if (!d || items.length === 0) return { request: { symbol, items: wanted.length }, httpStatus: null, error: "no drivers or no item for this batch any more" };
+    const ranks = d.drivers.map((x) => x.rank);
+    const r = await ctx.complete({ system: EVIDENCE_SYSTEM, prompt: batchPrompt(symbol, d, items) });
+    const verdicts = parseBatch(r.text, items.length, ranks);
+    const questionKey = evidenceKey(d.version);
+    const rows = items.flatMap((it, i) =>
+      ranks.map((rank) => {
+        const v = verdicts.get(`${i + 1}#${rank}`)!;
+        return { subjectKind: EVIDENCE_SUBJECT_KIND, subjectId: evidenceSubject(symbol, it.kind, it.id, rank), questionKey, question: `${EVIDENCE_QUESTION} batch: item vs driver ${rank}`, verdict: v.tag, probability: v.p, citedSentence: v.cited, reason: v.why, model: r.model, raw: { batch: subject.length } };
+      }),
+    );
+    await ctx.db.insert(silver.judgments).values(rows).onConflictDoNothing();
+    return { request: { symbol, items: items.length, drivers: ranks.length, questionKey }, httpStatus: null, payload: { judged: rows.length, model: r.model } };
   },
 };
 
