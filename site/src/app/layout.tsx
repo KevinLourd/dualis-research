@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body>
         <Header substackUrl={substackUrl} />
         <main>{children}</main>
-        <Footer />
+        <Footer substackUrl={substackUrl} />
       </body>
     </html>
   );

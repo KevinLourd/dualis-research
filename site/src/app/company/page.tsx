@@ -14,12 +14,12 @@ export default async function Company() {
   const calls = posts.filter((p) => p.category === "coverage");
   return (
     <>
-      <PageBand label="Company" line={`${BRAND} is an independent equity research firm.`} substackUrl={substackUrl} />
+      <PageBand label="Company" line={`${BRAND} is an independent equity research firm.`} />
 
       <section className="section split">
         <div className="wrap split-grid">
           <div className="prose">
-            <h2 className="h-bold">A Focused Voice in Small and Mid Cap Equity Research</h2>
+            <h2 className="h-bold">A focused voice in small and mid cap equity research</h2>
             <p className="lead">
               {BRAND} covers listed companies that few analysts follow. We look where big funds cannot buy and where the price has drifted far from what the business is worth.
             </p>
@@ -34,7 +34,7 @@ export default async function Company() {
             <NarrativeFigure />
           </div>
           <div className="prose">
-            <h2 className="h-bold">Play Winnable Games</h2>
+            <h2 className="h-bold">Play winnable games</h2>
             <p>The best odds sit where fewer eyes look: under-covered markets in Asia, small caps the large funds cannot own, names the market has murdered or loved without sense.</p>
             <p>Prices follow narratives. Value follows the business. When the two drift apart and the story starts to turn, there is a trade.</p>
           </div>
@@ -44,7 +44,7 @@ export default async function Company() {
       <section className="section grey split">
         <div className="wrap split-grid">
           <div className="prose">
-            <h2 className="h-bold">Research That Runs in Both Directions</h2>
+            <h2 className="h-bold">Research that runs in both directions</h2>
             <p>We go long when a bad narrative is cracking and a new one is inflecting, with the price still below fundamental value. We exit once it is priced fairly.</p>
             <p>We go short when the price sits above fundamental value on a story that is starting to break. Then we wait for the catalyst.</p>
             <p>Both sides come from the same work: the business, the numbers, and the narrative the market is paying for.</p>
@@ -58,7 +58,7 @@ export default async function Company() {
       <section className="section split">
         <div className="wrap split-grid">
           <div className="prose">
-            <h2 className="h-bold">Active Research</h2>
+            <h2 className="h-bold">Active research</h2>
             <p>Finding the idea is half the job. Every covered company is watched every day: filings, results, news and insider trades.</p>
             <p>When the facts move a thesis, readers hear it first. When a thesis has played out, or broken, we say so clearly.</p>
           </div>
@@ -87,7 +87,7 @@ export default async function Company() {
 
       <section className="section grey">
         <div className="wrap">
-          <h2 className="h-bold">Recent Track Record</h2>
+          <h2 className="h-bold">Recent track record</h2>
           <p className="sub">
             Our best calls so far: {BEST_CALLS.map((c) => `${c.name} (${c.side.toLowerCase()})`).join(" and ")}, both above +{BEST_CALLS_MIN_RETURN}%.
           </p>
@@ -110,7 +110,7 @@ export default async function Company() {
       <section className="section split">
         <div className="wrap split-grid">
           <div className="prose">
-            <h2 className="h-bold">Based in Astana. Global Coverage.</h2>
+            <h2 className="h-bold">Based in Astana. Global coverage.</h2>
             <p>{BRAND} is based in Astana, Kazakhstan. Coverage spans small and mid caps across Asia, North America and Europe.</p>
             <p>For our highest-conviction ideas we meet management, on site when it matters.</p>
           </div>
@@ -124,21 +124,21 @@ export default async function Company() {
 
       <section className="section">
         <div className="wrap narrow center">
-          <h2 className="h-bold">Global Distribution</h2>
+          <h2 className="h-bold">Global distribution</h2>
           <p className="lead">Our research serves independent investors, professionals and anyone who wants to see what the market is missing.</p>
           <div className="platform-box">
             <h3>{BRAND} Platform</h3>
             <p>Our research is published as a subscription on Substack.</p>
             {substackUrl && (
               <a target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg stacked" href={substackUrl}>
-                Read our research →<small>{new URL(substackUrl).host}</small>
+                Read our research<small>{new URL(substackUrl).host}</small>
               </a>
             )}
           </div>
         </div>
       </section>
 
-      <CtaBand title="Explore Our Research" body="Our coverage, our method, and what subscribers receive." href="/research" cta="View the research page" substackUrl={substackUrl} />
+      <CtaBand title="Explore our research" body="Our coverage, our method, and what subscribers receive." href="/research" cta="View the research page" />
     </>
   );
 }

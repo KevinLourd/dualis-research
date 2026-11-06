@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BRAND, DISCLAIMER } from "@/lib/model";
 import { Mark } from "./mark";
+import { Social } from "./social";
 import { SubscribeButton } from "./subscribe-button";
 
 const NAV = [
@@ -42,13 +43,16 @@ export function Header({ substackUrl }: { substackUrl: string | null }) {
   );
 }
 
-export function Footer() {
+export function Footer({ substackUrl }: { substackUrl: string | null }) {
   return (
     <footer className="site-footer">
       <div className="wrap">
-        <p className="footer-contact">
-          Contact: <Link href="/contact">write to Thierry</Link>
-        </p>
+        <div className="footer-top">
+          <p className="footer-contact">
+            Contact: <Link href="/contact">write to Thierry</Link>
+          </p>
+          <Social substackUrl={substackUrl} />
+        </div>
         <div className="footer-row">
           <ul>
             <li>

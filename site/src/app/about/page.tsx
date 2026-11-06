@@ -38,7 +38,7 @@ export default async function About() {
           <div className="recent-grid">
             {posts.map((p) => (
               <a target="_blank" rel="noopener noreferrer" key={p.id} href={p.url} className="recent-card">
-                <Cover id={p.id} title={p.title} category={p.category} publishedAt={p.publishedAt} />
+                <Cover post={p} />
                 <h3>{p.title}</h3>
               </a>
             ))}

@@ -16,13 +16,13 @@ export default async function Contact() {
   const substackUrl = await getSubstackUrl();
   return (
     <>
-      <PageBand label="Contact" substackUrl={substackUrl} />
+      <PageBand label="Contact" />
       {substackUrl && (
         <div className="strip">
           <div className="wrap strip-inner">
             <p>Looking for our research? Access the subscription platform directly.</p>
             <a target="_blank" rel="noopener noreferrer" className="btn btn-outline" href={substackUrl}>
-              Research Platform →
+              Research Platform
             </a>
           </div>
         </div>
@@ -51,15 +51,15 @@ export default async function Contact() {
               <ul className="channels">
                 <li>
                   <span>Substack</span>
-                  <a target="_blank" rel="noopener noreferrer" href={SUBSTACK_PROFILE_URL}>Send a message on Substack →</a>
+                  <a target="_blank" rel="noopener noreferrer" href={SUBSTACK_PROFILE_URL}>Send a message on Substack</a>
                 </li>
                 <li>
                   <span>X</span>
-                  <a target="_blank" rel="noopener noreferrer" href={X_URL}>Message {X_HANDLE} →</a>
+                  <a target="_blank" rel="noopener noreferrer" href={X_URL}>Message {X_HANDLE}</a>
                 </li>
                 <li>
                   <span>LinkedIn</span>
-                  <a target="_blank" rel="noopener noreferrer" href={LINKEDIN_URL}>Message Thierry Matin →</a>
+                  <a target="_blank" rel="noopener noreferrer" href={LINKEDIN_URL}>Message Thierry Matin</a>
                 </li>
               </ul>
             </div>

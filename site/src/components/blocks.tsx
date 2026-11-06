@@ -2,7 +2,6 @@ import Link from "next/link";
 import { DISCLAIMER, PLANS } from "@/lib/model";
 import type { Publication } from "@/lib/queries";
 import { Cover } from "./cover";
-import { Social } from "./social";
 import { SubscribeButton } from "./subscribe-button";
 
 export function Plans({ substackUrl }: { substackUrl: string | null }) {
@@ -71,47 +70,44 @@ export function Faq() {
   );
 }
 
-/** The closing navy band of every page (Aurelion's "See the research at work"). */
-export function CtaBand({ title, body, href, cta, substackUrl }: { title: string; body: string; href: string; cta: string; substackUrl: string | null }) {
+/** The closing band of every page: deep indigo, the statement on the left, one action on the right. */
+export function CtaBand({ title, body, href, cta }: { title: string; body: string; href: string; cta: string }) {
   return (
     <section className="cta-band">
       <div className="wrap cta-inner">
-        <h2>{title}</h2>
-        <p>{body}</p>
+        <div>
+          <h2>{title}</h2>
+          <p>{body}</p>
+        </div>
         {href.startsWith("http") ? (
           <a target="_blank" rel="noopener noreferrer" className="btn btn-light btn-lg" href={href}>
-            {cta} →
+            {cta}
           </a>
         ) : (
           <Link className="btn btn-light btn-lg" href={href}>
-            {cta} →
+            {cta}
           </Link>
         )}
-        <Social substackUrl={substackUrl} className="social social-side" />
       </div>
     </section>
   );
 }
 
-/** The latest covers fanned out, each opening its report (Aurelion's "From the Research Platform"). */
-export function CoverFan({ posts }: { posts: Publication[] }) {
-  const shown = posts.slice(0, 6);
-  const mid = (shown.length - 1) / 2;
+/**
+ * Every report as a horizontal strip on black (Thierry 2026-11-06, away from Aurelion's fan): covers in black and
+ * white; the one under the pointer grows and turns to colour. Native horizontal scroll when they overflow.
+ */
+export function CoverStrip({ posts }: { posts: Publication[] }) {
   return (
-    <div className="fan">
-      {shown.map((p, i) => (
-        <a
-          key={p.id}
-          target="_blank"
-          rel="noopener noreferrer"
-          href={p.url}
-          className="fan-item"
-          style={{ "--rot": `${(i - mid) * 4}deg`, "--lift": `${Math.abs(i - mid) * 10}px`, zIndex: 10 - Math.round(Math.abs(i - mid)) } as React.CSSProperties}
-        >
-          <Cover id={p.id} title={p.title} category={p.category} publishedAt={p.publishedAt} />
-        </a>
+    <ol className="cover-strip" aria-label="Reports">
+      {posts.map((p) => (
+        <li key={p.id}>
+          <a target="_blank" rel="noopener noreferrer" href={p.url} className="cs-item">
+            <Cover post={p} />
+          </a>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
@@ -130,6 +126,7 @@ export const CAREER = [
   { when: "2022 - 2023", where: "BCA Research", role: "Research associate, FX and fixed income strategy" },
   { when: "2021", where: "Fiera Capital", role: "Analyst, global equities" },
   { when: "2021", where: "CI Global Asset Management", role: "Research analyst, global small cap equities" },
+  { when: "2020", where: "BCI", role: "Summer analyst, U.S. small cap equities" },
 ] as const;
 
 export function Career() {

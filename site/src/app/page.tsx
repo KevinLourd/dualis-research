@@ -8,14 +8,14 @@ export default function Home() {
       <HeroField plain />
       <div className="wrap hero-inner">
         <h1>
-          Independent Research
+          Independent research
           <br />
-          on the Small Caps
+          on the small caps
           <br />
-          the Market Gets Wrong
+          the market gets wrong
         </h1>
         <Link href="/research" className="hero-link">
-          Read the research →
+          Read the research
         </Link>
       </div>
     </section>
