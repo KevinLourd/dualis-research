@@ -209,43 +209,6 @@ export function Proof() {
   );
 }
 
-const TRUST = [
-  {
-    title: "Institutional training",
-    body: "Thierry Matin covered global small caps at CI Global and macro strategy at BCA Research before he founded Dualis Research.",
-    icon: "M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10l9-6 9 6z",
-  },
-  {
-    title: "Every call on the record",
-    body: "Each idea is published with its thesis, then followed to the exit. Winners and losers stay online.",
-    icon: "M6 3h9l4 4v14H6zM14 3v5h5M9 13l2 2 4-4M9 18h7",
-  },
-  {
-    title: "Long and short",
-    body: "Cheap stories about to turn, and hyped stories about to crack. Both sides come from the same work.",
-    icon: "M7 20V5M3 9l4-4 4 4M17 4v15M13 15l4 4 4-4",
-  },
-] as const;
-
-/** Three reasons to read, icon top right (after Pernas). */
-export function TrustCards() {
-  return (
-    <div className="trust">
-      {TRUST.map((t) => (
-        <div key={t.title} className="trust-card">
-          <div className="trust-top">
-            <h3>{t.title}</h3>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d={t.icon} />
-            </svg>
-          </div>
-          <p>{t.body}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /**
  * The best calls as a scoreboard (Kevin 2026-11-06: « trop verbeux, le message clé pas assez mis en avant »): the
  * result first, big; the side, the name, ONE line of thesis, the report. Then every published call as one line.
