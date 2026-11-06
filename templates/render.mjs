@@ -42,7 +42,7 @@ function tokensCss(theme = "light") {
 
 function logoSvg(name = "split-disc") {
   const p = join(ROOT, "design/assets/Logos", `${name}.svg`);
-  return readFileSync(p, "utf8").replace(/#0B2A5B/gi, "currentColor");
+  return readFileSync(p, "utf8").replace(/#2b2463/gi, "currentColor");
 }
 
 function page(body, spec) {

@@ -7,12 +7,12 @@
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
 
-/* Dualis navy replaces Cloudflare's brand blue/orange. Kumo tokens live in @theme, so the override does too. */
+/* Dualis indigo (design/tokens.json `brand`) replaces Cloudflare's brand blue/orange. Kumo tokens live in @theme, so the override does too. */
 @theme {
-  --color-kumo-brand: light-dark(#0b2a5b, #3b64b0);
-  --color-kumo-brand-hover: light-dark(#16397a, #4a74c2);
-  --text-color-kumo-brand: light-dark(#0b2a5b, #8eaee6);
-  --text-color-kumo-link: light-dark(#0b2a5b, #8eaee6);
+  --color-kumo-brand: light-dark(#2b2463, #5b53a8);
+  --color-kumo-brand-hover: light-dark(#1e1947, #6c64b8);
+  --text-color-kumo-brand: light-dark(#2b2463, #b9b2ea);
+  --text-color-kumo-link: light-dark(#2b2463, #b9b2ea);
   /* Long / short stay data colours (design/tokens.json). */
   --color-dualis-long: light-dark(#1e7a57, #4cc28f);
   --color-dualis-long-soft: light-dark(#e3f1ea, #13281f);
