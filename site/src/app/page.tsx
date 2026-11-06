@@ -2,11 +2,12 @@ import Link from "next/link";
 
 /**
  * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 34 s loop of the industries
- * and real assets experts expect to hold up in the AI era (Kevin 2026-11-06; BlackRock "HALO" sectors, Goldman Sachs
- * and S&P Global on grid and copper, JLL on data-center power, Macquarie on infrastructure): power generation, the
- * grid, copper and mining, semiconductors, data centers, oil and gas, robotics, space (a launch), defense (a missile
- * at sea), ports and shipping, food and agriculture. Never a caption in the footage (Kevin: « enlève ça »). Mixkit
- * free licence. Muted; reduced motion = poster.
+ * and real assets experts expect to hold up in the AI era (BlackRock "HALO" sectors, Goldman Sachs and S&P Global on
+ * grid and copper, JLL on data-center power, Macquarie on infrastructure), hottest first (Kevin 2026-11-06): a SpaceX
+ * Falcon 9 launch (U.S. Space Force video, public domain), the XQ-58 Valkyrie AI-piloted drone (U.S. Air Force,
+ * public domain), robotics, semiconductors, data centers, power, the grid, oil and gas, ports, then raw materials
+ * (copper and mining, agriculture). Other clips: Mixkit free licence. Never a caption in the footage. Muted;
+ * reduced motion = poster.
  */
 export default function Home() {
   return (
