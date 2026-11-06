@@ -36,12 +36,12 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : n
 // ---------- Yahoo quoteSummary: earningsTrend (consensus) + earningsHistory (EPS actual vs estimate) ----------
 
 /** Yahoo answers 429 to browser-style headers and 200 to this plain client (same as the price source). */
-const YAHOO_HEADERS = { "User-Agent": "Mozilla/5.0 (dualis-collector)" };
+export const YAHOO_HEADERS = { "User-Agent": "Mozilla/5.0 (dualis-collector)" };
 
 type YahooSession = { cookie: string; crumb: string | null; error: string | null };
 
 /** quoteSummary needs a crumb tied to Yahoo's A3 cookie: one handshake per run. */
-function yahooSession(ctx: SourceContext): Promise<YahooSession> {
+export function yahooSession(ctx: SourceContext): Promise<YahooSession> {
   return memo(ctx, "yahoo-crumb", async () => {
     const home = await ctx.fetch("https://fc.yahoo.com", { headers: YAHOO_HEADERS, redirect: "manual" });
     await home.text();

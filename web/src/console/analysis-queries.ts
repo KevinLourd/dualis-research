@@ -22,6 +22,7 @@ import {
   type GoldSignal,
   type GoldSignalChange,
 } from "@/db/schema/analysis";
+import { goldMethodValuations, valuationMethods, valuationReports } from "@/db/schema/valuation";
 import { financialMetrics, goldFinancialLines, valuations, type GoldFinancialLine, type GoldFinancialMetric, type GoldValuation } from "@/db/schema/financials";
 import { companyProfiles, tickers } from "@/db/schema/gold";
 
@@ -137,3 +138,26 @@ export async function getFinancials(symbol: string): Promise<{ lines: GoldFinanc
   ]);
   return { lines, metrics, valuation: valuation ?? null };
 }
+
+/** The fair value pyramid of one ticker: the Valuation Report, every Method Valuation (catalogue order), the Fair Value. */
+export const getValuation = cache(async (symbol: string) => {
+  const db = getDb();
+  const [[report], methods, catalogue, [fairValue], [quote]] = await Promise.all([
+    db.select().from(valuationReports).where(eq(valuationReports.symbol, symbol)),
+    db.select().from(goldMethodValuations).where(eq(goldMethodValuations.symbol, symbol)),
+    db.select().from(valuationMethods).orderBy(asc(valuationMethods.rank)),
+    db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
+    db.select({ quote: signals.quote }).from(signals).where(eq(signals.symbol, symbol)),
+  ]);
+  const byId = new Map(methods.map((m) => [m.method, m]));
+  return {
+    report: report ?? null,
+    fairValue: fairValue ?? null,
+    quote: quote?.quote ?? null,
+    methods: catalogue.flatMap((c) => {
+      const m = byId.get(c.id);
+      return m ? [{ ...m, name: c.name, family: c.family, description: c.description, weight: report?.weights.find((w) => w.method === c.id) ?? null }] : [];
+    }),
+  };
+});
+export type Valuation = Awaited<ReturnType<typeof getValuation>>;

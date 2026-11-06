@@ -77,15 +77,17 @@ beforeEach(async () => {
   await db.insert(goldFinancialLines).values([line("2024-12", "revenue", 306.8e9), line("2025-12", "revenue", 291.8e9), line("2025-12", "cash", 143e9, "balance")]);
   await db.insert(financialMetrics).values(["2024-12", "2025-12"].map((p, i) => ({ symbol: SYMBOL, periodType: "year" as const, periodEnd: p, metric: "operating-margin", value: 0.2 - i * 0.01, unit: "ratio" as const, currency: null, formula: "x", inputs: [], sources: ["dart"] })));
   await db.insert(gold.quotes).values({ symbol: SYMBOL, date: "2026-11-04", close: 30000, currency: "KRW", sources: ["naver"] });
+  // The Fair Value is the valuation pyramid's (valuation.test.ts); the analysis reads it.
+  await db.insert(fairValues).values({ symbol: SYMBOL, value: 40000, currency: "KRW", low: 35000, high: 46000, method: "EV/EBITDA 60%, Listed peers 40%", label: "Mostly EV/EBITDA", author: "claude", claudeValue: 40000, inputs: [] });
   await db.insert(theses).values({ symbol: SYMBOL, narrative: "A generic chip-parts supplier." }).onConflictDoUpdate({ target: theses.symbol, set: { narrative: "A generic chip-parts supplier." } });
 });
 afterEach(async () => close());
 
 describe("analysis dimension", () => {
-  it("writes Fair Value, Narrative, Drivers, Exhibits bound to stored series only, and the Report, once per input", async () => {
+  it("writes Narrative, Drivers, Exhibits bound to stored series only, and the Report, once per input; reads the Fair Value, never writes it", async () => {
     await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
     const [fv] = await db.select().from(fairValues).where(eq(fairValues.symbol, SYMBOL));
-    expect(fv).toMatchObject({ value: 40000, currency: "KRW", author: "claude", label: "8x EV/EBITDA, 5-year median" });
+    expect(fv).toMatchObject({ value: 40000, label: "Mostly EV/EBITDA" });
     expect((await db.select().from(narratives))[0]).toMatchObject({ text: "The market prices Worldex as a cyclical parts maker.", detail: "Its margins held while sales dipped." });
     expect((await db.select().from(narrativeDrivers)).find((d) => d.rank === 1)?.summary).toBe("Chip makers buy fewer parts when they cut spending.");
     const drivers = await db.select().from(narrativeDrivers).where(eq(narrativeDrivers.symbol, SYMBOL));
@@ -106,13 +108,6 @@ describe("analysis dimension", () => {
     // Same inputs: never asked again.
     await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual(["analysis", "rationale", "report"]);
-  });
-
-  it("Thierry's own fair value wins, Claude's is kept beside it", async () => {
-    await db.update(theses).set({ fairValue: 45000, fairValueBasis: "his model", currency: "KRW" }).where(eq(theses.symbol, SYMBOL));
-    await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
-    const [fv] = await db.select().from(fairValues).where(eq(fairValues.symbol, SYMBOL));
-    expect(fv).toMatchObject({ value: 45000, method: "his model", author: "thierry", claudeValue: 40000 });
   });
 
   it("judges each item against EACH driver, tags each driver then the ticker, and signals BUY below fair value; the first signal is the baseline", async () => {

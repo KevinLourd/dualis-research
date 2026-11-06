@@ -76,7 +76,8 @@ export type RationaleClaim = { text: string; drivers: number[]; sources: Rationa
 export type RationaleAnswer = { summary: string; claims: RationaleClaim[]; exhibits: ExhibitSpec[] };
 
 export type AnalysisAnswer = {
-  fairValue: { value: number; currency: string; method: string; label?: string | null; inputs: { label: string; value: number; period: string }[] };
+  /** Up to analysis@v4 the analysis wrote the fair value; since v5 the `valuation` dimension does (the pyramid). */
+  fairValue?: { value: number; currency: string; method: string; label?: string | null; inputs: { label: string; value: number; period: string }[] };
   narrative: string;
   narrativeDetail?: string | null;
   /** Every driver SUPPORTS the narrative: a reason the market holds it (never one that weakens it, Kevin 2026-11-06). */
@@ -90,7 +91,10 @@ export const fairValues = gold.table("fair_values", {
   symbol: text("symbol").primaryKey(),
   value: doublePrecision("value").notNull(),
   currency: text("currency"),
-  /** One line: "10x EV/EBITDA, its 5-year median, on FY2025 EBITDA KRW 61B -> KRW 12,400 / share". */
+  /** Range of the Valuation Report (weighted low / high of the methods); null when Thierry's number wins. */
+  low: doublePrecision("low"),
+  high: doublePrecision("high"),
+  /** One line: the weighted methods ("EV/EBITDA 40%, DCF 35%, P/E 25%"), or Thierry's basis. */
   method: text("method"),
   /** The method in a few words, no arithmetic ("5.9x EV/EBITDA, 4-year median"); `method` = the full calculation (item panel). */
   label: text("label"),

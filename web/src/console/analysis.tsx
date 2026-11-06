@@ -5,7 +5,8 @@ import { evidenceStrength } from "@/content/signal-words";
 import type { GoldEvidence, GoldExhibit } from "@/db/schema/analysis";
 import type { GoldCatalyst } from "@/db/schema/catalysts";
 import type { GoldConsensus } from "@/db/schema/consensus";
-import { type DriverWithExhibits, getTickerAnalysis } from "./analysis-queries";
+import { type DriverWithExhibits, getTickerAnalysis, getValuation } from "./analysis-queries";
+import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
 import { CallBadge, FairValue, QuoteGap, StrengthBadge, TickerTag } from "./board";
@@ -17,7 +18,7 @@ import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
 import { EditableText } from "./editable-text";
-import { day, relativeTime, utc } from "./format";
+import { day, price, relativeTime, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section, StateBadge, StateChange } from "./signal";
 import { getWhy } from "./signal-queries";
@@ -33,16 +34,17 @@ import { ComingNext } from "./ui";
 export const itemHref = (symbol: string, item: string) => `/tickers/${encodeURIComponent(symbol)}?item=${encodeURIComponent(item)}`;
 
 export async function analysisData(symbol: string) {
-  const [row, data, why, consensus, objects, chart] = await Promise.all([
+  const [row, data, why, consensus, objects, chart, valuation] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
     getWhy(symbol),
     consensusOf(symbol),
     getTickerAnalysis(symbol),
     priceVsFairValue(symbol),
+    getValuation(symbol),
   ]);
   if (!row || !data) return null;
-  return { row, data, why, consensus, objects, chart };
+  return { row, data, why, consensus, objects, chart, valuation };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
@@ -50,7 +52,7 @@ type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 export const gapPctOf = (row: Pick<BoardRow, "gap">) => (row.gap ? (row.gap.side === "below" ? -row.gap.pct : row.gap.pct) : null);
 
 /** A's facts, each figure opening its own detail: those cards carry a caret and a stronger ring, so they read as buttons. */
-function Facts({ row, wide }: { row: BoardRow; wide: boolean }) {
+function Facts({ row, wide, range }: { row: BoardRow; wide: boolean; range: { low: number; high: number } | null }) {
   const cell = "flex flex-col gap-1.5 rounded-lg px-4 py-3 ring-1 ring-kumo-hairline";
   const clickable = "group relative flex flex-col gap-1.5 rounded-lg px-4 py-3 pr-10 ring-1 ring-kumo-line shadow-xs transition-colors hover:bg-kumo-tint hover:ring-kumo-brand";
   const caret = <CaretRightIcon size={16} weight="bold" aria-hidden className="absolute top-1/2 right-3 -translate-y-1/2 text-kumo-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-kumo-link" />;
@@ -68,6 +70,11 @@ function Facts({ row, wide }: { row: BoardRow; wide: boolean }) {
       <Link href={itemHref(row.symbol, "fair-value")} scroll={false} className={clickable} title="How the fair value was computed">
         <span className="text-sm text-kumo-subtle">Fair value</span>
         <span><FairValue row={row} /></span>
+        {range && (
+          <span className="font-mono text-sm tabular text-kumo-default">
+            Range {price(range.low)} to {price(range.high)}
+          </span>
+        )}
         {row.fairValueLabel && <span className="text-sm text-kumo-subtle">{row.fairValueLabel}</span>}
         {caret}
       </Link>
@@ -239,7 +246,7 @@ function Drivers({ symbol, drivers, gapPct }: { symbol: string; drivers: DriverW
 }
 
 export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
-  const { row, data, why, consensus, objects, chart } = analysis;
+  const { row, data, why, consensus, objects, chart, valuation } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const { thesis, latest, state, evidence } = why;
   const symbol = row.symbol;
@@ -256,7 +263,7 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
           <ArrowSquareOutIcon size={16} aria-hidden /> Open the full analysis
         </Link>
       )}
-      <Facts row={row} wide={variant === "page"} />
+      <Facts row={row} wide={variant === "page"} range={objects.fairValue?.low != null && objects.fairValue?.high != null ? { low: objects.fairValue.low, high: objects.fairValue.high } : null} />
 
       {chart.bars.length > 0 && (
         <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} />
@@ -328,6 +335,13 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
           {objects.signalChanges.length > 0 && (
             <Section title="Signal history">
               <SignalHistory changes={objects.signalChanges} />
+            </Section>
+          )}
+          {valuation.methods.length > 0 && (
+            <Section title="Valuation">
+              {valuation.report && <p className="max-w-prose text-lg leading-relaxed text-kumo-strong">{valuation.report.summary}</p>}
+              <ValuationField v={valuation} />
+              <MethodsTable symbol={symbol} v={valuation} />
             </Section>
           )}
           {objects.drivers.length > 0 && objects.evidence.length > 0 && (

@@ -1,9 +1,8 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { fetches as bronze, type BronzeFetch } from "@/db/schema/bronze";
-import { analyses, exhibits, fairValues, narrativeDrivers, narrativeRationales, narratives, researchReports, type AnalysisAnswer, type RationaleAnswer } from "@/db/schema/analysis";
+import { analyses, exhibits, narrativeDrivers, narrativeRationales, narratives, researchReports, type AnalysisAnswer, type RationaleAnswer } from "@/db/schema/analysis";
 import { goldFinancialLines } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
-import { theses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { analysedSymbols } from "../watchlist";
@@ -80,7 +79,7 @@ async function subjects(db: Db): Promise<string[]> {
 export const analysis: Dimension = {
   name: ANALYSIS_DIMENSION,
   description:
-    "Per ticker, from the reported numbers: Claude's Fair Value (number + one-line method), the Narrative (why the price sits there), up to 3 Narrative Drivers each with Exhibits drawn from stored series, and the Research Report. Once per input hash.",
+    "Per ticker, from the reported numbers and the Fair Value of the valuation pyramid: the Narrative (why the price sits there), up to 3 Narrative Drivers each with Exhibits drawn from stored series, the Narrative Rationale and the Research Report. Once per input hash.",
   sources: [analysisSource],
   subjects,
   promote: promoteAnalysis,
@@ -99,14 +98,11 @@ export async function promoteAnalysis(db: Db, fetches: BronzeFetch[]): Promise<P
   return { silverRowsBySource: { [SOURCE]: n } };
 }
 
-/** Gold from the latest analysis per active ticker; Thierry's fair value wins when he typed one. */
+/** Gold from the latest analysis per active ticker (the Fair Value is the `valuation` dimension's). */
 export async function rebuildAnalysisGold(db: Db): Promise<void> {
   const symbols = await analysedSymbols(db);
-  const thesisRows = new Map((await db.select().from(theses)).map((t) => [t.symbol, t]));
   const latest = new Map<string, typeof analyses.$inferSelect>();
   for (const a of await db.select().from(analyses).orderBy(analyses.createdAt)) latest.set(a.symbol, a);
-
-  const fv: (typeof fairValues.$inferInsert)[] = [];
   const nar: (typeof narratives.$inferInsert)[] = [];
   const drv: (typeof narrativeDrivers.$inferInsert)[] = [];
   const exh: (typeof exhibits.$inferInsert)[] = [];
@@ -114,23 +110,6 @@ export async function rebuildAnalysisGold(db: Db): Promise<void> {
   const rat: (typeof narrativeRationales.$inferInsert)[] = [];
   for (const symbol of symbols) {
     const a = latest.get(symbol);
-    const t = thesisRows.get(symbol);
-    const thierry = t?.fairValue ?? null;
-    if (a || thierry !== null) {
-      fv.push({
-        symbol,
-        value: thierry ?? a!.analysis.fairValue.value,
-        currency: thierry !== null ? (t?.currency ?? a?.analysis.fairValue.currency ?? null) : a!.analysis.fairValue.currency,
-        method: thierry !== null ? (t?.fairValueBasis ?? null) : a!.analysis.fairValue.method,
-        label: thierry !== null ? (t?.fairValueBasis ?? null) : (a!.analysis.fairValue.label ?? null),
-        author: thierry !== null ? "thierry" : "claude",
-        claudeValue: a?.analysis.fairValue.value ?? null,
-        claudeMethod: a?.analysis.fairValue.method ?? null,
-        inputs: a?.analysis.fairValue.inputs ?? [],
-        version: a?.id ?? null,
-        asOf: a?.createdAt ?? null,
-      });
-    }
     if (!a) continue;
     nar.push({ symbol, text: a.analysis.narrative, detail: a.analysis.narrativeDetail ?? null, version: a.id, asOf: a.createdAt });
     const catalog = await seriesCatalog(db, symbol);
@@ -159,8 +138,7 @@ export async function rebuildAnalysisGold(db: Db): Promise<void> {
     rep.push({ symbol, title: `${profile?.name ?? symbol} (${symbol}): Research Report`, markdown: `${a.report}\n\n_${DISCLAIMER}_`, exhibitIds, version: a.id, asOf: a.createdAt, model: a.model });
   }
   await db.transaction(async (tx) => {
-    for (const table of [fairValues, narratives, narrativeDrivers, exhibits, researchReports, narrativeRationales]) await tx.delete(table);
-    if (fv.length) await tx.insert(fairValues).values(fv);
+    for (const table of [narratives, narrativeDrivers, exhibits, researchReports, narrativeRationales]) await tx.delete(table);
     if (nar.length) await tx.insert(narratives).values(nar);
     if (drv.length) await tx.insert(narrativeDrivers).values(drv);
     if (exh.length) await tx.insert(exhibits).values(exh);

@@ -218,6 +218,13 @@
       "when": 1793945835755,
       "tag": "0030_signal-note-version",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793952166526,
+      "tag": "0031_fair-value-pyramid",
+      "breakpoints": true
     }
   ]
 }

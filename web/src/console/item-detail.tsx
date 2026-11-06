@@ -2,7 +2,9 @@ import { ArrowSquareOutIcon } from "@phosphor-icons/react/ssr";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { Badge } from "@cloudflare/kumo";
 import Link from "@/console/link";
-import { getTickerAnalysis } from "./analysis-queries";
+import { getTickerAnalysis, getValuation } from "./analysis-queries";
+import { ArticleBody } from "./article";
+import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
 import { driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
 import { StrengthBadge } from "./board";
 import { TagBadge } from "./tag-badge";
@@ -285,39 +287,118 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
   };
 }
 
+/** The Fair Value (level C): the range, the football field, every method (each opens its own panel), the Valuation Report. */
 async function fairValueItem(symbol: string): Promise<ItemView | null> {
-  const f = await fairValueDetail(symbol);
+  const [f, v] = await Promise.all([fairValueDetail(symbol), getValuation(symbol)]);
   if (!f) return null;
-  const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const r = v.report;
   return {
     title: `Fair value ${price(f.value)}${f.currency ? ` ${f.currency}` : ""}`,
-    subtitle: f.author === "thierry" ? "Your number" : "Computed by Claude from reported figures",
+    subtitle: f.author === "thierry" ? "Your number" : (r?.label ?? f.label ?? "Weighted from several valuation methods"),
     body: (
       <>
-        {f.method && <p className="text-lg leading-relaxed text-kumo-strong">{f.method}</p>}
-        {f.author === "thierry" && f.claudeValue !== null && (
-          <p className="text-base text-kumo-subtle">
-            Claude&apos;s own figure: {price(f.claudeValue)} {f.currency}
-            {f.claudeMethod ? `, ${f.claudeMethod}` : ""}
-          </p>
+        {r && <RangeCards low={r.low} base={r.base} high={r.high} currency={r.currency} baseLabel={f.author === "thierry" ? "Weighted methods" : "Fair value"} />}
+        {f.author === "thierry" && <p className="text-base text-kumo-default">Your number wins{f.method ? ` (${f.method})` : ""}. The methods below are Claude&apos;s, for reference.</p>}
+        {r && <p className="text-lg leading-relaxed text-kumo-strong">{r.summary}</p>}
+        <ValuationField v={v} />
+        {v.methods.length > 0 && (
+          <Section title="Methods">
+            <MethodsTable symbol={symbol} v={v} />
+          </Section>
         )}
-        {f.inputs.length > 0 && (
-          <Section title="Inputs">
-            <div className="rounded-lg ring-1 ring-kumo-hairline">
+        {r && (
+          <Section title="Valuation report">
+            <article className="flex max-w-3xl flex-col gap-4">
+              <ArticleBody markdown={r.markdown} />
+            </article>
+          </Section>
+        )}
+        <Provenance
+          gold={`gold.fair_values ${symbol} (${f.author === "thierry" ? "your console value wins" : "weighted methods"})${r ? `, gold.valuation_reports ${symbol}, gold.method_valuations ${symbol}:*` : ""}`}
+          silver={r ? `silver.valuation_syntheses version ${r.version}; silver.method_valuations (one per method and input set)` : "silver.facts thesis fairValue (your console edit)"}
+          sources={f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]}
+        />
+      </>
+    ),
+  };
+}
+
+/** One Valuation Method on the ticker (level C): its range, assumptions with why, the calculation step by step, its chart, inputs and report. */
+async function methodItem(symbol: string, method: string): Promise<ItemView | null> {
+  const v = await getValuation(symbol);
+  const m = v.methods.find((x) => x.method === method);
+  if (!m) return null;
+  const unit = (u: string, x: number) => formatUnit(x, u as "currency", u === "per-share" || u === "currency" ? m.currency : null);
+  return {
+    title: m.name,
+    subtitle: `${m.family}: ${m.description}`,
+    body: (
+      <>
+        {m.applicable && m.base !== null ? (
+          <RangeCards low={m.low} base={m.base} high={m.high} currency={m.currency} baseLabel={`Base${m.weight ? `, weight ${Math.round(m.weight.weight * 100)}%` : ""}`} />
+        ) : (
+          <p className="text-lg text-kumo-subtle">Not used for this company: {m.reason}</p>
+        )}
+        {m.summary && <p className="text-lg leading-relaxed text-kumo-strong">{m.summary}</p>}
+        {m.weight?.why && <p className="text-base text-kumo-default">Weight: {m.weight.why}</p>}
+        {m.history && m.history.points.length > 1 && (
+          <ExhibitChart
+            number={1}
+            title={m.history.label}
+            chart="bar"
+            series={[{ key: "h", label: m.history.label, unit: m.history.unit as "multiple", currency: m.currency, sources: [] }]}
+            points={m.history.points.map((p) => ({ period: p.period, values: { h: p.value } }))}
+            sources={[...new Set(m.inputs.flatMap((i) => i.sources))]}
+          />
+        )}
+        {m.assumptions.length > 0 && (
+          <Section title="Assumptions">
+            <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
                   <KTableRow>
-                    <KTableHead className="pl-4">Input</KTableHead>
-                    <KTableHead>Period</KTableHead>
-                    <KTableHead className="pr-4 text-right">Value</KTableHead>
+                    <KTableHead className="pl-4">Assumption</KTableHead>
+                    <KTableHead className="text-right">Low</KTableHead>
+                    <KTableHead className="text-right">Base</KTableHead>
+                    <KTableHead className="text-right">High</KTableHead>
+                    <KTableHead className="pr-4">Why</KTableHead>
                   </KTableRow>
                 </KTableHeader>
                 <KTableBody>
-                  {f.inputs.map((i) => (
-                    <KTableRow key={`${i.label}|${i.period}`}>
-                      <KTableCell className="pl-4">{i.label}</KTableCell>
-                      <KTableCell className="whitespace-nowrap text-kumo-subtle">{i.period}</KTableCell>
-                      <KTableCell className="pr-4 text-right font-mono tabular">{fmt(i.value)}</KTableCell>
+                  {m.assumptions.map((a) => (
+                    <KTableRow key={a.key}>
+                      <KTableCell className="pl-4 align-top">{a.label}</KTableCell>
+                      <KTableCell className="text-right align-top font-mono tabular">{unit(a.unit, a.low)}</KTableCell>
+                      <KTableCell className="text-right align-top font-mono tabular text-kumo-strong">{unit(a.unit, a.base)}</KTableCell>
+                      <KTableCell className="text-right align-top font-mono tabular">{unit(a.unit, a.high)}</KTableCell>
+                      <KTableCell className="pr-4 align-top text-kumo-default">{a.why}</KTableCell>
+                    </KTableRow>
+                  ))}
+                </KTableBody>
+              </KTable>
+            </div>
+            {m.basis && <p className="text-sm text-kumo-subtle">Run on: {m.basis}</p>}
+          </Section>
+        )}
+        {m.steps.length > 0 && (
+          <Section title="Calculation">
+            <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
+              <KTable>
+                <KTableHeader>
+                  <KTableRow>
+                    <KTableHead className="pl-4">Step</KTableHead>
+                    <KTableHead className="text-right">Low</KTableHead>
+                    <KTableHead className="text-right">Base</KTableHead>
+                    <KTableHead className="pr-4 text-right">High</KTableHead>
+                  </KTableRow>
+                </KTableHeader>
+                <KTableBody>
+                  {m.steps.map((st) => (
+                    <KTableRow key={st.label}>
+                      <KTableCell className="pl-4">{st.label}</KTableCell>
+                      <KTableCell className="text-right font-mono tabular">{unit(st.unit, st.low)}</KTableCell>
+                      <KTableCell className="text-right font-mono tabular text-kumo-strong">{unit(st.unit, st.base)}</KTableCell>
+                      <KTableCell className="pr-4 text-right font-mono tabular">{unit(st.unit, st.high)}</KTableCell>
                     </KTableRow>
                   ))}
                 </KTableBody>
@@ -325,11 +406,57 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
             </div>
           </Section>
         )}
-        <Provenance
-          gold={`gold.fair_values ${symbol} (${f.author === "thierry" ? "your console value wins" : "Claude's value"})`}
-          silver={f.version ? `silver.analyses version ${f.version}, inputs read from gold financials` : "silver.facts thesis fairValue (your console edit)"}
-          sources={[f.author === "thierry" ? "console" : "claude"]}
-        />
+        {m.peers.length > 0 && (
+          <Section title="Comparable companies">
+            <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
+              <KTable>
+                <KTableHeader>
+                  <KTableRow>
+                    <KTableHead className="pl-4">Company</KTableHead>
+                    <KTableHead className="text-right">EV/EBITDA</KTableHead>
+                    <KTableHead className="pr-4 text-right">P/E</KTableHead>
+                  </KTableRow>
+                </KTableHeader>
+                <KTableBody>
+                  {m.peers.map((p) => (
+                    <KTableRow key={p.symbol}>
+                      <KTableCell className="pl-4">
+                        {p.name ?? p.symbol} <span className="font-mono text-[12px] text-kumo-subtle">{p.symbol}</span>
+                      </KTableCell>
+                      <KTableCell className="text-right font-mono tabular">{p.evEbitda === null ? "–" : `${p.evEbitda.toFixed(1)}x`}</KTableCell>
+                      <KTableCell className="pr-4 text-right font-mono tabular">{p.pe === null ? "–" : `${p.pe.toFixed(1)}x`}</KTableCell>
+                    </KTableRow>
+                  ))}
+                </KTableBody>
+              </KTable>
+            </div>
+          </Section>
+        )}
+        {m.inputs.length > 0 && (
+          <Section title="Inputs">
+            <div className="rounded-lg ring-1 ring-kumo-hairline">
+              <FactList>
+                {m.inputs.map((i) => (
+                  <Fact key={i.key} label={i.label}>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono tabular">{unit(i.unit, i.value)}</span>
+                      <span className="text-sm text-kumo-subtle">{i.period}</span>
+                      <SourceTags sources={i.sources} />
+                    </span>
+                  </Fact>
+                ))}
+              </FactList>
+            </div>
+          </Section>
+        )}
+        {m.report && (
+          <Section title="Report">
+            <article className="flex max-w-3xl flex-col gap-4">
+              <ArticleBody markdown={m.report} />
+            </article>
+          </Section>
+        )}
+        <Provenance gold={`gold.method_valuations ${m.id}`} silver={`silver.method_valuations version ${m.version} (Claude picked the assumptions, the code did the arithmetic)`} sources={["claude", ...new Set(m.inputs.flatMap((i) => i.sources))]} />
       </>
     ),
   };
@@ -406,5 +533,6 @@ export async function itemView(symbol: string, item: string): Promise<ItemView |
   if (kind === "kpi") return kpiItem(symbol, key);
   if (kind === "driver") return driverItem(symbol, key);
   if (kind === "exhibit") return exhibitItem(symbol, key);
+  if (kind === "valuation") return methodItem(symbol, key);
   return null;
 }
