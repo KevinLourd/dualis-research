@@ -8,6 +8,7 @@ import { fetches } from "../../web/src/db/schema/bronze";
 import { whatsappLink } from "../../web/src/db/schema/whatsapp";
 import type { Db } from "../../web/src/db/types";
 import { allowlist, jidUser, phoneJid } from "../../web/src/whatsapp/allowlist";
+import { pairingDue } from "../../web/src/whatsapp/pairing";
 import { inboundEntry, receiptEntry } from "../../web/src/whatsapp/inbound";
 import { failInterrupted, nextDueAt, processOutbox, type Sender } from "../../web/src/whatsapp/outbox";
 import { type BronzeEntry, DIMENSION, ingest, SOURCE_WHATSAPP, SOURCE_WHISPER } from "../../web/src/whatsapp/store";
@@ -28,6 +29,8 @@ const MAX_MEDIA_BYTES = 16 * 1024 * 1024;
 /** Thierry often sends several messages in a row: answer once they settle. */
 const REPLY_DEBOUNCE_MS = 20_000;
 const AUTH_DIR = process.env.AUTH_DIR ?? "/data/auth";
+/** While not linked, how often Settings is checked for a "link with a code" request (the QR already keeps the DB awake then). */
+const PAIRING_POLL_MS = 5_000;
 
 const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL_UNPOOLED / DATABASE_URL is not set");
@@ -176,6 +179,30 @@ async function getMessage(key: { id?: string | null }) {
   return fromJson<WAMessage>(raw).message ?? undefined;
 }
 
+/** The connection that showed a QR (WhatsApp accepts a code request only then) and the request already answered on it. */
+let qrSocket: WASocket | null = null;
+let pairingAnswered: { requestedAt: number; connection: unknown } | null = null;
+
+/** Settings asked to link with a code: ask WhatsApp for one on the current connection and write it back for the page. */
+async function pairingTick() {
+  const s = qrSocket;
+  if (linked || !s || s !== sock) return;
+  const [row] = await db
+    .select({ pairingPhone: whatsappLink.pairingPhone, pairingRequestedAt: whatsappLink.pairingRequestedAt })
+    .from(whatsappLink)
+    .where(eq(whatsappLink.id, "default"));
+  if (!pairingDue(row, pairingAnswered, s, Date.now())) return;
+  pairingAnswered = { requestedAt: row!.pairingRequestedAt!.getTime(), connection: s };
+  try {
+    const code = await s.requestPairingCode(row!.pairingPhone!);
+    console.log("[wa] pairing code ready for the number typed in Settings");
+    await setLink({ status: "waiting-for-scan", pairingCode: code, error: null });
+  } catch (err) {
+    console.warn("[wa] WhatsApp refused the pairing code request", err);
+    await setLink({ status: "waiting-for-scan", pairingCode: null, error: `WhatsApp refused the code request: ${(err as Error).message}. Check the number and try again.` });
+  }
+}
+
 function start() {
   const s = makeWASocket({
     auth: { creds: auth.state.creds, keys: makeCacheableSignalKeyStore(auth.state.keys, logger) },
@@ -193,6 +220,7 @@ function start() {
   s.ev.on("connection.update", (u) => {
     if (u.qr) {
       const qr = u.qr;
+      qrSocket = s;
       void serial(async () => {
         console.log(`[wa] not linked: scan this code from the phone (WhatsApp > Linked devices > Link a device)\n${await QRCode.toString(qr, { type: "terminal", small: true })}`);
         await setLink({ status: "waiting-for-scan", qrSvg: await QRCode.toString(qr, { type: "svg", margin: 1 }), error: null });
@@ -204,7 +232,7 @@ function start() {
       const phone = s.user?.id ? jidUser(s.user.id) : null;
       console.log(`[wa] linked to ${phone}`);
       void serial(async () => {
-        await setLink({ status: "linked", qrSvg: null, phone, error: null });
+        await setLink({ status: "linked", qrSvg: null, phone, error: null, pairingCode: null, pairingPhone: null, pairingRequestedAt: null });
         await auth.snapshot();
         authDirty = false;
         await learnLids(s);
@@ -226,6 +254,11 @@ function start() {
         return;
       }
       console.warn(`[wa] connection closed (${code ?? "?"}: ${reason}), reconnecting in ${reconnectDelay / 1000}s`);
+      // A pairing code lives with its connection: the next one asks for a new code if the request is still fresh.
+      if (qrSocket === s) {
+        qrSocket = null;
+        void serial(() => db.update(whatsappLink).set({ pairingCode: null }).where(eq(whatsappLink.id, "default")));
+      }
       setTimeout(start, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
     }
@@ -257,6 +290,9 @@ async function main() {
   if (interrupted > 0) console.warn(`[wa] ${interrupted} outbox row(s) were mid-send at the last stop: marked failed, not re-sent`);
   await setLink({ status: "starting" });
   start();
+  setInterval(() => {
+    if (!linked && qrSocket) void serial(pairingTick);
+  }, PAIRING_POLL_MS);
   // First tick a minute after boot: deploys restart the container more often than the idle interval fires.
   schedule(60_000);
 }
