@@ -25,7 +25,7 @@ export function fieldRows(v: Valuation): FieldRow[] {
 export function ValuationField({ v }: { v: Valuation }) {
   const rows = fieldRows(v);
   if (rows.length === 0) return null;
-  return <FootballField rows={rows} quote={v.quote} currency={v.report?.currency ?? v.fairValue?.currency ?? null} />;
+  return <FootballField rows={rows} fairValue={v.fairValue?.value ?? v.report?.base ?? null} currency={v.report?.currency ?? v.fairValue?.currency ?? null} />;
 }
 
 /** Every method of the catalogue the ticker ran: a method that does not fit says why, in grey. */

@@ -12,13 +12,13 @@ echarts.use([BarChart, ScatterChart, GridComponent, TooltipComponent, MarkLineCo
 
 /**
  * The football field (how sell-side research shows a valuation): one horizontal bar per method from its low to its high
- * value per share, a dot on its base case, the weighted Fair Value as the last bar, the quote as a vertical line.
+ * value per share, a dot on its base case, the weighted Fair Value as the last bar, the Fair Value as a vertical line.
  */
 export type FieldRow = { label: string; low: number; base: number; high: number; weight: number | null; total?: boolean };
 
 const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 });
 
-export function FootballField({ rows, quote, currency }: { rows: FieldRow[]; quote: number | null; currency: string | null }) {
+export function FootballField({ rows, fairValue, currency }: { rows: FieldRow[]; fairValue: number | null; currency: string | null }) {
   const dark = usePageDark();
   const ink = dark ? INK.dark : INK.light;
   const text = { fontFamily: FONT, fontSize: 11, color: ink.text };
@@ -47,11 +47,12 @@ export function FootballField({ rows, quote, currency }: { rows: FieldRow[]; quo
         data: shown.map((r) => ({ value: r.high - r.low, itemStyle: { color: r.total ? ink.navy : r.weight ? `${ink.navy}88` : `${ink.muted}55` } })),
         barWidth: 14,
         markLine:
-          quote !== null
-            ? { silent: true, symbol: "none", lineStyle: { color: ink.text, type: "dashed", width: 1 }, label: { formatter: `Quote ${fmt(quote)}`, fontFamily: FONT, fontSize: 10, color: ink.text, position: "end" }, data: [{ xAxis: quote }] }
+          fairValue !== null
+            ? { silent: true, symbol: "none", lineStyle: { color: ink.text, type: "dashed", width: 1 }, label: { formatter: `Fair value ${fmt(fairValue)}`, fontFamily: FONT, fontSize: 10, color: ink.text, position: "end" }, data: [{ xAxis: fairValue }] }
             : undefined,
       },
-      { type: "scatter", data: shown.map((r, i) => [r.base, i]), symbolSize: 9, itemStyle: { color: dark ? "#ffffff" : "#111827", borderColor: ink.navy, borderWidth: 1 }, z: 3 },
+      // White on the dark Fair value bar (Kevin 2026-11-06: a dark dot on it could not be read), dark on the pale method bars.
+      { type: "scatter", data: shown.map((r, i) => ({ value: [r.base, i], itemStyle: { color: r.total || dark ? "#ffffff" : "#111827", borderColor: ink.navy, borderWidth: 1 } })), symbolSize: 9, z: 3 },
     ],
     aria: { enabled: true },
   };
