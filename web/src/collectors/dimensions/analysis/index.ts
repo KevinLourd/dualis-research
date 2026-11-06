@@ -80,7 +80,7 @@ async function subjects(db: Db): Promise<string[]> {
 export const analysis: Dimension = {
   name: ANALYSIS_DIMENSION,
   description:
-    "Per ticker, from the reported numbers: Claude's Fair Value (number + one-line method), the Narrative (why the price sits there), up to 3 Narrative Drivers each with Exhibits drawn from stored series, and the Research Report. Once per input hash.",
+    "Per ticker, from the reported numbers: Claude's Fair Value (number + one-line method), the Narrative (why the price sits there), 1 to 5 Narrative Drivers each with Exhibits drawn from stored series, and the Research Report. Once per input hash.",
   sources: [analysisSource],
   subjects,
   promote: promoteAnalysis,

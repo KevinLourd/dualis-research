@@ -3,7 +3,7 @@ import { firstJsonObject } from "@/llm/judge";
 import { stripDashes } from "../thesis/structure";
 
 /** Bump when a prompt changes meaning: every ticker is analysed again. */
-export const ANALYSIS_VERSION = "analysis@v4";
+export const ANALYSIS_VERSION = "analysis@v5";
 
 const METHOD = [
   "The analyst's method: he does not believe in one true value. The price reflects the market's NARRATIVE; the FAIR VALUE is what the business is worth if its plan works,",
@@ -29,13 +29,15 @@ export function analysisPrompt(factsText: string): string {
     '  "fairValue": {"value": <number per share, in the reporting currency>, "currency": "<ISO>", "method": "<the full calculation in one line: multiple, which reported figure and period, net debt, shares -> value per share>", "label": "<the method in a few words, no arithmetic, e.g. 5.9x EV/EBITDA, 4-year median>", "inputs": [{"label": "<figure used>", "value": <number as given in the facts, full units>, "period": "<period>"}]},',
     '  "narrative": "<ONE short plain sentence, subject verb complement: the story the market tells about the company that explains why the price sits below (or above) your fair value, at most one figure, e.g. The market sees Kyungbang as a dying textile maker.>",',
     '  "narrativeDetail": "<3 to 5 sentences: why the price sits where it does versus that fair value, so far, with the figures>",',
-    '  "drivers": [ up to 3, the REASONS the market holds that narrative, most important first:',
+    '  "drivers": [ 1 to 5, the REASONS the market holds that narrative, most important first:',
     `    {"category": <one of: ${DRIVER_CATEGORIES.map((c) => JSON.stringify(c)).join(", ")}>, "title": "<5 to 9 words, the reason itself>", "summary": "<ONE short plain sentence, subject verb complement, no figure>", "text": "<2 to 3 sentences with the reported figures>",`,
     '     "exhibits": [1 or 2 charts that show it: {"title": "<chart title>", "chart": "bar" | "line", "series": [<1 to 3 keys from the stored chart series list, same period type>], "takeaway": "<one line: what the chart shows>"}]}',
     "  ]",
     "}",
     "Fair value: use the reported figures and the valuation lines above; the 5-year EV/EBITDA median is a good default multiple when the business is stable. If EBITDA is negative, use another reported base (revenue, book value) and say so.",
     "Every driver SUPPORTS the narrative: it is a reason the market believes the story. Price below fair value: each driver is a reason for pessimism (debt, a missed guide, a shrinking market, a dilution...). Price above: each is a reason for optimism. A fact that goes AGAINST the narrative (a record quarter under a gloomy story) is never a driver: it is the news that may reverse one.",
+    "Drivers are every reason the market really holds, and only those: 1 to 5, as many as there are. Never invent a reason to fill the list, and never leave one out: a reason left out is a reason whose reversal no news can show.",
+    `"Consensus expectations" is a driver when the analyst consensus agrees with the narrative, even when it only follows another reason (estimates cut because the cycle turns down): below fair value, analysts expect a decline or keep cutting estimates; above, they bake in strong growth or keep raising them. A company no analyst follows (no consensus in the facts) is also a reason for the discount. When the consensus goes against the price sitting below (or above) fair value, it is not a driver of this narrative.`,
     "Each driver needs at least one exhibit whose series keys appear EXACTLY in the stored chart series list.",
   ].join("\n");
 }
@@ -91,7 +93,7 @@ export function parseAnalysis(text: string): AnalysisAnswer {
     },
     narrative: stripDashes(o.narrative),
     narrativeDetail: isStr(o.narrativeDetail) ? stripDashes(o.narrativeDetail) : null,
-    drivers: drivers.slice(0, 3).map((d, i) => {
+    drivers: drivers.slice(0, 5).map((d, i) => {
       const category = DRIVER_CATEGORIES.find((c) => c === d.category);
       if (!category) throw new Error(`analysis: driver ${i + 1} category "${String(d.category)}" is not a Driver Category`);
       if (!isStr(d.title) || !isStr(d.text)) throw new Error(`analysis: driver ${i + 1} has no title or text`);

@@ -9,7 +9,7 @@ import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { analysis } from "./dimensions/analysis";
-import { analysisPrompt } from "./dimensions/analysis/prompt";
+import { analysisPrompt, parseAnalysis } from "./dimensions/analysis/prompt";
 import { evidenceDim, parseEvidenceSubject, verdictRank } from "./dimensions/evidence";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { computeSignal, signalsDim } from "./dimensions/signals";
@@ -168,6 +168,23 @@ describe("analysis dimension", () => {
     const p = analysisPrompt("facts");
     expect(p).toContain("Every driver SUPPORTS the narrative");
     expect(p).not.toMatch(/weakens/);
+  });
+
+  it("asks for 1 to 5 drivers, none invented and none left out, and says when the consensus is one", () => {
+    const p = analysisPrompt("facts");
+    expect(p).toContain("1 to 5");
+    expect(p).toContain("Never invent a reason");
+    expect(p).toContain("never leave one out");
+    expect(p).toContain('"Consensus expectations"');
+    expect(p).toContain("agrees with the narrative");
+  });
+
+  it("keeps up to 5 drivers and refuses the old category name", () => {
+    const d = (category: string, i: number) => ({ category, title: `Reason ${i}`, text: "t", exhibits: [] });
+    const base = { fairValue: { value: 1, currency: "USD", method: "m" }, narrative: "n" };
+    const six = parseAnalysis(JSON.stringify({ ...base, drivers: [1, 2, 3, 4, 5, 6].map((i) => d("Consensus expectations", i)) }));
+    expect(six.drivers.map((x) => x.title)).toEqual(["Reason 1", "Reason 2", "Reason 3", "Reason 4", "Reason 5"]);
+    expect(() => parseAnalysis(JSON.stringify({ ...base, drivers: [d("Expectations", 1)] }))).toThrow(/not a Driver Category/);
   });
 });
 
