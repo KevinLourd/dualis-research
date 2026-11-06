@@ -21,7 +21,9 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
   const [tab, setTab] = useState<Tab>(count("strong") ? "strong" : count("weak") ? "weak" : "noise");
   const shown = rows.filter((r) => r.strength === tab);
   return (
-    <div className="flex flex-col gap-4">
+    <TableSearch
+      placeholder="Search news"
+      tabs={
       <Tabs
         variant="underline"
         value={tab}
@@ -32,7 +34,8 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
           { value: "noise", label: `Noise · ${count("noise")}` },
         ]}
       />
-      <TableSearch placeholder="Search news">
+      }
+    >
       {shown.length === 0 ? (
         <p className="text-base text-kumo-subtle">No {tab} news.</p>
       ) : (
@@ -70,7 +73,6 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
           </KTable>
         </div>
       )}
-      </TableSearch>
-    </div>
+    </TableSearch>
   );
 }

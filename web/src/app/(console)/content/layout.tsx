@@ -8,8 +8,9 @@ export default async function ContentLayout({ children }: { children: React.Reac
   return (
     <>
       <PageHeader title="Content" description="What to publish next, ranked for each channel. Open an idea to draft it." />
-      <ContentTabs ideas={ideas.length} drafts={drafts.length} />
-      <TableSearch placeholder="Search ideas and drafts">{children}</TableSearch>
+      <TableSearch placeholder="Search ideas and drafts" tabs={<ContentTabs ideas={ideas.length} drafts={drafts.length} />}>
+        {children}
+      </TableSearch>
     </>
   );
 }
