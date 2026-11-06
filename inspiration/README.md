@@ -18,5 +18,5 @@ node serve.mjs              # then open http://inspo.localhost:4400/
 `*.localhost` resolves to your machine in Chrome and Safari, no `/etc/hosts` edit.
 
 - Capture = real Chrome (Playwright, `channel: "chrome"`): home + up to 5 key pages per site (subscribe/pricing, one post, research/archive, about, FAQ), picked from the home page links. A site blocking headless Chrome: `node capture.mjs <id> --headed`.
-- `mirrors/` is **gitignored**: it is third-party content and this repo is transferred to Thierry. Only the scripts are versioned.
+- Captures live in `~/.cache/dualis-inspiration` (override `DUALIS_MIRRORS`), outside the repo: third-party content never enters git (this repo is public and goes to Thierry), and every workspace reuses one capture instead of re-capturing. Re-capture only a site that changed: `node capture.mjs <id>`.
 - Add a site: one line in `sites.json` (`id` = the subdomain).
