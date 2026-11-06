@@ -50,12 +50,69 @@ export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyPr
  */
 export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-drafts", "content-dispatch", "content-replies", "growth-outreach", "substack-network"];
 
-/** `all`, `core` (all but Growth/content), `growth`, or one dimension name. */
+/**
+ * Stages of a collect (Kevin 2026-11-06: « comment speeder x10 »): the dimensions of one stage run at the same time,
+ * stages one after the other. A stage only reads what earlier stages wrote; Yahoo users (company-profile, price,
+ * consensus, financials, peers) sit in different stages so they never hit its rate limit together.
+ */
+export const STAGES: readonly (readonly string[])[] = [
+  ["watchlist"],
+  ["portfolio", "company-profile"],
+  ["news", "onedrive", "price", "filings", "earnings"],
+  ["thesis", "onedrive-filings", "consensus"],
+  ["financials"],
+  ["peers"],
+  ["valuation"],
+  ["analysis", "catalysts"],
+  ["thesis-confidence", "evidence"],
+  ["narrative-state"],
+  ["signals"],
+  ...GROWTH_DIMENSIONS.map((d) => [d]),
+];
+
+/** The dimensions to run, grouped by stage, in order. */
+export function stagesFor(dimensions: readonly Dimension[]): Dimension[][] {
+  const names = new Set(dimensions.map((d) => d.name));
+  return STAGES.map((stage) => stage.filter((n) => names.has(n)).map(dimensionByName)).filter((s) => s.length > 0);
+}
+
+/**
+ * `all`, `core` (all but Growth/content), `growth`, one dimension name, `from:<name>` (that dimension and every later
+ * core one: what a change to it can move), or a comma list of those.
+ */
 export function dimensionsFor(arg: string): readonly Dimension[] {
   if (arg === "all") return DIMENSIONS;
   if (arg === "core") return DIMENSIONS.filter((d) => !GROWTH_DIMENSIONS.includes(d.name));
   if (arg === "growth") return DIMENSIONS.filter((d) => GROWTH_DIMENSIONS.includes(d.name));
+  if (arg.includes(",")) {
+    const names = new Set(arg.split(",").flatMap((a) => dimensionsFor(a.trim()).map((d) => d.name)));
+    return DIMENSIONS.filter((d) => names.has(d.name));
+  }
+  if (arg.startsWith("from:")) {
+    const i = DIMENSIONS.indexOf(dimensionByName(arg.slice(5)));
+    return DIMENSIONS.slice(i).filter((d) => d === DIMENSIONS[i] || !GROWTH_DIMENSIONS.includes(d.name));
+  }
   return [dimensionByName(arg)];
+}
+
+/**
+ * What a merge must collect (the deploy's "Refresh data now"), from the files it changed: a dimension's folder ->
+ * `from:<the earliest one>`; shared collector, schema, LLM or migration code -> `core`; console / site / docs only -> nothing.
+ */
+export function collectPlan(files: readonly string[]): string | null {
+  let core = false;
+  const touched = new Set<string>();
+  for (const f of files) {
+    const dim = /^web\/src\/collectors\/dimensions\/([^/]+)\//.exec(f)?.[1];
+    if (dim && DIMENSIONS.some((d) => d.name === dim)) touched.add(dim);
+    else if (/^web\/(src\/(collectors|llm|bsg|db|private|growth|content|onedrive)\/|drizzle\/)/.test(f) && !/\.test\.ts$/.test(f)) core = true;
+  }
+  if (core) return "core";
+  const order = DIMENSIONS.map((d) => d.name).filter((n) => touched.has(n));
+  if (order.length === 0) return null;
+  const growth = order.filter((n) => GROWTH_DIMENSIONS.includes(n));
+  const firstCore = order.find((n) => !GROWTH_DIMENSIONS.includes(n));
+  return [...(firstCore ? [`from:${firstCore}`] : []), ...growth].join(",");
 }
 
 export function dimensionByName(name: string): Dimension {

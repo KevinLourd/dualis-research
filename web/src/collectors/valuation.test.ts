@@ -137,7 +137,8 @@ describe("fair value pyramid", () => {
     const report = await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
     expect(report.status).toBe("succeeded");
     // No dividend: no call for it; analyst targets are read, not asked.
-    expect(calls).toEqual(["method:EV/EBITDA, own history", "method:P/E", "method:P/B, book value", "method:DCF on free cash flow", "method:Net cash and assets", "method:Listed peers", "weights", "report"]);
+    expect(calls.slice(0, 6).sort()).toEqual(["method:DCF on free cash flow", "method:EV/EBITDA, own history", "method:Listed peers", "method:Net cash and assets", "method:P/B, book value", "method:P/E"]);
+    expect(calls.slice(6)).toEqual(["weights", "report"]);
     const rows = new Map((await db.select().from(goldMethodValuations)).map((r) => [r.method, r]));
     expect(rows.get("ev-ebitda")).toMatchObject({ applicable: 1, low: (4 * 70e9 + 100e9) / 16.5e6, base: (6 * 70e9 + 100e9) / 16.5e6, high: (8 * 70e9 + 100e9) / 16.5e6 });
     expect(rows.get("ev-ebitda")!.history?.points.map((p) => p.value)).toEqual([5, 7, 6]);

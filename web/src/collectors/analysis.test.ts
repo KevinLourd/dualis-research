@@ -10,7 +10,8 @@ import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { analysis } from "./dimensions/analysis";
 import { analysisPrompt, parseAnalysis } from "./dimensions/analysis/prompt";
-import { evidenceDim, parseEvidenceSubject, verdictRank } from "./dimensions/evidence";
+import { batchSubject, evidenceDim, parseBatch, parseBatchSubject, parseEvidenceSubject, verdictRank } from "./dimensions/evidence";
+import { collectPlan, dimensionsFor, stagesFor, STAGES, DIMENSIONS } from "./registry";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { computeSignal, signalsDim } from "./dimensions/signals";
 import { watchlist } from "./dimensions/watchlist";
@@ -47,10 +48,11 @@ const fake: Complete = async ({ prompt, system }) => {
     return { text: JSON.stringify({ summary: "The market sees a cyclical parts maker after a 2025 dip.", claims: [{ text: "Revenue fell to KRW 291.8B in 2025.", drivers: [1, 7], sources: [{ type: "exhibit", ref: "1", label: "Revenue" }, { type: "bogus", ref: "x" }] }], exhibits: [{ title: "Share price", chart: "line", series: ["line:revenue", "nope"], takeaway: "Back to a year ago." }, { title: "Invented", chart: "bar", series: ["nope"], takeaway: "x" }] }), model: "fake" };
   }
   const verdict = (v: string, reason: string) => ({ text: JSON.stringify({ verdict: v, probability: 0.8, cited_sentence: "buyback", reason }), model: "fake" });
-  if (prompt.includes("What does this news item or filing do to THIS reason")) {
+  if (prompt.includes("For EACH item below and EACH driver")) {
     calls.push("evidence");
     // The buyback reverses the cash reason (driver 2) and is noise for the cycle reason (driver 1).
-    return prompt.includes("Net cash funds buybacks") ? verdict("reversal:strong", "A buyback trust returns cash.") : verdict("noise", "Nothing on the cycle.");
+    const n = (prompt.match(/^\[\d+\]/gm) ?? []).length;
+    return { text: JSON.stringify({ items: Array.from({ length: n }, (_, i) => ({ n: i + 1, drivers: { "1": { tag: "noise", p: 0.8, why: "Nothing on the cycle.", cited: null }, "2": { tag: "reversal:strong", p: 0.8, why: "A buyback trust returns cash.", cited: "buyback" } } })) }), model: "fake" };
   }
   if (prompt.includes("Where does this reason stand NOW")) {
     calls.push("driver-state");
@@ -122,7 +124,7 @@ describe("analysis dimension", () => {
     await db.insert(gold.filings).values({ id: "6f1d1a52-1111-4a3b-9c1d-000000000002", symbol: SYMBOL, registry: "dart", filingKey: "r0", form: null, title: "Old notice", filedAt: new Date(Date.now() - 400 * 86_400_000), url: null, language: "ko", sources: ["dart"] });
     calls = [];
     await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
-    expect(calls).toEqual(["evidence", "evidence"]);
+    expect(calls).toEqual(["evidence"]);
     const all = await db.select().from(evidence);
     expect(all).toHaveLength(1);
     const [e] = all;
@@ -199,7 +201,29 @@ describe("signal rule", () => {
   });
   it("subject grammar and verdict order", () => {
     expect(parseEvidenceSubject("101160.KQ|news:abc-1#2")).toEqual({ symbol: "101160.KQ", kind: "news", id: "abc-1", rank: 2 });
+    expect(parseBatchSubject(batchSubject("CCLD", [{ kind: "news", id: "a:1" }, { kind: "filing", id: "b" }]))).toEqual({ symbol: "CCLD", items: [{ kind: "news", id: "a:1" }, { kind: "filing", id: "b" }] });
     const order = (["continuation:weak", "reversal:weak", "noise:noise", "continuation:strong", "reversal:strong"] as const).map((t) => t.split(":") as [string, string]);
     expect([...order].sort((a, b) => verdictRank({ effect: a[0] as never, strength: a[1] as never }) - verdictRank({ effect: b[0] as never, strength: b[1] as never })).map((x) => x.join(":"))).toEqual(["reversal:strong", "continuation:strong", "reversal:weak", "continuation:weak", "noise:noise"]);
   });
 });
+
+describe("speed (Kevin 2026-11-06)", () => {
+  it("a batch answer missing an item x driver pair fails loud", () => {
+    expect(() => parseBatch(JSON.stringify({ items: [{ n: 1, drivers: { "1": { tag: "noise" } } }] }), 2, [1])).toThrow(/2#1/);
+    expect(parseBatch(JSON.stringify({ items: [{ n: 1, drivers: { "1": { tag: "reversal:weak", p: 2, why: "x" } } }] }), 1, [1]).get("1#1")).toEqual({ tag: "reversal:weak", p: 0.5, why: "x", cited: null });
+  });
+  it("every dimension sits in exactly one stage, after the ones it reads", () => {
+    expect(STAGES.flat().sort()).toEqual(DIMENSIONS.map((d) => d.name).sort());
+    const at = (n: string) => STAGES.findIndex((s) => s.includes(n));
+    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["analysis", "evidence"], ["catalysts", "thesis-confidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"]]) expect(at(before)).toBeLessThan(at(after));
+    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["analysis", "catalysts"], ["thesis-confidence", "evidence"], ["narrative-state"], ["signals"]]);
+  });
+  it("a merge collects only what its files can move", () => {
+    expect(collectPlan(["web/src/console/analysis.tsx", "site/src/app/page.tsx", "CLAUDE.md"])).toBeNull();
+    expect(collectPlan(["web/src/collectors/dimensions/valuation/prompt.ts", "web/src/collectors/dimensions/evidence/index.ts"])).toBe("from:valuation");
+    expect(collectPlan(["web/src/collectors/dimensions/cover-photos/index.ts"])).toBe("cover-photos");
+    expect(collectPlan(["web/src/collectors/runner.ts"])).toBe("core");
+    expect(collectPlan(["web/src/collectors/valuation.test.ts"])).toBeNull();
+  });
+});
+
