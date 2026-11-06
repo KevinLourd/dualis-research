@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { gold } from "./gold";
 import { silver } from "./silver";
 
@@ -456,3 +456,67 @@ export const goldContentPublished = gold.table(
   (t) => [index("gold_content_published_at").on(t.publishedAt)],
 );
 export type GoldContentPublished = typeof goldContentPublished.$inferSelect;
+
+/** bytea: Neon over HTTP hands back `\\x<hex>`, node-postgres / PGlite a byte array; both read as a Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array | string }>({
+  dataType: () => "bytea",
+  fromDriver: (v) => (typeof v === "string" ? Buffer.from(v.startsWith("\\x") ? v.slice(2) : v, "hex") : Buffer.from(v)),
+});
+
+/**
+ * Visuals of an Idea, shared by every draft made from it (Kevin 2026-11-06: each draft carries an image or a video):
+ * `chart` (price vs fair value, his black Note style), `montage` (16:9 card: the idea, the chart, the mark),
+ * `video` (the same card, the line drawing itself, MP4) and `capture` (a screenshot of the news the idea cites).
+ * Rendered at $0 in GitHub Actions. The file itself sits here once (bytea); bronze keeps what was rendered from and
+ * its size, gold the list the console shows (no bytes): `/api/visuals/<id>` streams the file. Natural key: (idea, kind, version).
+ */
+export const VISUAL_KINDS = ["montage", "video", "chart", "capture"] as const;
+export type VisualKind = (typeof VISUAL_KINDS)[number];
+
+export const contentVisuals = silver.table(
+  "content_visuals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ideaId: uuid("idea_id").notNull(),
+    kind: text("kind").$type<VisualKind>().notNull(),
+    /** Render version (`VISUALS_VERSION`): a new look renders every Idea again once. */
+    version: text("version").notNull(),
+    status: text("status").$type<"ok" | "failed">().notNull(),
+    error: text("error"),
+    mime: text("mime"),
+    width: integer("width"),
+    height: integer("height"),
+    file: bytea("file"),
+    sizeBytes: integer("size_bytes"),
+    /** The page a capture shows. */
+    sourceUrl: text("source_url"),
+    /** Credit line ("Capture of reuters.com", "Prices: Yahoo Finance"). */
+    caption: text("caption"),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("content_visuals_natural_key").on(t.ideaId, t.kind, t.version)],
+);
+
+/** What the console lists per Idea (latest version per kind), without the file. Same id as silver. */
+export const goldContentVisuals = gold.table(
+  "content_visuals",
+  {
+    id: uuid("id").primaryKey(),
+    ideaId: uuid("idea_id").notNull(),
+    kind: text("kind").$type<VisualKind>().notNull(),
+    status: text("status").$type<"ok" | "failed">().notNull(),
+    error: text("error"),
+    mime: text("mime"),
+    width: integer("width"),
+    height: integer("height"),
+    sizeBytes: integer("size_bytes"),
+    sourceUrl: text("source_url"),
+    caption: text("caption"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    rebuiltAt,
+  },
+  (t) => [index("gold_content_visuals_idea").on(t.ideaId)],
+);
+export type GoldContentVisual = typeof goldContentVisuals.$inferSelect;

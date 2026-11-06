@@ -2,7 +2,7 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { cache } from "react";
 import { getDb } from "@/db/client";
 import { runs } from "@/db/schema/ops";
-import { goldContentAccounts, goldContentDrafts, goldContentIdeas, goldContentLibrary, goldContentPublications } from "@/db/schema/content";
+import { goldContentAccounts, goldContentDrafts, goldContentIdeas, goldContentLibrary, goldContentPublications, goldContentVisuals, VISUAL_KINDS } from "@/db/schema/content";
 
 /** Content section reads: gold only. */
 
@@ -41,3 +41,9 @@ export async function lastContentRun(dimension: "content-posts" | "content-draft
 export const listIdeas = cache(async () =>
   getDb().select().from(goldContentIdeas).orderBy(desc(goldContentIdeas.day), sql`${goldContentIdeas.bestScore} desc nulls last`, asc(goldContentIdeas.rank)),
 );
+
+/** The visuals of an Idea (latest per kind), in the order the panel shows them: card, video, chart, capture. */
+export async function listVisuals(ideaId: string) {
+  const rows = await getDb().select().from(goldContentVisuals).where(eq(goldContentVisuals.ideaId, ideaId));
+  return rows.sort((a, b) => VISUAL_KINDS.indexOf(a.kind) - VISUAL_KINDS.indexOf(b.kind));
+}

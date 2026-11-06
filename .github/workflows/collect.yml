@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   collect:
-    runs-on: ubuntu-latest
+    # 24.04: Chrome is on the image (content-visuals captures news pages with it); ffmpeg added below (its card video).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
@@ -53,5 +54,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: ffmpeg
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
       - run: pnpm db:migrate
       - run: pnpm collect ${{ github.event.inputs.dimension || (github.event.schedule == '15 5 * * *' && 'all') || (github.event.schedule == '0 2 * * *' && 'growth-outreach,substack-network,growth-brief') || 'core' }}
