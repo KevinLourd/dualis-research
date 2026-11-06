@@ -10,7 +10,7 @@ import { usePageDark } from "./use-page-dark";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, BrushComponent, ToolboxComponent, CanvasRenderer]);
 
-const NAVY = { light: "#0b2a5b", dark: "#3b64b0" };
+const NAVY = { light: "#2b2463", dark: "#5b53a8" };
 const LINE = "#94a3b8";
 
 /** Thierry's subscribers per day against the straight line to the goal. */

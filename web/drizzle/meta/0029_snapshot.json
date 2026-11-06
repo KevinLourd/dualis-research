@@ -1,5 +1,5 @@
 {
-  "id": "5cf5744c-570e-4f2d-9c78-2d62991b1627",
+  "id": "5355aec1-6a8e-4bf8-9f98-2caf5bbc9d43",
   "prevId": "253bc77c-ffb5-4d8e-b610-16abfff58ec2",
   "version": "7",
   "dialect": "postgresql",
@@ -3186,6 +3186,24 @@
         },
         "research_category": {
           "name": "research_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_photo_url": {
+          "name": "cover_photo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_photo_credit": {
+          "name": "cover_photo_credit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_photo_link": {
+          "name": "cover_photo_link",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -7131,12 +7149,6 @@
         },
         "model": {
           "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "note_version": {
-          "name": "note_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false

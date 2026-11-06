@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider appearance={{ variables: { colorPrimary: "#0b2a5b", borderRadius: "8px" } }}>
+    <ClerkProvider appearance={{ variables: { colorPrimary: "#2b2463", borderRadius: "8px" } }}>
       <html lang="en" data-theme="kumo">
         <body className="antialiased">
           <Providers>{children}</Providers>
