@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import { CtaBand, TrustCards } from "@/components/blocks";
+import { CallsBoard, CtaBand, TrustCards } from "@/components/blocks";
 import { Constellation } from "@/components/constellation";
 import { BothWaysFigure, NarrativeFigure } from "@/components/figures";
 import { PageBand } from "@/components/page-band";
-import { BEST_CALLS, BEST_CALLS_MIN_RETURN, BRAND, formatMonth, MARKETS } from "@/lib/model";
+import { BEST_CALLS_MIN_RETURN, BRAND, MARKETS } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Company" };
 
 export default async function Company() {
   const posts = await getPublications();
-  const calls = posts.filter((p) => p.category === "coverage");
   return (
     <>
       <PageBand label="Company" line="Equity research on the companies few analysts follow." />
@@ -60,31 +59,17 @@ export default async function Company() {
 
       <section className="section deep">
         <div className="wrap">
-          <h2 className="h-bold">Calls on the record</h2>
-          <p className="sub">
-            Our best calls so far: {BEST_CALLS.map((c) => `${c.name} (${c.side.toLowerCase()})`).join(" and ")}, both above +{BEST_CALLS_MIN_RETURN}%.
-          </p>
-          <ol className="timeline">
-            {calls.map((p) => (
-              <li key={p.id}>
-                <span className="tl-date">{formatMonth(p.publishedAt)}</span>
-                <span className="tl-dot" aria-hidden="true" />
-                <a target="_blank" rel="noopener noreferrer" href={p.url} className="tl-body">
-                  <strong>{p.title}</strong>
-                  {p.subtitle && <span>{p.subtitle}</span>}
-                </a>
-              </li>
-            ))}
-          </ol>
+          <p className="proof-kicker">Track record</p>
+          <h2 className="calls-head">Two calls, both above +{BEST_CALLS_MIN_RETURN}%. One long, one short.</h2>
+          <CallsBoard posts={posts} />
         </div>
       </section>
 
       <section className="section split">
         <div className="wrap split-grid">
           <div className="prose">
-            <h2 className="h-bold">From Astana, across eight markets</h2>
-            <p>{BRAND} is based in Astana, Kazakhstan. Coverage spans small and mid caps across Asia, North America and Europe.</p>
-            <p>For the highest-conviction ideas, we meet management, on site when it matters.</p>
+            <h2 className="h-bold">Global coverage</h2>
+            <p>Small and mid caps across Asia, North America and Europe. For the highest-conviction ideas, we meet management.</p>
           </div>
           <ul className="markets">
             {MARKETS.map((m) => (

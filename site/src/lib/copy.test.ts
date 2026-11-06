@@ -16,7 +16,7 @@ describe("site copy and colours", () => {
 
   // Kevin 2026-11-06: Thierry is the founder and lead analyst of Dualis Research, never a fund manager; the
   // portfolio size is not an identity ("2-4 names", "concentrated" hidden for now).
-  it.each([/Duality/i, /fund manager/i, /concentrated/i, /two to four/i, /2 - 4/, /own capital/i])("never says %s", (banned) => {
+  it.each([/Duality/i, /fund manager/i, /concentrated/i, /two to four/i, /2 - 4/, /own capital/i, /Astana/, /Kazakh/])("never says %s", (banned) => {
     expect(files.filter((f) => banned.test(f.text)).map((f) => f.path)).toEqual([]);
   });
 

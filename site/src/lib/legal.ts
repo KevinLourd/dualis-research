@@ -26,7 +26,7 @@ export const TERMS: LegalPage = {
     {
       heading: "Who we are",
       paragraphs: [
-        "Dualis Research is an independent equity research publisher based in Astana, Kazakhstan.",
+        "Dualis Research is an independent equity research publisher.",
         "We publish research on listed small and mid cap companies, including long and short ideas.",
         "Thierry Matin is the Founder and Lead Analyst.",
       ],
@@ -132,8 +132,8 @@ export const TERMS: LegalPage = {
     {
       heading: "Governing law",
       paragraphs: [
-        "These terms are governed by the laws of the Republic of Kazakhstan.",
-        "Any dispute will be handled by the competent courts of the Republic of Kazakhstan, unless mandatory law where you live says otherwise.",
+        "These terms are governed by the laws of the place where Dualis Research is established.",
+        "Any dispute will be handled by the competent courts of that place, unless mandatory law where you live says otherwise.",
         "If a court finds one part of these terms invalid, the rest stays in force.",
       ],
     },
@@ -156,7 +156,7 @@ export const PRIVACY: LegalPage = {
     {
       heading: "Who we are",
       paragraphs: [
-        "Dualis Research is an independent equity research publisher based in Astana, Kazakhstan.",
+        "Dualis Research is an independent equity research publisher.",
         "Thierry Matin is the Founder and Lead Analyst.",
         "This policy explains what personal data this website handles and what rights you have.",
         "For this website, Dualis Research is the data controller.",
@@ -239,7 +239,7 @@ export const PRIVACY: LegalPage = {
     {
       heading: "International transfers",
       paragraphs: [
-        "We are based in Kazakhstan. Cloudflare and Substack operate globally.",
+        "Cloudflare and Substack operate globally.",
         "Your data may be processed in countries other than your own, including the United States.",
         "Those providers apply their own safeguards to such transfers, as described in their policies.",
       ],
