@@ -49,9 +49,9 @@ jobs:
           npx wrangler versions deploy "$NEW@50%" "$OLD@50%" -y --message "cpu probe A/B" > /dev/null
           npx wrangler tail dualis-console --format json > tail.jsonl 2> tail.err &
           sleep 15
-          for p in /sign-in / /tickers /portfolio; do
+          for p in /sign-in /tickers; do
             echo "== $p"
-            for i in $(seq 1 40); do curl -s -o /dev/null -w "%{http_code} " -H "Accept: text/html" "$PROD$p"; done; echo
+            for i in $(seq 1 60); do curl -s -o /dev/null -w "%{http_code} " "$PROD$p"; done; echo
           done
           sleep 15
           kill %1 || true
