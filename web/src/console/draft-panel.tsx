@@ -37,6 +37,8 @@ export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldCont
         </span>
       }
     >
+      {draft.ideaId && <Visuals visuals={visuals} name={draft.symbol} />}
+
       <section className="flex flex-col gap-2">
         {draft.title && <h3 className="text-lg font-semibold text-kumo-strong">{draft.title}</h3>}
         <p className="rounded-lg bg-kumo-recessed p-4 text-base whitespace-pre-wrap text-kumo-default">{draft.body}</p>
@@ -44,8 +46,6 @@ export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldCont
           {draft.body.length} characters{draft.format === "x-post" && (over ? `, over the ${X_LIMIT} character X limit: shorten before posting` : ` of ${X_LIMIT}`)}
         </p>
       </section>
-
-      {draft.ideaId && <Visuals visuals={visuals} name={draft.symbol} />}
 
       <section className="flex flex-wrap gap-2">
         {link && (
