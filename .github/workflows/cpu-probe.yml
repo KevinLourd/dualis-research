@@ -41,32 +41,38 @@ jobs:
           node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/s.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY }))'
           npx wrangler versions upload --secrets-file "$RUNNER_TEMP/s.json" 2>&1 | tee up.log
           rm -f "$RUNNER_TEMP/s.json"
-      - name: Tail and hit
+      - name: A/B on prod (50/50), then restore the current version
         run: |
-          PREV=$(grep -o 'https://[a-zA-Z0-9-]*-dualis-console[a-zA-Z0-9.-]*\.workers\.dev' up.log | head -1)
-          echo "preview $PREV"
+          OLD=$(npx wrangler deployments status --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(max(d["versions"], key=lambda v: v["percentage"])["version_id"])')
+          NEW=$(grep -o 'Worker Version ID: [0-9a-f-]*' up.log | awk '{print $4}')
+          echo "old $OLD new $NEW"; grep "Startup" up.log || true
+          npx wrangler versions deploy "$NEW@50%" "$OLD@50%" -y --message "cpu probe A/B" > /dev/null
           npx wrangler tail dualis-console --format json > tail.jsonl 2> tail.err &
           sleep 15
-          for base in "$PROD" "$PREV"; do for p in /sign-in /; do
-            echo "== $base$p"
-            for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code} " "$base$p"; done; echo
-          done; done
+          for p in /sign-in / /tickers /portfolio; do
+            echo "== $p"
+            for i in $(seq 1 40); do curl -s -o /dev/null -w "%{http_code} " -H "Accept: text/html" "$PROD$p"; done; echo
+          done
           sleep 15
           kill %1 || true
-          python3 - <<'PY'
-          import json, collections
+          npx wrangler versions deploy "$OLD@100%" -y --message "cpu probe restore" > /dev/null
+          echo "restored $OLD"
+          OLD=$OLD NEW=$NEW python3 - <<'PY'
+          import json, collections, os
           dec = json.JSONDecoder(); s = open("tail.jsonl").read(); i = 0; rows = []
           while i < len(s):
               while i < len(s) and s[i].isspace(): i += 1
               if i >= len(s): break
               o, i = dec.raw_decode(s, i); rows.append(o)
+          name = {os.environ["OLD"][:8]: "OLD", os.environ["NEW"][:8]: "NEW"}
           by = collections.defaultdict(list)
           for o in rows:
               url = ((o.get("event") or {}).get("request") or {}).get("url", "?")
-              host, _, path = url.partition(".workers.dev")
+              path = url.split(".workers.dev")[-1]
               ver = ((o.get("scriptVersion") or {}).get("id") or "?")[:8]
-              by[(ver, host.split("//")[-1][:20], path)].append((o.get("outcome"), o.get("cpuTime")))
+              by[(name.get(ver, ver), path)].append((o.get("outcome"), o.get("cpuTime")))
           for k, v in sorted(by.items()):
-              print(k, len(v), dict(collections.Counter(x[0] for x in v)))
-              print("   cpu", sorted([x[1] for x in v if x[1] is not None]))
+              c = sorted([x[1] for x in v if x[1] is not None])
+              print(k, len(v), dict(collections.Counter(x[0] for x in v)), "median", c[len(c)//2] if c else None, "max", c[-1] if c else None, "over100", sum(1 for x in c if x > 100))
+              print("   cpu", c)
           PY
