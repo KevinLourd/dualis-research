@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 /**
- * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a trading-floor clip (Mixkit
- * free licence, no credit required) under a deep indigo veil (Kevin 2026-11-06, replaces the still constellation).
- * Muted, looped; reduced motion shows the still poster.
+ * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 30 s loop of the 10 industries
+ * and real assets experts expect to hold up in the AI era (Kevin 2026-11-06; BlackRock "HALO" sectors, Goldman Sachs
+ * and S&P Global on grid and copper, JLL on data-center power, Macquarie on infrastructure): power generation, the
+ * grid, copper and mining, semiconductors, data centers, oil and gas, robotics, aerospace and defense, ports and
+ * shipping, food and agriculture, each captioned in the clip. Mixkit free licence. Muted; reduced motion = poster.
  */
 export default function Home() {
   return (
