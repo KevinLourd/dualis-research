@@ -1,6 +1,7 @@
 import { KLayerCard, KLayerCardPrimary, KLayerCardSecondary } from "@/console/kumo";
 import { Badge, Empty } from "@cloudflare/kumo";
 import Link from "@/console/link";
+import { sourceLabel } from "./source-labels";
 
 /** Shared console primitives (server components) on top of Kumo. */
 
@@ -73,9 +74,9 @@ export function PositionTags({ inPortfolio, position }: { inPortfolio: boolean; 
 export function SourceTags({ sources }: { sources: string[] }) {
   return (
     <span className="inline-flex flex-wrap gap-1">
-      {sources.map((s) => (
-        <Badge key={s} variant="outline" className="font-mono text-[11px]">
-          {s}
+      {[...new Set(sources.map(sourceLabel))].map((label) => (
+        <Badge key={label} variant="outline">
+          {label}
         </Badge>
       ))}
     </span>
