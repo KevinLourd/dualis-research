@@ -65,6 +65,7 @@ describe("data freshness", () => {
     expect(dataAsOf([{ period: "fiscal year 2025-12" }, { period: "last 4 quarters to 2026-09" }], ran).toISOString().slice(0, 10)).toBe("2026-09-30");
     expect(dataAsOf([{ period: "quarter 2026-06" }, { period: "2026-11-05" }], ran).toISOString().slice(0, 10)).toBe("2026-11-05");
     expect(dataAsOf([{ period: "today" }], ran)).toBe(ran);
+    expect(dataAsOf([{ period: "fiscal year 2026-12, 3 analysts" }], ran)).toBe(ran);
   });
 });
 

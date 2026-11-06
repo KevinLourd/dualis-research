@@ -295,5 +295,6 @@ export function dataAsOf(inputs: readonly Pick<ValuationInput, "period">[], read
       if (!latest || d > latest) latest = d;
     }
   }
-  return latest ?? readAt;
+  // A forecast period (next year's consensus) is dated in the future: it is as fresh as the day it was read.
+  return latest && latest < readAt ? latest : readAt;
 }
