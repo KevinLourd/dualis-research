@@ -11,6 +11,7 @@ import { SlideOver } from "@/console/slide-over";
 import { Card, ComingNext, Fact, FactList, Missing, PageHeader } from "@/console/ui";
 import { saveOutreachMessage, updateOutreachStatus } from "@/growth/actions";
 import { GOAL, planned, progress } from "@/growth/goal";
+import { dailyOutreach } from "@/growth/daily";
 
 export const metadata = { title: "Growth" };
 
@@ -35,21 +36,6 @@ const STATUS_ACTIONS = [
   { status: "draft", label: "Back to draft" },
 ] as const;
 const FIT: Record<string, string> = { yes: "Same reader", partly: "Overlaps", no: "Other reader" };
-
-/** Day by day since the goal started (Astana days): contacts (status set that day), recommendations first seen, subscribers. */
-function dailyOutreach(live: GrowthRow[], audience: { date: string; subscribers: number }[], today: string) {
-  const astanaDay = (d: Date) => isoDate(new Date(d.getTime() + 5 * 3_600_000));
-  const out: { date: string; contacted: number; recommended: number; subscribers: number | null }[] = [];
-  for (let d: string = GOAL.startDate; d <= today && d <= GOAL.endDate; d = isoDate(new Date(Date.parse(`${d}T00:00:00Z`) + 86_400_000))) {
-    out.push({
-      date: d,
-      contacted: live.filter((r) => r.outreach && r.outreach.status !== "draft" && r.outreach.status !== "dropped" && r.outreach.statusAt && astanaDay(r.outreach.statusAt) === d).length,
-      recommended: live.filter((r) => r.outreach?.recommendsUsSince && astanaDay(r.outreach.recommendsUsSince) === d).length,
-      subscribers: audience.find((a) => a.date === d)?.subscribers ?? null,
-    });
-  }
-  return out.reverse();
-}
 
 function StatusBadge({ status, recommends = false }: { status: string; recommends?: boolean }) {
   if (recommends) return <Badge variant="success">Recommends you</Badge>;

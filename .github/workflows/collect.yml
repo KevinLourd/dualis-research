@@ -6,6 +6,7 @@ on:
   schedule:
     - cron: "15 5 * * *" # 05:15 UTC, before the European open: everything
     - cron: "15 1,9,13,17,21 * * *" # the analysis chain only
+    - cron: "0 2 * * *" # 07:00 Astana: fresh subscriber count + outreach, then the 08:00 Growth brief on WhatsApp
   workflow_dispatch:
     inputs:
       dimension:
@@ -53,4 +54,4 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
-      - run: pnpm collect ${{ github.event.inputs.dimension || (github.event.schedule == '15 5 * * *' && 'all') || 'core' }}
+      - run: pnpm collect ${{ github.event.inputs.dimension || (github.event.schedule == '15 5 * * *' && 'all') || (github.event.schedule == '0 2 * * *' && 'growth-outreach,substack-network,growth-brief') || 'core' }}
