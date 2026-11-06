@@ -32,7 +32,6 @@ export default async function Contact() {
           <h1 className="contact-title">Get in touch with us</h1>
           <div className="contact-grid">
             <div className="contact-side">
-              <p className="where">Astana, Kazakhstan</p>
               {TOPICS.map((t) => (
                 <div key={t.title} className="topic">
                   <h3>{t.title}</h3>

@@ -38,7 +38,8 @@ export const TRACK_RECORD = {
 } as const;
 
 /** Markets the coverage universe spans (the console collects filings and prices for each). */
-export const MARKETS = ["Japan", "Korea", "Hong Kong", "Kazakhstan", "Canada", "United States", "United Kingdom", "Australia"] as const;
+/** Markets covered. Never where Thierry lives (Kevin 2026-11-06; copy.test.ts). */
+export const MARKETS = ["Japan", "Korea", "Hong Kong", "Canada", "United States", "United Kingdom", "Australia"] as const;
 
 /** Thierry's Substack profile: messages reach him there. */
 export const SUBSTACK_PROFILE_URL = "https://substack.com/@analysisparalysis888";
@@ -48,10 +49,14 @@ export const LINKEDIN_URL = "https://www.linkedin.com/in/thierrymatin/";
 export const X_URL = "https://x.com/quantum_macro";
 export const X_HANDLE = "@quantum_macro";
 
-/** His two best calls, in his words (WhatsApp 2026-11-04): "both did above 40% returns". */
+/**
+ * His two best calls, in his words (WhatsApp 2026-11-04): "both did above 40% returns". `result` = what he published
+ * (Miraial: "Closed: ~45% return", Analysis Paralysis 2026-10-16; Quantum: "above 40%"). `report` = a word of the
+ * report's title, to link it; `line` = the thesis in one line, from his report.
+ */
 export const BEST_CALLS = [
-  { name: "Miraial", side: "Long" },
-  { name: "Quantum Corp", side: "Short" },
+  { name: "Miraial", ticker: "4238 JP", side: "Long", result: "+45%", resultNote: "closed", report: "wafer", line: "Wafer carriers at 8.5x earnings, bought as the chip cycle bottomed." },
+  { name: "Quantum Corp", ticker: "QMCO", side: "Short", result: "40%+", resultNote: "gain on the short", report: "Quantum", line: "A hyped story with a backlog about to run out." },
 ] as const;
 export const BEST_CALLS_MIN_RETURN = 40;
 

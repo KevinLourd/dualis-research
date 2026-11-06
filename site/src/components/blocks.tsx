@@ -178,7 +178,7 @@ export function Proof() {
   const figures = [
     { big: `+${TRACK_RECORD.ytdPct}%`, small: "Portfolio, year to date*" },
     { big: `+${TRACK_RECORD.benchmarkPct}%`, small: `${TRACK_RECORD.benchmark}, same period` },
-    ...BEST_CALLS.map((c) => ({ big: "40%+", small: `${c.name}, ${c.side.toLowerCase()}` })),
+    ...BEST_CALLS.map((c) => ({ big: c.result, small: `${c.name}, ${c.side.toLowerCase()}` })),
   ];
   return (
     <section className="section deep proof" id="performance">
@@ -243,5 +243,61 @@ export function TrustCards() {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * The best calls as a scoreboard (Kevin 2026-11-06: « trop verbeux, le message clé pas assez mis en avant »): the
+ * result first, big; the side, the name, ONE line of thesis, the report. Then every published call as one line.
+ */
+export function CallsBoard({ posts }: { posts: Publication[] }) {
+  const calls = posts.filter((p) => p.category === "coverage");
+  return (
+    <>
+      <div className="calls-board">
+        {BEST_CALLS.map((c) => {
+          const report = posts.find((p) => p.title.includes(c.report));
+          const body = (
+            <>
+              <p className={`call-side ${c.side === "Long" ? "long" : "short"}`}>{c.side}</p>
+              <p className="call-result">
+                {c.result}
+                <small>{c.resultNote}</small>
+              </p>
+              <h3>
+                {c.name} <span>{c.ticker}</span>
+              </h3>
+              <p className="call-line">{c.line}</p>
+              {report && <p className="call-read">Read the report ↗</p>}
+            </>
+          );
+          return report ? (
+            <a key={c.name} className="call-card" target="_blank" rel="noopener noreferrer" href={report.url}>
+              {body}
+            </a>
+          ) : (
+            <div key={c.name} className="call-card">
+              {body}
+            </div>
+          );
+        })}
+      </div>
+      {calls.length > 0 && (
+        <>
+          <h3 className="calls-all">Every published call</h3>
+          <ol className="calls-list">
+            {calls.map((p) => (
+              <li key={p.id}>
+                <a target="_blank" rel="noopener noreferrer" href={p.url}>
+                  <span className="cl-date">{formatDate(p.publishedAt)}</span>
+                  <span className="cl-title">{p.title}</span>
+                  <span className="cl-go" aria-hidden="true">↗</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </>
   );
 }
