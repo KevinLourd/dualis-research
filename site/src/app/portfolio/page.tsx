@@ -11,19 +11,19 @@ export const metadata: Metadata = { title: "Portfolio" };
 export default async function Portfolio() {
   return (
     <>
-      <PageBand label="Portfolio" line="Every position starts as a published report." />
+      <PageBand label="Portfolio" line="Live positions, year to date." />
 
       <Proof />
 
       <section className="section">
         <div className="wrap narrow prose">
           <h2 className="h-bold">How positions are taken</h2>
-          <p className="lead">Thierry Matin buys what he writes up. Each position traces back to a report with its thesis, and forward to the update that closes it.</p>
+          <p className="lead">Thierry Matin takes a position when price and value drift apart.</p>
           <p>Ideas go long when a bad story starts to turn, and short when a hyped one starts to crack. Winners and losers are both reported.</p>
         </div>
       </section>
 
-      <CtaBand title="Read the reports behind each position" body="From the first idea to the exit." href="/research" cta="Open the research" />
+      <CtaBand title="Read the research" body="Long and short ideas in small and mid caps." href="/research" cta="Open the research" />
     </>
   );
 }
