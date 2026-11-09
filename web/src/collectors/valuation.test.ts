@@ -12,6 +12,7 @@ import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { parsePeers, peersDim, readSummary } from "./dimensions/peers";
 import { valuationDim, valuationFactsHash } from "./dimensions/valuation";
+import { methodPrompt, parseMethodAnswer } from "./dimensions/valuation/prompt";
 import { dataAsOf, methodSpec, peerMedian, peerPriced, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
@@ -69,6 +70,14 @@ describe("valuation methods: the arithmetic", () => {
     // CCLD-like: peers at 8x, much smaller company: a 25% discount for base, 12.5% for high = 6x and 7x.
     expect(peerPriced(8, { base: -0.25, high: -0.125 })).toEqual({ base: 6, high: 7 });
     expect(() => peerPriced(8, { base: -1.2, high: 0 })).toThrow(/above -100%/);
+  });
+  it("P/E offers only the basis its peers carry, and a missing base or high fails instead of reading as 0", () => {
+    const f = { ...facts({ "eps-trailing": { key: "eps-trailing", label: "EPS", value: 2, unit: "per-share", period: "FY", sources: [] }, "eps-forward": { key: "eps-forward", label: "EPS fwd", value: 2.5, unit: "per-share", period: "FY", sources: [] } }), peers: [{ symbol: "A", name: "A", currency: "USD", evEbitda: 6, pe: null, peForward: 10, sources: [] }] };
+    expect(methodPrompt(methodSpec("pe"), f, "ctx")).toContain('"basis": "forward",');
+    // Asked for trailing (no peer carries it): the forward basis is used, priced off the peers.
+    const a = parseMethodAnswer(JSON.stringify({ applicable: true, basis: "trailing", assumptions: { multiple: { low: 6, why: "x" } }, peers: { base: 0, high: 0.1, why: "y" } }), methodSpec("pe"), f);
+    expect([a.basis, a.peerPricing?.multiple, a.assumptions[0].base]).toEqual(["forward", "pe-forward", 10]);
+    expect(() => parseMethodAnswer(JSON.stringify({ applicable: true, basis: "forward", assumptions: { multiple: { low: 6, why: "x" } }, peers: { base: null, high: null } }), methodSpec("pe"), f)).toThrow(/premium/);
   });
   it("weighted fair value normalises the weights over the methods given", () => {
     const w = weighted([{ method: "ev-ebitda", low: 1, base: 2, high: 3 }, { method: "dcf", low: 3, base: 4, high: 5 }], { "ev-ebitda": 30, dcf: 10 });
