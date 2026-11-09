@@ -2,7 +2,7 @@
 
 import { Slider } from "@cloudflare/kumo";
 import { useMemo, useState } from "react";
-import { DEFAULT_WEAK_WEIGHT, portfolioPnl, type PnlPosition } from "./live-test";
+import { DEFAULT_WEAK_WEIGHT, portfolioPnl, type PnlBenchmark, type PnlPosition } from "./live-test";
 import type { Bar } from "./portfolio-series";
 import { ReturnChart } from "./return-chart";
 
@@ -23,9 +23,9 @@ function Stat({ label, value, hint }: { label: string; value: React.ReactNode; h
  * The book's P&L vs the S&P 500, computed in the browser for the weak weight the cursor sets (a strong entry = 1).
  * No server render per cursor move (Workers CPU rule).
  */
-export function LivePnl({ positions, bars, benchmark, start, open, closed, won }: { positions: PnlPosition[]; bars: Record<string, Bar[]>; benchmark: Bar[]; start: string | null; open: number; closed: number; won: number }) {
+export function LivePnl({ positions, bars, benchmark, open, closed, won }: { positions: PnlPosition[]; bars: Record<string, Bar[]>; benchmark: PnlBenchmark; open: number; closed: number; won: number }) {
   const [weak, setWeak] = useState(DEFAULT_WEAK_WEIGHT);
-  const pnl = useMemo(() => portfolioPnl(positions, bars, benchmark, start, weak), [positions, bars, benchmark, start, weak]);
+  const pnl = useMemo(() => portfolioPnl(positions, bars, benchmark, weak), [positions, bars, benchmark, weak]);
   const vs = pnl.benchmarkReturn === null ? null : pnl.totalReturn - pnl.benchmarkReturn;
   return (
     <div className="flex flex-col gap-6 p-5">

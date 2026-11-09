@@ -347,8 +347,8 @@ describe("speed (Kevin 2026-11-06)", () => {
   it("every dimension sits in exactly one stage, after the ones it reads", () => {
     expect(STAGES.flat().sort()).toEqual(DIMENSIONS.map((d) => d.name).sort());
     const at = (n: string) => STAGES.findIndex((s) => s.includes(n));
-    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["valuation", "market-reaction"], ["market-reaction", "evidence"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"]]) expect(at(before)).toBeLessThan(at(after));
-    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["analysis", "market-reaction"], ["narrative-since"], ["evidence"], ["narrative-state"], ["signals"]]);
+    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["valuation", "market-reaction"], ["market-reaction", "evidence"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"], ["intraday-price", "market-reaction"], ["intraday-price", "signals"]]) expect(at(before)).toBeLessThan(at(after));
+    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation", "intraday-price"], ["analysis", "market-reaction"], ["narrative-since"], ["evidence"], ["narrative-state"], ["signals"]]);
   });
   it("a merge collects only what its files can move", () => {
     expect(collectPlan(["web/src/console/analysis.tsx", "site/src/app/page.tsx", "CLAUDE.md"])).toBeNull();

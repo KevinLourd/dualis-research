@@ -45,6 +45,13 @@ function SignalCell({ p }: { p: Position }) {
   );
 }
 
+/** When the price was known: « 6 Nov 2026, 14:35 UTC » for a 5-minute price, « 6 Nov 2026 close » when the market was shut. */
+function when(date: string | null, at: Date | null, source: string | null): string | null {
+  if (!date) return null;
+  if (source === "intraday" && at) return `${day(date)}, ${at.toISOString().slice(11, 16)} UTC`;
+  return `${day(date)} close`;
+}
+
 function PriceCell({ value, date, currency, missing }: { value: number | null; date: string | null; currency: string | null; missing: string }) {
   if (value === null) return <span className="text-sm text-kumo-subtle">{missing}</span>;
   return (
@@ -52,7 +59,7 @@ function PriceCell({ value, date, currency, missing }: { value: number | null; d
       <span className="font-mono tabular text-kumo-strong">
         {price(value)} <span className="text-kumo-subtle">{currency}</span>
       </span>
-      {date && <span className="text-sm text-kumo-subtle">{day(date)}</span>}
+      {date && <span className="text-sm text-kumo-subtle">{date}</span>}
     </span>
   );
 }
@@ -79,7 +86,7 @@ function held(from: Date, to: Date): string {
 export default async function LiveTestPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: raw } = await searchParams;
   const tab: LiveTab = raw === "closed" || raw === "history" ? raw : "open";
-  const { start, startAt, events, positions, bars, benchmark, companies } = await liveTestView();
+  const { start, events, positions, bars, benchmark, companies } = await liveTestView();
   const open = positions.filter((p) => p.closedAt === null);
   const closed = positions.filter((p) => p.closedAt !== null);
   const now = new Date();
@@ -90,10 +97,9 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
 
       <Card title="Signal book vs S&P 500">
         <LivePnl
-          positions={positions.map((p) => ({ symbol: p.symbol, side: p.side, strength: p.strength, entryDate: p.entryDate, exitDate: p.exitDate, closedAt: p.closedAt }))}
+          positions={positions.map((p) => ({ symbol: p.symbol, side: p.side, strength: p.strength, entryDate: p.entryDate, entryPrice: p.entryPrice, exitDate: p.exitDate, exitPrice: p.exitPrice, markDate: p.markDate, markPrice: p.markPrice, closedAt: p.closedAt }))}
           bars={bars}
           benchmark={benchmark}
-          start={startAt}
           open={open.length}
           closed={closed.length}
           won={closed.filter((p) => (p.return ?? 0) > 0).length}
@@ -121,8 +127,8 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
                 <KTableRow key={p.id}>
                   <KTableCell className="py-4 pl-6"><Company symbol={p.symbol} companies={companies} /></KTableCell>
                   <KTableCell className="py-4"><SignalCell p={p} /></KTableCell>
-                  <KTableCell className="py-4 text-right"><PriceCell value={p.entryPrice} date={p.entryDate} currency={p.currency} missing="No close yet" /></KTableCell>
-                  <KTableCell className="py-4 text-right"><PriceCell value={p.markPrice} date={p.markDate} currency={p.currency} missing="–" /></KTableCell>
+                  <KTableCell className="py-4 text-right"><PriceCell value={p.entryPrice} date={when(p.entryDate, p.entryAt, p.entrySource)} currency={p.currency} missing="No price yet" /></KTableCell>
+                  <KTableCell className="py-4 text-right"><PriceCell value={p.markPrice} date={when(p.markDate, p.markAt, p.markSource)} currency={p.currency} missing="–" /></KTableCell>
                   <KTableCell className="py-4 text-right"><Pct value={p.return} /></KTableCell>
                   <KTableCell className="py-4 pr-6 text-right text-kumo-default" title={utc(p.openedAt)}>{relativeTime(p.openedAt, now)}</KTableCell>
                 </KTableRow>
@@ -150,8 +156,8 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
                 <KTableRow key={p.id}>
                   <KTableCell className="py-4 pl-6"><Company symbol={p.symbol} companies={companies} /></KTableCell>
                   <KTableCell className="py-4"><SignalCell p={p} /></KTableCell>
-                  <KTableCell className="py-4 text-right"><PriceCell value={p.entryPrice} date={p.entryDate} currency={p.currency} missing="No close stored" /></KTableCell>
-                  <KTableCell className="py-4 text-right"><PriceCell value={p.exitPrice} date={p.exitDate} currency={p.currency} missing="Next close" /></KTableCell>
+                  <KTableCell className="py-4 text-right"><PriceCell value={p.entryPrice} date={when(p.entryDate, p.entryAt, p.entrySource)} currency={p.currency} missing="No price stored" /></KTableCell>
+                  <KTableCell className="py-4 text-right"><PriceCell value={p.exitPrice} date={when(p.exitDate, p.exitAt, p.exitSource)} currency={p.currency} missing="No price stored" /></KTableCell>
                   <KTableCell className="py-4 text-right"><Pct value={p.return} /></KTableCell>
                   <KTableCell className="py-4 pr-6 text-right text-kumo-default" title={`${utc(p.openedAt)} to ${utc(p.closedAt!)}`}>{held(p.openedAt, p.closedAt!)}</KTableCell>
                 </KTableRow>
