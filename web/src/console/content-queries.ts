@@ -2,7 +2,7 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { cache } from "react";
 import { getDb } from "@/db/client";
 import { runs } from "@/db/schema/ops";
-import { goldContentAccounts, goldContentDrafts, goldContentIdeas, goldContentLibrary, goldContentPublications, goldContentVisuals, VISUAL_KINDS } from "@/db/schema/content";
+import { goldContentAccounts, goldContentDrafts, goldContentIdeas, goldContentLibrary, goldContentPublications, goldContentVisuals, type VisualKind } from "@/db/schema/content";
 
 /** Content section reads: gold only. */
 
@@ -42,8 +42,14 @@ export const listIdeas = cache(async () =>
   getDb().select().from(goldContentIdeas).orderBy(desc(goldContentIdeas.day), sql`${goldContentIdeas.bestScore} desc nulls last`, asc(goldContentIdeas.rank)),
 );
 
-/** The visuals of an Idea (latest per kind), in the order the panel shows them: card, video, chart, capture. */
+/**
+ * Panel order: the chart first (the driver's key graph is the default visual, Thierry 2026-11-06), then the video, the
+ * news capture, and the post card last (an option for once in a while).
+ */
+const VISUAL_ORDER: readonly VisualKind[] = ["chart", "video", "capture", "montage"];
+
+/** The visuals of an Idea (latest per kind), in the order the panel shows them. */
 export async function listVisuals(ideaId: string) {
   const rows = await getDb().select().from(goldContentVisuals).where(eq(goldContentVisuals.ideaId, ideaId));
-  return rows.sort((a, b) => VISUAL_KINDS.indexOf(a.kind) - VISUAL_KINDS.indexOf(b.kind));
+  return rows.sort((a, b) => VISUAL_ORDER.indexOf(a.kind) - VISUAL_ORDER.indexOf(b.kind));
 }

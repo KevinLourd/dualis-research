@@ -27,3 +27,9 @@ export function formatUnit(v: number, unit: ExhibitUnit, currency: string | null
   const n = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
   return unit === "currency" && currency ? `${n} ${currency}` : n;
 }
+
+/** The period type of an Exhibit series, read from its stored key: quarterly (`q…`), market (`price`), else annual. */
+export function seriesPeriod(key: string): ExhibitPeriod {
+  if (key === "price") return "market";
+  return key.startsWith("q") ? "quarterly" : "annual";
+}

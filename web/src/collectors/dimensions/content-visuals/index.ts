@@ -4,11 +4,13 @@ import * as content from "@/db/schema/content";
 import { VISUAL_KINDS, type VisualKind } from "@/db/schema/content";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
+import { chooseChart } from "./choose";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
-export const VISUALS_VERSION = "visuals-v1";
+// v2 (Thierry 2026-11-06): the chart shows the driver's most striking Exhibit, the price only when the Idea is about price.
+export const VISUALS_VERSION = "visuals-v2";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
@@ -51,6 +53,7 @@ function summary(input: VisualInput) {
     last: input.bars.at(-1)?.date ?? null,
     fair: input.fair,
     newsUrl: input.newsUrl,
+    exhibits: input.exhibits.map((e) => e.id),
   };
 }
 
@@ -63,12 +66,22 @@ export const renderSource: Source = {
     if (!ctx.db) throw new Error("no database in the collector context");
     const { ideaId, kind } = parseSubject(subject);
     const input = await inputFor(ctx.db, ideaId);
+    // The chart draws the driver the Idea cites (its most striking Exhibit), the price only when the Idea is about price.
+    const choice = kind === "chart" ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
     const request = {
       version: VISUALS_VERSION,
       ideaId,
       kind,
       input: summary(input),
+      ...(choice ? { chart: choice.kind === "exhibit" ? { exhibitId: choice.exhibit.id, why: choice.reason } : { exhibitId: null, why: choice.reason } } : {}),
     };
+    if (choice?.kind === "exhibit") {
+      const r = await renderModule();
+      const file = r.png(r.exhibitSvg(input, choice.exhibit));
+      const out: Rendered = { file, mime: "image/png", width: r.W, height: r.H, sourceUrl: null, caption: `Exhibit: ${choice.exhibit.title}` };
+      rendered.set(subject, out);
+      return { request, httpStatus: null, payload: { mime: out.mime, width: out.width, height: out.height, sizeBytes: file.length } };
+    }
     if (input.bars.length < MIN_BARS)
       return {
         request,
@@ -258,7 +271,7 @@ export async function rebuildGoldVisuals(db: Db): Promise<void> {
 
 export const contentVisuals: Dimension = {
   name: VISUALS_DIMENSION,
-  description: "Visuals of every drafted Idea: price vs fair value chart, 16:9 post card, the card as a short video, and a capture of the news it cites.",
+  description: "Visuals of every drafted Idea: the chart of the driver it cites (its most striking Exhibit, or price vs fair value when the Idea is about price), 16:9 post card, the card as a short video, and a capture of the news it cites.",
   sources: [renderSource, captureSource],
   subjects: pickVisualSubjects,
   promote: promoteVisuals,
