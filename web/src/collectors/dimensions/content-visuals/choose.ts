@@ -95,7 +95,7 @@ export const CALLOUT_SYSTEM = [
   "5. priceSays: what the share price still assumes, the belief this proves wrong.",
   "The lines tell ONE story: each says something the others do not, none repeats another, and a number appears on one line only. NEVER copy a headline, a driver title or a narrative sentence: say what is interesting in it, in your own short words a retail investor gets at once (no accounting jargon like EPS, net income, common shareholders, preferred dividends or income available to common: say profit, profit per share, shareholders, payments to other investors).",
   "Answer with JSON only, no prose, no code fence:",
-  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, starts with Look:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
+  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, the claim itself, no prefix like Look: or Signal:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
   "No em or en dash, no emoji. Use only numbers you can read below.",
 ].join("\n");
 
