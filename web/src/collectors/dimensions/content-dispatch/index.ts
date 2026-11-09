@@ -95,9 +95,11 @@ export async function planDispatch(db: Db): Promise<string[]> {
   // One engine (Kevin 2026-11-09): the alert is the Signal Change (gold.signal_changes, with its Update Note).
   const changes = await db.select().from(signalChanges);
   const nameOf = new Map((await db.select({ symbol: companyProfiles.symbol, name: companyProfiles.name }).from(companyProfiles)).map((r) => [r.symbol, r.name]));
+  // First pass over Signal Changes (none recorded yet): every existing one is the baseline, never a burst to Thierry.
+  const firstPass = !changes.some((c) => knownTransitions.has(c.id));
   for (const c of changes.filter((c) => !knownTransitions.has(c.id)).sort((a, b) => a.at.getTime() - b.at.getTime())) {
     const key = `signal:${c.id}`;
-    const old = c.at.getTime() < now - BASELINE_HOURS * 3600_000;
+    const old = firstPass || c.at.getTime() < now - BASELINE_HOURS * 3600_000;
     planned.set(key, { purpose: old ? "baseline" : "alert", recipient, text: signalAlert(c, nameOf.get(c.symbol) ?? null), scheduledAt: new Date(now).toISOString(), draftId: null, transitionId: c.id });
     out.push(key);
   }
