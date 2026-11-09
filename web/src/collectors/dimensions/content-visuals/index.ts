@@ -16,7 +16,8 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v5 (Kevin 2026-11-09): the note says what the price narrative said and the driver broken; the news is a BREAKING inset.
 // v6 (Kevin 2026-11-09): every word written for the image as one story, never a headline or driver title copied.
 // v7 (Kevin 2026-11-09): time ago in the red stamp, no driver line, a price vs fair value card pasted on top with the signal arrow.
-export const VISUALS_VERSION = "visuals-v7";
+// v8 (Kevin 2026-11-09): the price card says « +N-M% opportunity » in green, never « Fair value X to Y ».
+export const VISUALS_VERSION = "visuals-v8";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;

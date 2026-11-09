@@ -10,7 +10,7 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentVisuals, pickVisualSubjects, renderSource, VISUALS_VERSION } from ".";
-import { chartSvg, exhibitSvg, gapWords, signalCardSvg, timeAgo, toneOf, videoFrames } from "./render";
+import { chartSvg, exhibitSvg, gapWords, opportunity, signalCardSvg, timeAgo, toneOf, videoFrames } from "./render";
 import { COLOR } from "@/design/tokens";
 import { fetches as bronzeFetches } from "@/db/schema/bronze";
 import { CALLOUT_SYSTEM, calloutPoints, chartJudgeInput, parseCallout } from "./choose";
@@ -220,7 +220,12 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(svg).toContain('<image href="data:image/png;base64,');
     expect(input.signal).toBe("BUY");
     const card = signalCardSvg(input);
-    for (const t of ["BUY signal", "Fair value 2.6 to 3.8", "CareCloud: share price vs fair value"]) expect(card).toContain(t);
+    for (const t of ["BUY signal", "% opportunity", "+", "CareCloud: share price vs fair value"]) expect(card).toContain(t);
+    expect(card).not.toContain("Fair value 2.6 to 3.8");
+    expect(opportunity(2.6, 3.4, 4.8, true)).toBe("+30-85% opportunity");
+    // Whole, strictly different, strictly above 0: a price inside the range still reads 1 to the low.
+    expect(opportunity(3.5, 3.4, 3.51, true)).toBe("+1-2% opportunity");
+    expect(opportunity(12, 8, 10, false)).toBe("16-34% downside");
     expect(signalCardSvg({ ...input, signal: null })).toContain("below fair value");
     expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
     const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Look: 32% under fair value", tone: "short", banner: null });

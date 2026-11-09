@@ -530,7 +530,7 @@ export function signalCardSvg(input: VisualInput): string {
     animation: false,
     textStyle: { fontFamily: FONT },
     title: { text: `${input.companyName ?? input.symbol}: share price vs fair value`, left: 16, top: 12, textStyle: { color: "#333", fontSize: 15, fontWeight: 600, fontFamily: FONT } },
-    grid: { left: 16, right: 196, top: 44, bottom: 18 },
+    grid: { left: 16, right: 196, top: 44, bottom: 46 },
     xAxis: { type: "time", min: x0, max: x1, show: false },
     yAxis: { type: "value", min: Math.max(0, min - pad), max: max + pad, show: false },
     series: [
@@ -561,12 +561,26 @@ export function signalCardSvg(input: VisualInput): string {
       { type: "rect", shape: { x: pillX, y: (py + fy) / 2 - 20, width: pillW, height: 40, r: 6 }, style: { fill: colour }, z: 10 },
       { type: "text", style: { text: label, x: pillX + pillW / 2, y: (py + fy) / 2, fill: "#fff", fontSize: 18, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 11 },
       { type: "text", style: { text: "Fair value", x: 22, y: fy - 12, fill: colour, fontSize: 13, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
-      { type: "text", style: { text: `Fair value ${fmt(lo)} to ${fmt(hi)}`, x: CARD_W - 12, y: CARD_H - 14, fill: "#666", fontSize: 13, fontFamily: FONT, align: "right", verticalAlign: "middle" }, z: 11 },
+      // The gap to fair value as the opportunity (Kevin 2026-11-09: « Fair value X - X: NON, +N% opportunity en vert »).
+      { type: "text", style: { text: opportunity(last.close, lo, hi, up), x: CARD_W - 16, y: CARD_H - 22, fill: colour, fontSize: 22, fontWeight: 600, fontFamily: FONT, align: "right", verticalAlign: "middle" }, z: 11 },
     ],
   });
   const svg = chart.renderToSVGString();
   chart.dispose();
   return svg;
+}
+
+/**
+ * The way to the fair value range as whole percents (Kevin 2026-11-09: « N-M% opportunity, N et M entiers, strictement
+ * différents, strictement > 0 »): below fair value « +31-85% opportunity » (to the low, to the high of the range),
+ * above it « 15-40% downside ». N is rounded down, M up, at least 1 and N + 1.
+ */
+export function opportunity(price: number, low: number, high: number, up: boolean): string {
+  const near = up ? low / price - 1 : 1 - high / price;
+  const far = up ? high / price - 1 : 1 - low / price;
+  const n = Math.max(1, Math.floor(near * 100));
+  const m = Math.max(n + 1, Math.ceil(far * 100));
+  return up ? `+${n}-${m}% opportunity` : `${n}-${m}% downside`;
 }
 
 /** Pastes the price card on the chart, slightly turned like a cut-out, with a shadow. */
