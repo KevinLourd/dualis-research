@@ -14,8 +14,11 @@ export const DISPATCH_DIMENSION = "content-dispatch";
 export const PLAN_SOURCE = "content";
 /** Drafts are queued this far ahead of their slot, so the WhatsApp service (idle tick: 30 min) sends them on time. */
 const AHEAD_MIN = 35;
-/** A slot missed by more than this (device not linked, service down) is skipped, never sent late in a burst. */
-const LATE_MIN = 120;
+/**
+ * A slot missed by more than this (device not linked, service down) is skipped, never sent late in a burst. Half a day:
+ * the day's 2 posts still go out when the device is linked again the same day.
+ */
+const LATE_MIN = 12 * 60;
 /** First run: transitions older than this are the baseline, recorded as known without a message. */
 const BASELINE_HOURS = 24;
 /** A draft waits this long for its card (content-visuals runs right after the writer), then goes without an image. */
