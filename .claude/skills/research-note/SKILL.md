@@ -19,7 +19,7 @@ Price = the market's **narrative**; **fundamental value** = what the business is
 - Source of each claim: link. Inputs first: core filings (5 years), his Excel model, his notes. Prefilled text shows as plain editable text (never labelled Claude's); Thierry edits and owns it.
 
 ## Article anatomy (Substack + website, same order)
-1. Title: the claim, not the topic.
+1. Title: the claim with its figures, not the topic (Multibagger Ideas: « 60%+ Revenue Growth, an Order Book Bigger Than the Company, Under 10x Earnings »). A closed call gets its own post titled with its result (« Thesis Closed at +81% in 15 Months »).
 2. Key takeaways: 3 bullets above the fold (free).
 3. The setup: what the market believes now.
 4. Our view + drivers, with 1-2 charts.

@@ -9,7 +9,7 @@ export const VOICES_DIMENSION = "content-voices";
 export const CLAUDE_SOURCE = "claude";
 
 /** Publications Thierry admires (docs/references.md): their FORMAT is borrowed, never their voice. */
-const ADMIRED_HOSTS = ["read.aurelionresearch.com", "www.citriniresearch.com"];
+const ADMIRED_HOSTS = ["read.aurelionresearch.com", "www.citriniresearch.com", "multibaggerideas.substack.com"];
 const OWN_POSTS = 8;
 const ADMIRED_POSTS = 2;
 
