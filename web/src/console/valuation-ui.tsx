@@ -55,6 +55,8 @@ export function MethodsTable({ symbol, v }: { symbol: string; v: Valuation }) {
                       Data from {relativeTime(m.dataAsOf)}
                     </time>
                   )}
+                  {/* Why a method does not count (PB-WEIGHT-1109: P/B on a company whose book value is intangible). */}
+                  {!m.applicable && m.reason && <span className="max-w-prose text-sm text-kumo-subtle">{m.reason}</span>}
                 </span>
               </KTableCell>
               <KTableCell className="py-3 text-right align-top font-mono tabular">{val(m.low)}</KTableCell>
