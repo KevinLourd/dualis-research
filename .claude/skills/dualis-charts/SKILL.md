@@ -22,7 +22,7 @@ Use `dualis_charts.py` (in this skill's folder; matplotlib only, $0). It loads t
 ```python
 import sys; sys.path.insert(0, "<this skill folder>")
 import dualis_charts as dc
-fig, ax = dc.figure("dark")   # "dark" = the black Note chart (default), "light" = report page
+fig, ax = dc.figure("dark")   # "dark" = the black Note chart (Substack Notes, X; default), "light" = website and report pages
 dc.bars(ax, ["FY23", "FY24", "FY25", "FY26E"], [455, 498, 541, 590], label="Revenue ($m)")
 dc.line(ax, ["FY23", "FY24", "FY25", "FY26E"], [12.4, 13.1, 14.6, 15.8], label="EBITDA margin (%, right)", right=True, fmt="{:.1f}%")
 dc.finish(fig, ax, title="Margins are back at the 2019 level", source="Source: Company filings, Dualis Research.", out="chart.png")
