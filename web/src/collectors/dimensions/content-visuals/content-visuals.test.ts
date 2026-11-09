@@ -215,7 +215,7 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const banner = { headline: "CareCloud signs a new hospital client", publisher: "Reuters", logo: PNG_1PX.toString("base64"), ago: "2h ago" };
     const say = { priceSays: "The biggest client is gone", chartLabel: "Hospitals that pay us" };
     const svg = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner });
-    for (const t of ["CareCloud: Hospitals that pay us", "Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "BREAKING", "REUTERS", "2h ago", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
+    for (const t of ["CareCloud: Hospitals that pay us", "Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "BREAKING", "REUTERS", "2h ago", "CareCloud signs a new"]) expect(svg).toContain(t);
     expect(svg).toContain(COLOR.breaking.dark);
     expect(svg).not.toContain("Driver broken");
     // With a news inset the claim is not repeated over the chart; without one it heads it.

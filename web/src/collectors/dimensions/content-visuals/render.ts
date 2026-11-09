@@ -187,22 +187,23 @@ export function timeAgo(at: Date, now: Date): string {
  * The breaking-news inset (Kevin 2026-11-09: « un encart rectangulaire en mode breaking news, with a time ago »): a
  * white card on the indigo, a red BREAKING stamp, the publisher's logo, name and time, the headline in black.
  */
-function bannerGraphics(b: NonNullable<Annotation["banner"]>) {
-  const x = 40;
-  const y = 18;
-  const w = W - 40 - 130;
-  const h = BANNER_H - 30;
+function bannerGraphics(b: NonNullable<Annotation["banner"]>, box: { x: number; y: number; w: number; h: number; big: boolean } = { x: 40, y: 18, w: W - 40 - 130, h: BANNER_H - 30, big: false }) {
+  const { x, y, w, h, big } = box;
   const stampW = 168;
-  const info = x + stampW + 18 + (b.logo ? 34 : 0);
+  const logo = big ? 28 : 24;
+  const info = x + stampW + 18 + (b.logo ? logo + 10 : 0);
+  const pubY = big ? y + 34 : y + 22;
   return [
     { type: "rect", shape: { x: x + 5, y: y + 6, width: w, height: h }, style: { fill: "rgba(0,0,0,0.45)" }, z: 10 },
     { type: "rect", shape: { x, y, width: w, height: h }, style: { fill: "#fff" }, z: 11 },
     { type: "rect", shape: { x, y, width: stampW, height: h }, style: { fill: COLOR.breaking.dark }, z: 12 },
-    { type: "text", style: { text: "BREAKING", x: x + stampW / 2, y: y + h / 2 - 12, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
-    { type: "text", style: { text: b.ago, x: x + stampW / 2, y: y + h / 2 + 18, fill: "#fff", fontSize: 17, fontWeight: 400, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
-    ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: x + stampW + 18, y: y + 10, width: 24, height: 24 }, z: 13 }] : []),
-    { type: "text", style: { text: b.publisher.toUpperCase(), x: info, y: y + 22, fill: "#555", fontSize: 17, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 13 },
-    { type: "text", style: { text: b.headline, x: x + stampW + 18, y: y + 56, fill: "#111", fontSize: 24, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: w - stampW - 36, overflow: "truncate" }, z: 13 },
+    { type: "text", style: { text: "BREAKING", x: x + stampW / 2, y: y + h / 2 - 14, fill: "#fff", fontSize: big ? 30 : 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
+    { type: "text", style: { text: b.ago, x: x + stampW / 2, y: y + h / 2 + 20, fill: "#fff", fontSize: big ? 19 : 17, fontWeight: 400, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
+    ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: x + stampW + 18, y: pubY - logo / 2, width: logo, height: logo }, z: 13 }] : []),
+    { type: "text", style: { text: b.publisher.toUpperCase(), x: info, y: pubY, fill: "#555", fontSize: big ? 19 : 17, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 13 },
+    big
+      ? { type: "text", style: { text: b.headline, x: x + stampW + 18, y: y + 62, fill: "#111", fontSize: 34, lineHeight: 44, fontWeight: 600, fontFamily: FONT, verticalAlign: "top", width: w - stampW - 40, overflow: "break" }, z: 13 }
+      : { type: "text", style: { text: b.headline, x: x + stampW + 18, y: y + 56, fill: "#111", fontSize: 24, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: w - stampW - 36, overflow: "truncate" }, z: 13 },
   ];
 }
 
@@ -322,26 +323,31 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const bars = e.chart === "bar";
   const legend = e.series.length > 1;
   const note = sourceNote([...e.sources, "dualis"]) ?? "Source: Dualis Research.";
-  const off = a?.banner ? BANNER_H : 0;
+  // With a news inset the news takes the top of the image, big, where the headline was (Kevin 2026-11-09: « mets la
+  // news prendre plus de place sur le trou laissé »); the chart label stays small above the chart.
+  const news = !!a?.banner;
+  const off = 0;
   const hit = a ? e.points.findIndex((p) => p.period === a.point) : -1;
   if (a && hit === -1) throw new Error(`annotation point ${a.point} is not a period of exhibit ${e.id}`);
   const accent = a ? toneColour(a.tone) : NOTE.main;
   // With an annotation and a fair value, the price card sits top right and the headline wraps beside it.
   const card = !!a && !!input.fair && input.bars.length >= 20;
-  const cardY = off + 22;
+  const cardY = news ? 34 : off + 22;
+  const newsBox = { x: 40, y: 28, w: card ? W - 40 - CARD_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
   const titleW = card ? W - 56 - CARD_W - 40 - 40 : W - 112 - (off ? 0 : 96);
   const titleSize = a ? 34 : 32;
   const head = a ? heading(a, input.companyName ?? input.symbol) : null;
   const titleLines = card && head ? Math.min(2, Math.ceil((head.title.length * titleSize * 0.55) / titleW)) : 1;
   const subTop = 40 + off + (titleLines - 1) * 42 + 48;
-  const grid = { left: 110, right: bars ? 56 : 170, top: card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off, bottom: 92 };
+  const labelTop = newsBox.y + newsBox.h + 26;
+  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 : card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
-      { text: head ? (head.sub ?? "") : e.takeaway, left: 56, top: card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: card ? titleW : W - 112 - 96, overflow: "break" } },
+      { text: news ? "" : head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
+      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
@@ -414,11 +420,12 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
           return [{ x: cx - half - 30, y: Math.min(top, base) - 34, w: 2 * half + 60, h: Math.abs(base - top) + 34 }];
         })
       : [];
-    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
+    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner, newsBox) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
   }
   let svg = chart.renderToSVGString();
   chart.dispose();
-  svg = off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
+  // The top right belongs to the price card when there is news: the mark moves to the bottom right.
+  svg = news ? withMark(svg, W - 56 - 40, H - 62, 40) : off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
   return card ? withCard(svg, signalCardSvg(input), W - 40 - CARD_W, cardY) : svg;
 }
 

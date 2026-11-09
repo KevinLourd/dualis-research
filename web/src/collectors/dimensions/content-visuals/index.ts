@@ -18,7 +18,8 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v7 (Kevin 2026-11-09): time ago in the red stamp, no driver line, a price vs fair value card pasted on top with the signal arrow.
 // v8 (Kevin 2026-11-09): the price card says « +N-M% opportunity » in green, never « Fair value X to Y ».
 // v9 (Kevin 2026-11-09): the headline is the claim alone, no « Look: ».
-export const VISUALS_VERSION = "visuals-v9";
+// v10 (Kevin 2026-11-09): with news, the BREAKING card fills the top left big, the chart label stays small.
+export const VISUALS_VERSION = "visuals-v10";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
