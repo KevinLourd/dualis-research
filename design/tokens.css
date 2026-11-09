@@ -29,6 +29,9 @@
   --chart-bar: #FFFFFF;
   --chart-bar-muted: #55555E;
   --chart-line: #E0592A;
+  --chart-light-grid: #ECEDF1;
+  --chart-light-base: #C9CCD4;
+  --chart-light-benchmark: #A3A6B2;
   --font-serif: "Newsreader", "Source Serif 4", Georgia, serif;
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -73,4 +76,7 @@
   --chart-bar: #FFFFFF;
   --chart-bar-muted: #55555E;
   --chart-line: #E0592A;
+  --chart-light-grid: #1C2538;
+  --chart-light-base: #3A4660;
+  --chart-light-benchmark: #6B7385;
 }

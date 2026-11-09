@@ -3,7 +3,7 @@
 
 Library:
     import dualis_charts as dc
-    fig, ax = dc.figure("dark")                       # "dark" = Thierry's black Note chart, "light" = report page
+    fig, ax = dc.figure("dark")                       # "dark" = Thierry's black Note chart, "light" = website and report pages
     dc.bars(ax, ["FY24", "FY25", "FY26E"], [498, 541, 590], label="Revenue ($m)")
     dc.line(ax, ["FY24", "FY25", "FY26E"], [13.1, 14.6, 15.8], label="EBITDA margin (%)", right=True, fmt="{:.1f}%")
     dc.finish(fig, ax, title="Margins are back at the 2019 level", source="Source: Company filings, Dualis Research.", out="chart.png")

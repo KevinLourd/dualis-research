@@ -17,14 +17,13 @@
   --deep: var(--dualis-deep);
   --on-deep: var(--dualis-on-deep);
   --footer: var(--dualis-footer);
-  --chart-bg: var(--dualis-chart-bg);
-  --chart-grid: var(--dualis-chart-grid);
-  --chart-base: var(--dualis-chart-base);
-  --chart-text: var(--dualis-chart-text);
   --chart-muted: var(--dualis-chart-muted);
-  --chart-bar: var(--dualis-chart-bar);
-  --chart-bar-muted: var(--dualis-chart-bar-muted);
-  --chart-line: var(--dualis-chart-line);
+  /* Site charts = the light chart (Thierry 2026-11-06: « a white background with a purple », like Aurelion). */
+  --chart-ground: var(--dualis-surface);
+  --chart-grid: var(--dualis-chart-light-grid);
+  --chart-base: var(--dualis-chart-light-base);
+  --chart-main: var(--dualis-brand);
+  --chart-benchmark: var(--dualis-chart-light-benchmark);
   --long: var(--dualis-long);
   --short: var(--dualis-short);
   --wrap: 1180px;
@@ -530,53 +529,58 @@ body:has(.hero) .site-footer {
   fill: var(--brand);
 }
 
-/* Dark chart (Thierry's Note style) */
-.dark-chart {
+/* Site chart: white ground, Dualis indigo main series, grey benchmark, light axes (after Aurelion). */
+.site-chart {
   margin: 0;
 }
-.dark-chart svg {
+.site-chart svg {
   width: 100%;
   height: auto;
   display: block;
+  border-radius: 4px;
 }
-.dc-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  color: var(--brand);
-  font-weight: 600;
+.sc-bg {
+  fill: var(--chart-ground);
 }
-.dc-bg {
-  fill: var(--chart-bg);
-}
-.dc-grid {
+.sc-grid {
   stroke: var(--chart-grid);
 }
-.dc-base {
+.sc-base {
   stroke: var(--chart-base);
 }
-.dc-bar {
-  fill: var(--chart-bar);
+.sc-main {
+  stroke: var(--chart-main);
+  fill: none;
 }
-.dc-bar-muted {
-  fill: var(--chart-bar-muted);
+.sc-main-key {
+  fill: var(--chart-main);
 }
-.dc-axis,
-.dc-legend,
-.dc-value {
+.sc-bench {
+  stroke: var(--chart-benchmark);
+  fill: none;
+}
+.sc-bench-key {
+  fill: var(--chart-benchmark);
+}
+.sc-axis,
+.sc-legend,
+.sc-value {
   font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sc-legend {
+  fill: var(--ink);
   font-size: 14px;
-  fill: var(--chart-muted);
 }
-.dc-legend {
-  fill: var(--chart-text);
+.sc-value {
+  fill: var(--chart-main);
   font-size: 15px;
+  font-weight: 600;
 }
-.dc-value {
-  fill: var(--chart-text);
-  font-size: 16px;
-}
-.dc-source {
-  margin-top: 8px;
+.sc-source {
+  margin-top: 10px;
   font-size: 13px;
   color: var(--muted);
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -1329,10 +1333,7 @@ body:has(.hero) .site-footer {
   margin-top: 32px;
   color: #fff;
 }
-.proof .dc-title {
-  color: #fff;
-}
-.proof .dc-source,
+.proof .sc-source,
 .proof .footnote {
   color: var(--on-deep);
 }

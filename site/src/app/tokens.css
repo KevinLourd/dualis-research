@@ -29,4 +29,7 @@
   --dualis-chart-bar: #FFFFFF;
   --dualis-chart-bar-muted: #55555E;
   --dualis-chart-line: #E0592A;
+  --dualis-chart-light-grid: #ECEDF1;
+  --dualis-chart-light-base: #C9CCD4;
+  --dualis-chart-light-benchmark: #A3A6B2;
 }

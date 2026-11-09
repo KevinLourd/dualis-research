@@ -1,8 +1,9 @@
 import { YTD_SERIES } from "@/lib/track-record";
 
 /**
- * The portfolio vs the S&P 500 since January 1, in Thierry's Note chart style (near-black ground, faint gridlines):
- * the curve of his own published chart, redrawn. White = portfolio, grey = S&P 500.
+ * The portfolio vs the S&P 500 since January 1, the curve of Thierry's own published chart, redrawn in the site's
+ * light chart style (design/tokens.json `chart.themes.light`): white ground, Dualis indigo portfolio line, grey
+ * benchmark, faint horizontal gridlines only (Thierry 2026-11-06: « a white background with a purple », like Aurelion).
  */
 export function YtdChart({ source }: { source: string }) {
   const W = 640;
@@ -24,38 +25,38 @@ export function YtdChart({ source }: { source: string }) {
   const months = ["2026-01-01", "2026-03-01", "2026-05-01", "2026-07-01", "2026-09-01"];
   const pct = (v: number) => `${v > 0 ? "+" : ""}${Math.round(v)}%`;
   return (
-    <figure className="dark-chart">
+    <figure className="site-chart">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Return since January 1, 2026: portfolio ${pct(last[1])}, S&P 500 ${pct(last[2])}`}>
-        <rect width={W} height={H} className="dc-bg" />
-        <g transform={`translate(${left} 26)`} className="dc-legend">
-          <rect width="14" height="3" y="-6" fill="#fff" />
+        <rect width={W} height={H} className="sc-bg" />
+        <g transform={`translate(${left} 26)`} className="sc-legend">
+          <rect width="14" height="3" y="-6" className="sc-main-key" />
           <text x="22">Portfolio</text>
-          <rect x="120" width="14" height="3" y="-6" className="dc-bar-muted" />
+          <rect x="120" width="14" height="3" y="-6" className="sc-bench-key" />
           <text x="142">S&amp;P 500</text>
         </g>
         {ticks.map((v) => (
           <g key={v}>
-            <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} className={v === 0 ? "dc-base" : "dc-grid"} />
-            <text x={left - 10} y={y(v) + 4} textAnchor="end" className="dc-axis">
+            <line x1={left} x2={W - right} y1={y(v)} y2={y(v)} className={v === 0 ? "sc-base" : "sc-grid"} />
+            <text x={left - 10} y={y(v) + 4} textAnchor="end" className="sc-axis">
               {v}%
             </text>
           </g>
         ))}
         {months.map((m) => (
-          <text key={m} x={x(m)} y={H - 12} textAnchor="middle" className="dc-axis">
+          <text key={m} x={x(m)} y={H - 12} textAnchor="middle" className="sc-axis">
             {new Date(`${m}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}
           </text>
         ))}
-        <path d={line(2)} fill="none" stroke="#8b8b95" strokeWidth="2" />
-        <path d={line(1)} fill="none" stroke="#fff" strokeWidth="2.5" />
-        <text x={x(last[0]) + 8} y={y(last[1]) + 5} className="dc-value">
+        <path d={line(2)} className="sc-bench" strokeWidth="2" />
+        <path d={line(1)} className="sc-main" strokeWidth="2.5" strokeLinejoin="round" />
+        <text x={x(last[0]) + 8} y={y(last[1]) + 5} className="sc-value">
           {pct(last[1])}
         </text>
-        <text x={x(last[0]) + 8} y={y(last[2]) + 5} className="dc-axis">
+        <text x={x(last[0]) + 8} y={y(last[2]) + 5} className="sc-axis">
           {pct(last[2])}
         </text>
       </svg>
-      <p className="dc-source">{source}</p>
+      <p className="sc-source">{source}</p>
     </figure>
   );
 }

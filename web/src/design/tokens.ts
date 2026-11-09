@@ -118,6 +118,18 @@ export const COLOR = {
   "chart-line": {
     "light": "#E0592A",
     "dark": "#E0592A"
+  },
+  "chart-light-grid": {
+    "light": "#ECEDF1",
+    "dark": "#1C2538"
+  },
+  "chart-light-base": {
+    "light": "#C9CCD4",
+    "dark": "#3A4660"
+  },
+  "chart-light-benchmark": {
+    "light": "#A3A6B2",
+    "dark": "#6B7385"
   }
 } as const;
 

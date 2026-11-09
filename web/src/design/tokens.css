@@ -29,4 +29,7 @@
   --dualis-chart-bar: light-dark(#FFFFFF, #FFFFFF);
   --dualis-chart-bar-muted: light-dark(#55555E, #55555E);
   --dualis-chart-line: light-dark(#E0592A, #E0592A);
+  --dualis-chart-light-grid: light-dark(#ECEDF1, #1C2538);
+  --dualis-chart-light-base: light-dark(#C9CCD4, #3A4660);
+  --dualis-chart-light-benchmark: light-dark(#A3A6B2, #6B7385);
 }

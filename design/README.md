@@ -14,13 +14,13 @@ Version 3, November 2026 (v3: one indigo colour; v2: purple accent, dark charts,
 - English only. Every published piece ends with the disclaimer.
 
 ## Colour
-- **One colour: Dualis indigo `#2B2463`** (`brand` = `accent`, Thierry 2026-11-06: "a purple close to a very professional dark blue"; the old navy was too blue, the old purple CTA too light). It carries the logo, headings, page bands, buttons, the closing band and the console brand. Hover `accent-ink` `#1E1947`, deep bands `deep` `#1A1640` (white type), neutral tint `accent-soft` `#EEF0F3`, on black charts the main series is white and the benchmark grey. **No light purple surface or accent on the website** (Kevin 2026-11-06). Never a second accent.
+- **One colour: Dualis indigo `#2B2463`** (`brand` = `accent`, Thierry 2026-11-06: "a purple close to a very professional dark blue"; the old navy was too blue, the old purple CTA too light). It carries the logo, headings, page bands, buttons, the closing band and the console brand. Hover `accent-ink` `#1E1947`, deep bands `deep` `#1A1640` (white type), neutral tint `accent-soft` `#EEF0F3`, on black Note charts the main series is white and the benchmark grey; on the website's light charts the main series is indigo on white. **No light purple surface or accent on the website** (Kevin 2026-11-06). Never a second accent.
 - **`long` green and `short` red are data, never decoration.** They mark a position, an upside or a move.
 - Grounds: `paper` for the page, `surface` for the note body. Text in `ink`, captions and sources in `muted`.
 - Separate with `rule` hairlines, never shadows.
 
 ## Charts (Substack Notes, articles, website)
-Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/thierry-note-cpng-2026-11-03.png`): `chart-bg` #161616 ground, faint `chart-grid` lines, legend on top, a value label on every bar or point, "E" after an estimate period (FY26E), source line under the chart. Main series in `chart-bar` indigo (rounded 4px tops), second series as a `chart-line` orange line with dots, benchmark in `chart-bar-muted`. Site component: `site/src/components/dark-chart.tsx`.
+Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/thierry-note-cpng-2026-11-03.png`): `chart-bg` #161616 ground, faint `chart-grid` lines, legend on top, a value label on every bar or point, "E" after an estimate period (FY26E), source line under the chart. Main series in `chart-bar` indigo (rounded 4px tops), second series as a `chart-line` orange line with dots, benchmark in `chart-bar-muted`. This is the Substack Note / X style. **The website uses the light chart** (`chart.themes.light`, Thierry 2026-11-06: « a white background with a purple », like Aurelion): `surface` white ground, `chart-light-grid` faint lines, `chart-light-base` zero line, `brand` indigo main series, `chart-light-benchmark` grey benchmark. Site component: `site/src/components/ytd-chart.tsx`.
 
 ## Type
 - **Newsreader** (serif, Google Fonts) for titles and headings: the research-house voice.
