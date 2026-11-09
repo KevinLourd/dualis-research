@@ -21,6 +21,7 @@ import {
   type TickerBrief,
 } from "./prompt";
 
+import { publicSide } from "../analysis/sides";
 export const IDEAS_DIMENSION = "content-ideas";
 export const CLAUDE_SOURCE = "claude";
 /** What the Ideas read: Signal Changes and Evidence of the last two weeks, the publication history of three months. */
@@ -48,7 +49,7 @@ export async function tickerBriefs(db: Db, now = new Date()): Promise<TickerBrie
       .from(evidence)
       .where(and(inArray(evidence.symbol, symbols), gte(evidence.eventAt, since), ne(evidence.strength, "noise")))
       .orderBy(desc(evidence.eventAt)),
-    db.select({ symbol: researchReports.symbol, title: researchReports.title }).from(researchReports).where(inArray(researchReports.symbol, symbols)),
+    db.select({ symbol: researchReports.symbol, side: researchReports.side, title: researchReports.title }).from(researchReports).where(inArray(researchReports.symbol, symbols)),
   ]);
   const nameOf = new Map(names.map((n) => [n.symbol, n.name]));
   return scope.map((t) => {
@@ -56,10 +57,11 @@ export async function tickerBriefs(db: Db, now = new Date()): Promise<TickerBrie
     const who = name ?? t.symbol;
     const offered: Offered[] = [];
     const s = sigs.find((x) => x.symbol === t.symbol);
-    const n = narrs.find((x) => x.symbol === t.symbol);
+    const side = publicSide(s, narrs.filter((x) => x.symbol === t.symbol));
+    const n = narrs.find((x) => x.symbol === t.symbol && x.side === side);
     if (s) {
       const call = s.signal === "none" ? "no signal" : `${s.signal}, ${s.strength}`;
-      offered.push({ ref: `signal:${t.symbol}`, kind: "signal", symbol: t.symbol, label: `${who}: ${call}`, detail: `Signal: ${call}. Narrative: ${n?.text ?? "not written yet"}` });
+      offered.push({ ref: `signal:${t.symbol}`, kind: "signal", symbol: t.symbol, label: `${who}: ${call}`, detail: `Signal: ${call}. Narrative: ${n?.text ?? (side === null && narrs.some((x) => x.symbol === t.symbol) ? "two stories compete, neither signals" : "not written yet")}` });
       if (s.fairValue !== null && s.quote !== null) {
         const gap = s.gapPct !== null ? ` (${pct(s.gapPct)} vs fair value)` : "";
         offered.push({
@@ -79,10 +81,10 @@ export async function tickerBriefs(db: Db, now = new Date()): Promise<TickerBrie
     for (const e of strongFirst.slice(0, EVIDENCE_PER_TICKER)) {
       offered.push({ ref: `evidence:${e.id}`, kind: "evidence", symbol: t.symbol, label: e.headline, detail: `${e.eventDay} ${e.strength} ${e.effect}: ${e.headline}. ${e.why ?? ""}`.trim() });
     }
-    for (const d of drivers.filter((x) => x.symbol === t.symbol)) {
+    for (const d of drivers.filter((x) => x.symbol === t.symbol && x.side === side)) {
       offered.push({ ref: `driver:${d.id}`, kind: "driver", symbol: t.symbol, label: d.title, detail: `Narrative Driver (${d.category}): ${d.title}. ${d.summary ?? ""}`.trim() });
     }
-    const r = reports.find((x) => x.symbol === t.symbol);
+    const r = reports.find((x) => x.symbol === t.symbol && x.side === side);
     if (r) offered.push({ ref: `report:${t.symbol}`, kind: "report", symbol: t.symbol, label: r.title, detail: `Research Report: ${r.title}` });
     return { symbol: t.symbol, name, inPortfolio: t.inPortfolio, position: t.position, offered };
   });

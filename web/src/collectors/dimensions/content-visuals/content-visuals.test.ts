@@ -116,13 +116,13 @@ describe("content-visuals dimension", () => {
   });
 });
 
-const DRIVER = { kind: "driver" as const, ref: "driver:CCLD:1", symbol: "CCLD", label: "Client loss" };
+const DRIVER = { kind: "driver" as const, ref: "driver:CCLD:long:1", symbol: "CCLD", label: "Client loss" };
 async function addExhibits() {
   const series = (key: string, label: string) => ({ key, label, unit: "count" as const, currency: null, sources: ["sec"] });
   await db.insert(exhibits).values([
-    { id: "CCLD:1:1", symbol: "CCLD", driverId: "CCLD:1", rank: 1, number: 1, title: "Hospital clients", chart: "bar", series: [series("line:clients", "Hospital clients")],
+    { id: "CCLD:long:1:1", symbol: "CCLD", driverId: "CCLD:long:1", rank: 1, number: 1, title: "Hospital clients", chart: "bar", series: [series("line:clients", "Hospital clients")],
       points: [2022, 2023, 2024, 2025].map((y, i) => ({ period: `${y}-12-31`, values: { "line:clients": [40, 31, 33, 45][i] } })), takeaway: "Clients are back above the 2022 level.", sources: ["sec"] },
-    { id: "CCLD:1:2", symbol: "CCLD", driverId: "CCLD:1", rank: 2, number: 2, title: "Revenue", chart: "bar", series: [series("line:revenue", "Revenue")],
+    { id: "CCLD:long:1:2", symbol: "CCLD", driverId: "CCLD:long:1", rank: 2, number: 2, title: "Revenue", chart: "bar", series: [series("line:revenue", "Revenue")],
       points: [{ period: "2025-12-31", values: { "line:revenue": null } }], takeaway: "No data yet.", sources: ["sec"] },
     { id: "OTHER:1:1", symbol: "CCLD", driverId: "CCLD:9", rank: 1, number: 3, title: "Not cited", chart: "line", series: [series("line:x", "X")],
       points: [{ period: "2025-12-31", values: { "line:x": 1 } }], takeaway: "t", sources: [] },
@@ -133,29 +133,29 @@ describe("the chart of an Idea", () => {
   it("draws the most striking Exhibit of the driver the Idea cites, judged once", async () => {
     await addExhibits();
     const cited = await addIdea([DRIVER]);
-    const judge = fakeJudge("CCLD:1:1");
+    const judge = fakeJudge("CCLD:long:1:1");
     await runDimension(db, renderOnly, { trigger: "test", ctx: { ...ctx, complete: judge.complete } });
     const rows = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, cited));
     const byKind = Object.fromEntries(rows.map((r) => [r.kind, r]));
     expect(byKind.chart).toMatchObject({ status: "ok", mime: "image/png", caption: "Exhibit: Hospital clients" });
     // The judge saw the cited driver's Exhibit with data, never an empty one or another driver's.
     const prompt = judge.prompts.find((p) => p.includes(DRIVER_IDEA_TITLE))!;
-    expect(prompt).toContain("Exhibit id CCLD:1:1");
-    expect(prompt).not.toContain("CCLD:1:2");
+    expect(prompt).toContain("Exhibit id CCLD:long:1:1");
+    expect(prompt).not.toContain("CCLD:long:1:2");
     expect(prompt).not.toContain("OTHER:1:1");
     // Judged once: a second run asks nothing more.
     const asked = judge.prompts.length;
     await runDimension(db, renderOnly, { trigger: "test", ctx: { ...ctx, complete: judge.complete } });
     expect(judge.prompts).toHaveLength(asked);
     const [j] = await db.select().from(judgments).where(eq(judgments.subjectId, cited));
-    expect(j).toMatchObject({ subjectKind: "content-idea", verdict: "CCLD:1:1" });
+    expect(j).toMatchObject({ subjectKind: "content-idea", verdict: "CCLD:long:1:1" });
   });
 
   it("an Idea citing Evidence reaches the driver that Evidence moves", async () => {
     await addExhibits();
     const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
     const input = await visualInput(db, idea);
-    expect(input.exhibits.map((e) => e.id)).toEqual(["CCLD:1:1"]);
+    expect(input.exhibits.map((e) => e.id)).toEqual(["CCLD:long:1:1"]);
     expect(chartJudgeInput(input)).toContain("Hospital clients (count): 2022-12 40, 2023-12 31, 2024-12 33, 2025-12 45 (first 40, last 45)");
   });
 

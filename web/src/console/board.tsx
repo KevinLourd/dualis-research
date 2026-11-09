@@ -29,8 +29,8 @@ export function StrengthBadge({ strength }: { strength: SignalStrength }) {
 }
 
 /** The ticker's tag in words ("Weak inflection", "Strong crack"); a ticker not tagged yet reads by its strength. */
-export function TickerTag({ row }: { row: Pick<BoardRow, "tag" | "strength" | "gapPct"> }) {
-  return row.tag ? <TagBadge effect={row.tag.effect} strength={row.tag.strength} gapPct={row.gapPct} /> : <StrengthBadge strength={row.strength} />;
+export function TickerTag({ row }: { row: Pick<BoardRow, "tag" | "strength" | "side"> }) {
+  return row.tag ? <TagBadge effect={row.tag.effect} strength={row.tag.strength} side={row.side} /> : <StrengthBadge strength={row.strength} />;
 }
 
 /** The last close, and how far it sits from the fair value. */

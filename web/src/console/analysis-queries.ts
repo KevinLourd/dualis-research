@@ -21,6 +21,9 @@ import {
   type GoldResearchReport,
   type GoldSignal,
   type GoldSignalChange,
+  type GoldMarketReaction,
+  type ThesisSide,
+  marketReactions,
 } from "@/db/schema/analysis";
 import { goldMethodValuations, valuationMethods, valuationReports } from "@/db/schema/valuation";
 import { financialMetrics, goldFinancialLines, valuations, type GoldFinancialLine, type GoldFinancialMetric, type GoldValuation } from "@/db/schema/financials";
@@ -71,8 +74,15 @@ export type DriverWithExhibits = GoldNarrativeDriver & { exhibits: GoldExhibit[]
 /** The news that bear on one driver: its own verdict is not noise. */
 export const bearsOn = (e: GoldEvidence, driverId: string) => e.verdicts.some((v) => v.driverId === driverId && v.effect !== "noise");
 
+/** One current thesis of a ticker (one outside the fair value range, two inside it), with where it stands. */
+export type ThesisTab = { side: ThesisSide; narrative: string; state: GoldNarrativeState | null };
+
 export type TickerAnalysis = {
   symbol: string;
+  /** The thesis shown: the one asked for, else the one that signals, else the first (long before short). */
+  side: ThesisSide | null;
+  /** Every current thesis, long first. */
+  theses: ThesisTab[];
   signal: GoldSignal | null;
   fairValue: GoldFairValue | null;
   /** text = ONE sentence; detail = the longer why (item panel). */
@@ -81,18 +91,20 @@ export type TickerAnalysis = {
   rationale: (GoldNarrativeRationale & { exhibits: GoldExhibit[] }) | null;
   /** Rank order, 1 to 5; each with its Exhibits (chart data inside) and the Evidence judged against it, newest first. */
   drivers: DriverWithExhibits[];
-  /** Where the whole narrative stands (ticker-level tag), from its drivers' tags. */
+  /** Where the shown thesis stands and whether it signals (thesis-level judgment), from its drivers' tags. */
   narrativeState: GoldNarrativeState | null;
   /** Every judged news item and filing of the year, newest first, each with one verdict per driver. */
   evidence: GoldEvidence[];
   report: GoldResearchReport | null;
   signalChanges: GoldSignalChange[];
+  /** What the price did around each news item (by Evidence id). */
+  reactions: Map<string, GoldMarketReaction>;
 };
 
-/** Everything the panel / Analysis page shows for one ticker: reads in parallel, once per request. */
-export const getTickerAnalysis = cache(async (symbol: string): Promise<TickerAnalysis> => {
+/** Everything the panel / Analysis page shows for one ticker and one of its theses: reads in parallel, once per request. */
+export const getTickerAnalysis = cache(async (symbol: string, asked: ThesisSide | null = null): Promise<TickerAnalysis> => {
   const db = getDb();
-  const [[signal], [fairValue], [narrative], drivers, ex, ev, [report], changes, [rationale], states] = await Promise.all([
+  const [[signal], [fairValue], nars, allDrivers, ex, ev, reports, changes, rationales, states, reactions] = await Promise.all([
     db.select().from(signals).where(eq(signals.symbol, symbol)),
     db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
     db.select().from(narratives).where(eq(narratives.symbol, symbol)),
@@ -103,18 +115,28 @@ export const getTickerAnalysis = cache(async (symbol: string): Promise<TickerAna
     db.select().from(signalChanges).where(eq(signalChanges.symbol, symbol)).orderBy(desc(signalChanges.at)),
     db.select().from(narrativeRationales).where(eq(narrativeRationales.symbol, symbol)),
     db.select().from(narrativeStates).where(eq(narrativeStates.symbol, symbol)),
+    db.select().from(marketReactions).where(eq(marketReactions.symbol, symbol)),
   ]);
+  const theses: ThesisTab[] = [...nars].sort((a, b) => a.side.localeCompare(b.side)).map((n) => ({ side: n.side, narrative: n.text, state: states.find((s) => s.level === "thesis" && s.side === n.side) ?? null }));
+  const has = (s: ThesisSide | null | undefined): s is ThesisSide => !!s && theses.some((t) => t.side === s);
+  const side = has(asked) ? asked : has(signal?.side) ? signal!.side! : (theses[0]?.side ?? null);
+  const narrative = nars.find((n) => n.side === side);
+  const rationale = rationales.find((r) => r.side === side);
+  const drivers = allDrivers.filter((d) => d.side === side);
   return {
     symbol,
+    side,
+    theses,
     signal: signal ?? null,
     fairValue: fairValue ?? null,
     narrative: narrative ? { text: narrative.text, detail: narrative.detail, asOf: narrative.asOf } : null,
-    rationale: rationale ? { ...rationale, exhibits: ex.filter((e) => e.driverId === `${symbol}:rationale`) } : null,
+    rationale: rationale ? { ...rationale, exhibits: ex.filter((e) => e.driverId === `${symbol}:${side}:rationale`) } : null,
     drivers: drivers.map((d) => ({ ...d, exhibits: ex.filter((e) => e.driverId === d.id), evidence: ev.filter((e) => bearsOn(e, d.id)), state: states.find((s) => s.level === "driver" && s.driverId === d.id) ?? null })),
-    narrativeState: states.find((s) => s.level === "ticker") ?? null,
+    narrativeState: theses.find((t) => t.side === side)?.state ?? null,
     evidence: ev,
-    report: report ?? null,
+    report: reports.find((r) => r.side === side) ?? null,
     signalChanges: changes,
+    reactions: new Map(reactions.map((r) => [r.id, r])),
   };
 });
 

@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { fetches as bronze, type BronzeFetch } from "@/db/schema/bronze";
-import { analyses, exhibits, narrativeDrivers, narrativeRationales, narratives, researchReports, type AnalysisAnswer, type RationaleAnswer } from "@/db/schema/analysis";
+import { analyses, exhibits, narrativeDrivers, narrativeRationales, narratives, researchReports, type AnalysisAnswer, type RationaleAnswer, type ThesisSide } from "@/db/schema/analysis";
 import { goldFinancialLines } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
@@ -10,13 +10,16 @@ import { stripDashes } from "../thesis/structure";
 import { fnv, gatherFacts } from "./facts";
 import { ANALYSIS_SYSTEM, ANALYSIS_VERSION, RATIONALE_SYSTEM, REPORT_SYSTEM, analysisPrompt, parseAnalysis, parseRationale, rationalePrompt, reportPrompt } from "./prompt";
 import { exhibitData, seriesCatalog, type StoredSeries } from "./series";
+import { currentSides, driverIdOf, parseThesisId, thesisId } from "./sides";
+
+export * from "./sides";
 
 export const ANALYSIS_DIMENSION = "analysis";
 const SOURCE = "claude";
 const PARALLEL = 4;
 export const DISCLAIMER = "This report is for information only and is not investment advice. Figures come from company filings and data providers as collected; check the sources before acting.";
 
-export type AnalysisPayload = { version: string; inputHash: string; analysis: AnalysisAnswer; rationale: RationaleAnswer | null; report: string; model: string; quote: { close: number; date: string; currency: string | null } | null };
+export type AnalysisPayload = { version: string; side: ThesisSide; inputHash: string; analysis: AnalysisAnswer; rationale: RationaleAnswer | null; report: string; model: string; quote: { close: number; date: string; currency: string | null } | null };
 
 /** Keeps only exhibit series that exist in the stored catalogue with 2+ points; an exhibit left with none is dropped. */
 export function bindExhibits(a: AnalysisAnswer, catalog: Map<string, StoredSeries>): { answer: AnalysisAnswer; unbound: number[] } {
@@ -35,21 +38,30 @@ export const analysisSource: Source = {
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
   covers: () => true,
   concurrency: PARALLEL,
-  async fetch(symbol: string, ctx: SourceContext): Promise<FetchOutcome> {
+  async fetch(subject: string, ctx: SourceContext): Promise<FetchOutcome> {
     if (!ctx.db) throw new Error("analysis: needs the database");
+    const { symbol, side } = parseThesisId(subject);
     const facts = await gatherFacts(ctx.db, symbol);
-    if (!facts.hasFinancials) return { request: { symbol }, httpStatus: null, error: "no financial statements collected for this ticker" };
-    const inputHash = fnv(`${ANALYSIS_VERSION}\n${facts.hash}`);
+    if (!facts.hasFinancials) return { request: { symbol, side }, httpStatus: null, error: "no financial statements collected for this ticker" };
+    const inputHash = fnv(`${ANALYSIS_VERSION}\n${side}\n${facts.hash}`);
     const [prior] = await ctx.db
       .select({ id: bronze.id, payload: bronze.payload })
       .from(bronze)
-      .where(and(eq(bronze.dimension, ANALYSIS_DIMENSION), eq(bronze.subject, symbol), isNull(bronze.error)))
+      .where(and(eq(bronze.dimension, ANALYSIS_DIMENSION), eq(bronze.subject, subject), isNull(bronze.error)))
       .orderBy(desc(bronze.fetchedAt))
       .limit(1);
     if ((prior?.payload as AnalysisPayload | undefined)?.inputHash === inputHash) return { request: { inputHash, reusedFrom: prior.id }, httpStatus: null, payload: prior.payload };
     if (!ctx.complete) throw new Error("analysis: no LLM in the collector context (cli.ts sets ctx.complete)");
 
-    const prompt = analysisPrompt(facts.text);
+    // The same thesis' last version: kept word for word unless the facts changed what the market believes.
+    const [previous] = await ctx.db
+      .select({ analysis: analyses.analysis })
+      .from(analyses)
+      .where(and(eq(analyses.symbol, symbol), eq(analyses.side, side)))
+      .orderBy(desc(analyses.createdAt))
+      .limit(1);
+    const prev = previous ? { narrative: previous.analysis.narrative, narrativeDetail: previous.analysis.narrativeDetail ?? null, drivers: previous.analysis.drivers.map((d) => ({ category: d.category, title: d.title, summary: d.summary ?? null, text: d.text })) } : null;
+    const prompt = analysisPrompt(facts.text, side, prev);
     const first = await ctx.complete({ system: ANALYSIS_SYSTEM, prompt });
     let { answer, unbound } = bindExhibits(parseAnalysis(first.text), facts.catalog);
     if (unbound.length) {
@@ -64,22 +76,24 @@ export const analysisSource: Source = {
     const parsed = parseRationale(r.text, answer.drivers.length);
     const rationale: RationaleAnswer = { ...parsed, exhibits: parsed.exhibits.map((e) => ({ ...e, series: e.series.filter((k) => (facts.catalog.get(k)?.points.size ?? 0) >= 2) })).filter((e) => e.series.length > 0 && e.title) };
     const [profile] = await ctx.db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
-    const report = await ctx.complete({ system: REPORT_SYSTEM, prompt: reportPrompt(facts.text, answer, numbered, profile?.name ?? symbol) });
-    const payload: AnalysisPayload = { version: ANALYSIS_VERSION, inputHash, analysis: answer, rationale, report: stripDashes(report.text.trim()), model: first.model, quote: facts.quote };
-    return { request: { inputHash, version: ANALYSIS_VERSION }, httpStatus: null, payload };
+    const report = await ctx.complete({ system: REPORT_SYSTEM, prompt: reportPrompt(facts.text, answer, numbered, profile?.name ?? symbol, side) });
+    const payload: AnalysisPayload = { version: ANALYSIS_VERSION, side, inputHash, analysis: answer, rationale, report: stripDashes(report.text.trim()), model: first.model, quote: facts.quote };
+    return { request: { inputHash, version: ANALYSIS_VERSION, side }, httpStatus: null, payload };
   },
 };
 
-/** Tickers with collected statements: the analysis needs reported numbers. */
+/** One subject per current thesis (`<symbol>:<side>`) of the tickers with collected statements. */
 async function subjects(db: Db): Promise<string[]> {
   const withLines = new Set((await db.selectDistinct({ symbol: goldFinancialLines.symbol }).from(goldFinancialLines).where(eq(goldFinancialLines.line, "revenue"))).map((r) => r.symbol));
-  return (await analysedSymbols(db)).filter((s) => withLines.has(s));
+  const out: string[] = [];
+  for (const symbol of (await analysedSymbols(db)).filter((s) => withLines.has(s))) for (const side of await currentSides(db, symbol)) out.push(thesisId(symbol, side));
+  return out;
 }
 
 export const analysis: Dimension = {
   name: ANALYSIS_DIMENSION,
   description:
-    "Per ticker, from the reported numbers and the Fair Value of the valuation pyramid: the Narrative (why the price sits there), 1 to 5 Narrative Drivers each with Exhibits drawn from stored series, the Narrative Rationale and the Research Report. Once per input hash.",
+    "Per ticker and thesis (long below the fair value range, short above, both inside it), from the reported numbers and the Fair Value: the Narrative, 1 to 5 Narrative Drivers each with Exhibits drawn from stored series, the Narrative Rationale and the Research Report. Kept word for word unless the facts change; once per input hash.",
   sources: [analysisSource],
   subjects,
   promote: promoteAnalysis,
@@ -89,53 +103,64 @@ export async function promoteAnalysis(db: Db, fetches: BronzeFetch[]): Promise<P
   let n = 0;
   for (const f of fetches.filter((x) => !x.error && !(x.request as { reusedFrom?: string }).reusedFrom)) {
     const p = f.payload as AnalysisPayload;
-    const [exists] = await db.select({ id: analyses.id }).from(analyses).where(and(eq(analyses.symbol, f.subject), eq(analyses.inputHash, p.inputHash)));
+    const { symbol, side } = parseThesisId(f.subject);
+    const [exists] = await db.select({ id: analyses.id }).from(analyses).where(and(eq(analyses.symbol, symbol), eq(analyses.side, side), eq(analyses.inputHash, p.inputHash)));
     if (exists) continue;
-    await db.insert(analyses).values({ symbol: f.subject, inputHash: p.inputHash, analysis: p.analysis, rationale: p.rationale ?? null, report: p.report, model: p.model, bronzeId: f.id, quote: p.quote?.close ?? null, quoteDate: p.quote?.date ?? null, createdAt: f.fetchedAt });
+    await db.insert(analyses).values({ symbol, side, inputHash: p.inputHash, analysis: p.analysis, rationale: p.rationale ?? null, report: p.report, model: p.model, bronzeId: f.id, quote: p.quote?.close ?? null, quoteDate: p.quote?.date ?? null, createdAt: f.fetchedAt });
     n++;
   }
   await rebuildAnalysisGold(db);
   return { silverRowsBySource: { [SOURCE]: n } };
 }
 
-/** Gold from the latest analysis per active ticker (the Fair Value is the `valuation` dimension's). */
+/** Version of a thesis = hash of its words: a rewrite with the same words keeps every judgment built on it. */
+export const thesisVersion = (a: AnalysisAnswer) => fnv([a.narrative, ...a.drivers.map((d) => `${d.category}|${d.title}|${d.text}`)].join("\n"));
+
+/** Gold from the latest analysis per current thesis of each analysed ticker (the Fair Value is the `valuation` dimension's). */
 export async function rebuildAnalysisGold(db: Db): Promise<void> {
   const symbols = await analysedSymbols(db);
   const latest = new Map<string, typeof analyses.$inferSelect>();
-  for (const a of await db.select().from(analyses).orderBy(analyses.createdAt)) latest.set(a.symbol, a);
+  for (const a of await db.select().from(analyses).orderBy(analyses.createdAt)) if (a.side) latest.set(thesisId(a.symbol, a.side), a);
   const nar: (typeof narratives.$inferInsert)[] = [];
   const drv: (typeof narrativeDrivers.$inferInsert)[] = [];
   const exh: (typeof exhibits.$inferInsert)[] = [];
   const rep: (typeof researchReports.$inferInsert)[] = [];
   const rat: (typeof narrativeRationales.$inferInsert)[] = [];
   for (const symbol of symbols) {
-    const a = latest.get(symbol);
-    if (!a) continue;
-    nar.push({ symbol, text: a.analysis.narrative, detail: a.analysis.narrativeDetail ?? null, version: a.id, asOf: a.createdAt });
+    const sides = await currentSides(db, symbol);
+    if (sides.length === 0) continue;
     const catalog = await seriesCatalog(db, symbol);
-    const exhibitIds: string[] = [];
-    a.analysis.drivers.forEach((d, i) => drv.push({ id: `${symbol}:${i + 1}`, symbol, rank: i + 1, category: d.category, title: d.title, summary: d.summary ?? null, text: d.text, version: a.id }));
-    for (const e of numberedExhibits(a.analysis)) {
-      const data = exhibitData(catalog, e.series);
-      if (!data) continue;
-      const id = `${symbol}:${e.driver}:${e.rank}`;
-      exhibitIds.push(id);
-      exh.push({ id, symbol, driverId: `${symbol}:${e.driver}`, rank: e.rank, number: e.number, title: e.title, chart: e.chart, series: data.series, points: data.points, takeaway: e.takeaway, sources: data.sources });
-    }
-    if (a.rationale) {
-      const first = numberedExhibits(a.analysis).length;
-      const ids: string[] = [];
-      a.rationale.exhibits.forEach((e, i) => {
-        const data = exhibitData(catalog, e.series);
-        if (!data) return;
-        const id = `${symbol}:rationale:${i + 1}`;
-        ids.push(id);
-        exh.push({ id, symbol, driverId: `${symbol}:rationale`, rank: i + 1, number: first + i + 1, title: e.title, chart: e.chart, series: data.series, points: data.points, takeaway: e.takeaway, sources: data.sources });
-      });
-      rat.push({ symbol, summary: a.rationale.summary, claims: a.rationale.claims, exhibitIds: ids, version: a.id, asOf: a.createdAt });
-    }
     const [profile] = await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
-    rep.push({ symbol, title: `${profile?.name ?? symbol} (${symbol}): Research Report`, markdown: `${a.report}\n\n_${DISCLAIMER}_`, exhibitIds, version: a.id, asOf: a.createdAt, model: a.model });
+    for (const side of sides) {
+      const id = thesisId(symbol, side);
+      const a = latest.get(id);
+      if (!a) continue;
+      const version = thesisVersion(a.analysis);
+      nar.push({ id, symbol, side, text: a.analysis.narrative, detail: a.analysis.narrativeDetail ?? null, version, asOf: a.createdAt });
+      const exhibitIds: string[] = [];
+      a.analysis.drivers.forEach((d, i) => drv.push({ id: driverIdOf(symbol, side, i + 1), symbol, side, rank: i + 1, category: d.category, title: d.title, summary: d.summary ?? null, text: d.text, version }));
+      for (const e of numberedExhibits(a.analysis)) {
+        const data = exhibitData(catalog, e.series);
+        if (!data) continue;
+        const driverId = driverIdOf(symbol, side, e.driver);
+        const exId = `${driverId}:${e.rank}`;
+        exhibitIds.push(exId);
+        exh.push({ id: exId, symbol, driverId, rank: e.rank, number: e.number, title: e.title, chart: e.chart, series: data.series, points: data.points, takeaway: e.takeaway, sources: data.sources });
+      }
+      if (a.rationale) {
+        const first = numberedExhibits(a.analysis).length;
+        const ids: string[] = [];
+        a.rationale.exhibits.forEach((e, i) => {
+          const data = exhibitData(catalog, e.series);
+          if (!data) return;
+          const exId = `${id}:rationale:${i + 1}`;
+          ids.push(exId);
+          exh.push({ id: exId, symbol, driverId: `${id}:rationale`, rank: i + 1, number: first + i + 1, title: e.title, chart: e.chart, series: data.series, points: data.points, takeaway: e.takeaway, sources: data.sources });
+        });
+        rat.push({ id, symbol, side, summary: a.rationale.summary, claims: a.rationale.claims, exhibitIds: ids, version, asOf: a.createdAt });
+      }
+      rep.push({ id, symbol, side, title: `${profile?.name ?? symbol} (${symbol}): ${side === "long" ? "Long" : "Short"} thesis`, markdown: `${a.report}\n\n_${DISCLAIMER}_`, exhibitIds, version, asOf: a.createdAt, model: a.model });
+    }
   }
   await db.transaction(async (tx) => {
     for (const table of [narratives, narrativeDrivers, exhibits, researchReports, narrativeRationales]) await tx.delete(table);

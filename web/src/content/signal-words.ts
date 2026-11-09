@@ -44,13 +44,13 @@ export function evidenceStrength(direction: string, probability: number): Signal
 
 /**
  * A narrative tag in Thierry's words (Kevin 2026-11-06): stored as reversal / continuation / noise; a reversal reads
- * "Inflection" when the price sits below fair value (a bad story turning, a long) and "Crack" above it (a loved story
- * breaking, a short).
+ * "Inflection" on the long thesis (a bad story turning) and "Crack" on the short thesis (a loved story breaking). The
+ * thesis decides the word, never where the price sits (Kevin 2026-11-09: NVRI's good Q3 read "Crack" at +0.2%).
  */
-export function tagWord(effect: string, strength: string, gapPct: number | null): string {
+export function tagWord(effect: string, strength: string, side: "long" | "short" | null): string {
   if (effect === "too-old") return "Too old";
   if (effect === "noise" || strength === "noise") return "Noise";
   const s = strength === "strong" ? "Strong" : "Weak";
   if (effect === "continuation") return `${s} continuation`;
-  return `${s} ${gapPct === null ? "reversal" : gapPct < 0 ? "inflection" : "crack"}`;
+  return `${s} ${side === null ? "reversal" : side === "long" ? "inflection" : "crack"}`;
 }
