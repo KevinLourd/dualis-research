@@ -20,6 +20,7 @@ import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { fnv } from "../analysis/facts";
 import { analysedSymbols } from "../watchlist";
+import { bookValueJudgment } from "./book-value";
 import { targetsIn, valuationFacts } from "./facts";
 import { dataAsOf, historyOf, methodSpec, runScenarios, VALUATION_METHODS, weighted, type MethodSpec, type ValuationFacts } from "./methods";
 import { METHOD_SYSTEM, SYNTHESIS_SYSTEM, VALUATION_VERSION, methodPrompt, parseMethodAnswer, parseReport, parseWeights, reportPrompt, weightsPrompt } from "./prompt";
@@ -126,8 +127,10 @@ export const valuationSource: Source = {
       db.select().from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)),
       db.select().from(gold.tickers).where(eq(gold.tickers.symbol, symbol)),
     ]);
-    const base = await valuationFacts(db, symbol, { peers: [], targets: null });
+    if (!ctx.complete) throw new Error("valuation: no LLM in the collector context (cli.ts sets ctx.complete)");
+    const [base, bookValue] = await Promise.all([valuationFacts(db, symbol, { peers: [], targets: null }), bookValueJudgment(db, symbol, profile, ctx.complete)]);
     const f: ValuationFacts = {
+      bookValue,
       ...base,
       peers: peerRows.map((p) => ({ symbol: p.peerSymbol, name: p.name, currency: p.currency, evEbitda: p.evEbitda, pe: p.pe, peForward: p.peForward, pb: p.pb, marketCap: p.marketCap, revenueGrowth: p.revenueGrowth, ebitdaMargin: p.ebitdaMargin, sources: p.sources })),
       targets: target ? targetsIn(base.currency, { low: target.low, mean: target.mean, high: target.high, analysts: target.analysts, currency: target.currency, sources: target.sources }) : null,
@@ -195,7 +198,8 @@ export function valuationFactsHash(f: ValuationFacts, bucket: number | string, c
     .map((p) => [p.symbol, p.currency, ...[p.evEbitda, p.pe, p.peForward, p.pb, p.marketCap].map(marketBucket), ...[p.revenueGrowth, p.ebitdaMargin].map((x) => (x === null || x === undefined ? null : Math.round(x * 20)))]);
   const targets = f.targets ? [marketBucket(f.targets.low), marketBucket(f.targets.mean), marketBucket(f.targets.high), f.targets.currency] : null;
   const own = f.own ? [marketBucket(f.own.marketCap), ...[f.own.revenueGrowth, f.own.ebitdaMargin, f.own.netMargin].map((x) => (x === null ? null : Math.round(x * 100)))] : null;
-  return fnv(JSON.stringify({ v: VALUATION_VERSION, inputs, history: f.history, peers, own, targets, bucket, context }));
+  const bookValue = f.bookValue ? { drives: f.bookValue.drives, why: f.bookValue.why } : null;
+  return fnv(JSON.stringify({ v: VALUATION_VERSION, inputs, history: f.history, peers, own, targets, bucket, context, bookValue }));
 }
 
 export const valuationDim: Dimension = {

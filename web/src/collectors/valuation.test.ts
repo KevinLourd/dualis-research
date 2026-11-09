@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fairValues } from "@/db/schema/analysis";
 import { financialMetrics, goldFinancialLines, valuations } from "@/db/schema/financials";
 import { theses } from "@/db/schema/thesis";
+import { companyProfiles } from "@/db/schema/gold";
+import { judgments } from "@/db/schema/silver";
 import { analystTargets, goldMethodValuations, peers, valuationMethods, valuationReports } from "@/db/schema/valuation";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
@@ -122,6 +124,14 @@ let calls: string[] = [];
 let prompts: string[] = [];
 const fake: Complete = async ({ prompt, system }) => {
   const json = (o: unknown) => ({ text: JSON.stringify(o), model: "fake" });
+  if (system.includes("You judge one question")) {
+    // The fake judge: a bank's book value drives its value, anything else's does not.
+    calls.push("judge:book-value");
+    expect(prompt).toContain("price to book");
+    return prompt.includes("Banks")
+      ? json({ verdict: "drives", probability: 0.9, cited_sentence: null, reason: "A bank earns on the loans its balance sheet carries." })
+      : json({ verdict: "does-not-drive", probability: 0.9, cited_sentence: null, reason: "It sells equipment and services, so its book value does not measure its worth." });
+  }
   if (system.includes("pick trading comparables")) {
     calls.push("peers");
     return json({ peers: [{ symbol: "042700.KS", name: "Hanmi", why: "Same equipment" }] });
@@ -137,7 +147,6 @@ const fake: Complete = async ({ prompt, system }) => {
   }
   const method = /Method: ([^.]+)\./.exec(prompt)?.[1] ?? "?";
   calls.push(`method:${method}`);
-  if (method.startsWith("P/B")) return json({ applicable: false, reason: "Book value says little for this business." });
   // A multiple with a peers' median: the low on its own history, a discount / premium to the peers for base and high.
   if (prompt.includes("Peers' median") && /: \d+\.\d+x over/.test(prompt) && (method === "EV/EBITDA" || method === "P/E")) {
     prompts.push(prompt);
@@ -148,6 +157,7 @@ const fake: Complete = async ({ prompt, system }) => {
     "P/E": { multiple: [6, 8, 10] },
     "DCF on free cash flow": { growth: [0, 0.02, 0.04], terminalGrowth: [0.01, 0.02, 0.02], discountRate: [0.12, 0.1, 0.09] },
     "Net cash and assets": { recovery: [0.2, 0.4, 0.6] },
+    "P/B, book value": { multiple: [0.8, 1, 1.2] },
   };
   const a = Object.fromEntries(Object.entries(keys[method] ?? {}).map(([k, [low, base, high]]) => [k, { low, base, high, why: "From its history." }]));
   return json({ applicable: true, basis: method === "P/E" ? "trailing" : "average", assumptions: a, summary: "It says something.", report: "Short report." });
@@ -191,9 +201,10 @@ describe("fair value pyramid", () => {
     calls = [];
     const report = await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
     expect(report.status).toBe("succeeded");
-    // No dividend: no call for it; analyst targets are read, not asked.
-    // Listed peers is no method of its own any more: the multiples price off the peers.
-    expect(calls.slice(0, 5).sort()).toEqual(["method:DCF on free cash flow", "method:EV/EBITDA", "method:Net cash and assets", "method:P/B, book value", "method:P/E"]);
+    // The book value judgment first; no dividend: no call for it; P/B not applicable (book value does not drive it): no call;
+    // analyst targets are read, not asked. Listed peers is no method of its own any more: the multiples price off the peers.
+    expect(calls[0]).toBe("judge:book-value");
+    expect(calls.slice(1, 5).sort()).toEqual(["method:DCF on free cash flow", "method:EV/EBITDA", "method:Net cash and assets", "method:P/E"]);
     expect(calls.slice(5)).toEqual(["weights", "report"]);
     // The model sees the company beside its peers: size, growth, margins.
     expect(prompts[0]).toContain("revenue growth last fiscal year -3.3%, EBITDA margin 24.0%");
@@ -213,7 +224,7 @@ describe("fair value pyramid", () => {
     expect([pe0.low, pe0.base, pe0.high].map((x) => x! / 3000)).toEqual([6, expect.closeTo(10.8, 9), expect.closeTo(12.6, 9)]);
     expect(rows.get("ev-ebitda")!.history?.points.map((p) => p.value)).toEqual([5, 7, 6]);
     expect(rows.get("ev-ebitda")!.dataAsOf?.toISOString().slice(0, 10)).toBe("2025-12-31");
-    expect(rows.get("pb")).toMatchObject({ applicable: 0, reason: "Book value says little for this business." });
+    expect(rows.get("pb")).toMatchObject({ applicable: 0, reason: "It sells equipment and services, so its book value does not measure its worth.", base: null });
     expect(rows.get("dividend-yield")).toMatchObject({ applicable: 0, reason: "No dividend paid last fiscal year." });
     expect(rows.get("analyst-targets")).toMatchObject({ applicable: 1, low: 35000, base: 42000, high: 50000 });
     expect(rows.get("peers")).toBeUndefined();
@@ -229,6 +240,9 @@ describe("fair value pyramid", () => {
     expect(fv.value).toBeCloseTo(rep.base, 6);
     expect(fv.method).toBe("EV/EBITDA 60%, P/E 40%");
     expect((await db.select().from(valuationMethods)).length).toBe(7);
+    expect(rep.weights.map((w) => w.method)).not.toContain("pb");
+    // Stored once, with its why.
+    expect((await db.select().from(judgments)).filter((j) => j.questionKey.startsWith("book-value-drives@v1")).map((j) => [j.subjectId, j.verdict])).toEqual([[SYMBOL, "does-not-drive"]]);
 
     calls = [];
     await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
@@ -242,6 +256,15 @@ describe("fair value pyramid", () => {
     const [ev] = await db.select().from(goldMethodValuations).where(eq(goldMethodValuations.id, `${SYMBOL}:ev-ebitda`));
     expect(ev.peerPricing).toBeNull();
     expect(ev.base).toBeCloseTo((6 * 70e9 + 100e9) / 16.5e6, 6);
+  });
+
+  it("a financial company keeps P/B: its book value drives its value", async () => {
+    await db.update(companyProfiles).set({ name: "Test Bank", sector: "Financial Services", industry: "Banks - Regional", description: "A regional bank lending to small firms." }).where(eq(companyProfiles.symbol, SYMBOL));
+    await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toContain("method:P/B, book value");
+    const [pb] = await db.select().from(goldMethodValuations).where(eq(goldMethodValuations.method, "pb"));
+    expect(pb).toMatchObject({ applicable: 1, reason: null });
+    expect(pb.base).toBeGreaterThan(0);
   });
 
   it("Thierry's own fair value wins, the weighted one is kept beside it", async () => {

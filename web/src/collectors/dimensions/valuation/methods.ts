@@ -23,6 +23,12 @@ export type ValuationFacts = {
   own?: { marketCap: number | null; revenueGrowth: number | null; ebitdaMargin: number | null; netMargin: number | null };
   /** Analyst price targets (analyst-targets method). */
   targets: { low: number; mean: number; high: number; analysts: number | null; currency: string | null; sources: string[] } | null;
+  /**
+   * Whether book value drives this company's value (a stored judgment, once per company profile; PB-WEIGHT-1109).
+   * `drives: false` makes P/B not applicable (weight 0, no LLM call): book value is mostly irrelevant for service and
+   * intangible-heavy firms (Damodaran), a core measure for banks, insurers and asset-heavy firms. Absent = not judged.
+   */
+  bookValue?: { drives: boolean; why: string | null } | null;
 };
 
 export type FactKey = "shares" | "net-debt" | "cash" | "total-debt" | "ebitda" | "eps-trailing" | "eps-forward" | "equity" | "fcf-last" | "fcf-average" | "dividends";
@@ -133,7 +139,7 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     assumptions: [{ key: "multiple", label: "P/B multiple", unit: "multiple" }],
     peerMultiple: () => ({ key: "pb", id: "pb", label: "P/B" }),
     history: { key: "pb", label: "Price to book at each fiscal year end", unit: "multiple" },
-    notApplicable: (f) => need(f, ["equity", "shares"], ["equity", "shares"]),
+    notApplicable: (f) => (f.bookValue && !f.bookValue.drives ? (f.bookValue.why ?? "Book value does not drive this company's value.") : need(f, ["equity", "shares"], ["equity", "shares"])),
     uses: () => ["equity", "shares"],
     compute: (f, a) => {
       const bvps = v(f, "equity")! / v(f, "shares")!;

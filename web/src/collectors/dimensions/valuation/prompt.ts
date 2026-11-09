@@ -4,7 +4,7 @@ import { stripDashes } from "../thesis/structure";
 import { FACT_LABEL, peerMedian, peerPriced, type MethodSpec, type ValuationFacts } from "./methods";
 
 /** Bump when a prompt or the arithmetic changes meaning: every method and synthesis is asked again. */
-export const VALUATION_VERSION = "valuation@v2";
+export const VALUATION_VERSION = "valuation@v3";
 
 const f2 = (v: number) => (Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
 const median = (xs: number[]) => {
