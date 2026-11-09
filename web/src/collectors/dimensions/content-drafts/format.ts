@@ -5,6 +5,12 @@ import type { DraftInputs } from "@/db/schema/content";
 export const DRAFT_FORMATS = ["x-post", "linkedin-post", "substack-note", "substack-article"] as const;
 export type DraftFormat = (typeof DRAFT_FORMATS)[number];
 
+/**
+ * The formats an Idea is scored and offered for. Thierry writes the weekly article himself (call 2026-11-06: « that's
+ * where a lot of my time is going to go »), so drafts are for Notes and posts; an article request already made still shows.
+ */
+export const PROPOSED_FORMATS = ["substack-note", "x-post", "linkedin-post"] as const satisfies readonly DraftFormat[];
+
 /** Short channels end with this line; the Substack article ends with the template's full disclaimer. */
 export const SHORT_DISCLAIMER = "Not investment advice.";
 export const ARTICLE_DISCLAIMER =
@@ -12,23 +18,28 @@ export const ARTICLE_DISCLAIMER =
 
 export const X_LIMIT = 280;
 
-export const PROMPT_VERSION = "drafts-v5";
+export const PROMPT_VERSION = "drafts-v6";
 
 const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
   "The game: grow paid Substack subscribers. The reader is a self-directed, experienced small-cap investor who reads filings and pays for ideas the big funds miss.",
   "A post earns a follow when it gives one sharp, dated, sourced fact and says what it means for the thesis, so readers feel they learned something only this writer tells them. Numbers first, the view right after.",
   "The post tells ONE Idea, given below with the evidence behind it: the fact first, then what it means for the story the market tells about the company, in plain words. Stay honest about what is not proven yet.",
+  "An Idea is not always a turn in the story: an interesting update on the company is worth a post too. Say what is new and why a holder should care.",
   "Never write a disclaimer, it is added after you. Never invent a figure that is not in the inputs. Never an em dash or en dash, no emojis, no hashtags, no hype words.",
   "Write in the voice of the account below, following its style guide. When the guide and these rules disagree, these rules win.",
 ].join("\n");
 
 const FORMAT_RULES: Record<DraftFormat, string> = {
-  "x-post": "Format: one X post, at most 240 characters, the ticker as a $cashtag once. Answer with the post text only.",
+  "x-post": [
+    "Format: one X post, much smaller than a Note: one or two short sentences, at most 160 characters, the ticker as a $cashtag once.",
+    "Lead with the number. The chart of the Idea is attached, so the words carry only the hook. Answer with the post text only.",
+  ].join("\n"),
   "linkedin-post": "Format: one LinkedIn post, 600 to 1200 characters, short paragraphs, ends with one question to the reader. Answer with the post text only.",
   "substack-note": [
-    "Format: one Substack Note, 300 to 700 characters, built like the Notes of Multibagger Ideas (a small-cap Substack that grew to 42,000 readers): 5 to 8 lines, one sentence each, a blank line between lines.",
-    "Open on the number or a one-line claim. Then the few facts that make it land. Close on one line that says what it means, starting with \"The point:\" or \"The maths:\" when it fits.",
+    "Format: one Substack Note = one small paragraph with a chart. The chart of the Idea (price against fair value, or the figure the Idea rests on) is attached under the text, so never describe it point by point.",
+    "Write ONE paragraph of 2 to 4 sentences, 200 to 400 characters, no line breaks, no headings, no list. It reads as a quick note, never a report.",
+    "Open on the number or a one-line claim, then the fact that makes it land, then what it means for the story the market tells.",
     "Answer with the note text only.",
   ].join("\n"),
   "substack-article": [

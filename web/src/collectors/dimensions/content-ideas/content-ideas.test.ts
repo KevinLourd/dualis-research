@@ -7,9 +7,9 @@ import type { Complete } from "@/llm/complete";
 import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
-import { DRAFT_FORMATS } from "../content-drafts/format";
+import { PROPOSED_FORMATS } from "../content-drafts/format";
 import { contentIdeas } from ".";
-import { parseIdeas, parseScores } from "./prompt";
+import { ideasSystem, parseIdeas, parseScores, scoresSystem } from "./prompt";
 
 const IDEAS = JSON.stringify({
   ideas: [
@@ -23,7 +23,7 @@ const IDEAS = JSON.stringify({
 
 function grid(ideas: number, skip?: string) {
   const scores = [];
-  for (let i = 1; i <= ideas; i++) for (const f of DRAFT_FORMATS) if (`${i}/${f}` !== skip) scores.push({ idea: i, format: f, score: f === "x-post" ? 90 - i : 50 - i, why: `fit ${i} ${f}` });
+  for (let i = 1; i <= ideas; i++) for (const f of PROPOSED_FORMATS) if (`${i}/${f}` !== skip) scores.push({ idea: i, format: f, score: f === "x-post" ? 90 - i : 50 - i, why: `fit ${i} ${f}` });
   return JSON.stringify({ scores });
 }
 
@@ -58,7 +58,7 @@ describe("content-ideas dimension", () => {
     const first = ideas.find((i) => i.rank === 1)!;
     expect(first.sourceRefs.map((s) => s.ref)).toEqual(["evidence:CCLD|news:n1", "driver:CCLD:1"]);
     expect(first.sourceRefs[0]).toMatchObject({ kind: "evidence", symbol: "CCLD", label: "CCLD signs a new hospital client" });
-    expect(await db.select().from(content.contentIdeaScores)).toHaveLength(3 * DRAFT_FORMATS.length);
+    expect(await db.select().from(content.contentIdeaScores)).toHaveLength(3 * PROPOSED_FORMATS.length);
 
     const [g] = await db.select().from(content.goldContentIdeas).where(eq(content.goldContentIdeas.id, first.id));
     expect(g).toMatchObject({ companyName: "CareCloud", bestFormat: "x-post", bestScore: 89, draftCount: 0, requests: [] });
@@ -107,7 +107,7 @@ describe("content-ideas dimension", () => {
     await runDimension(db, contentIdeas, { trigger: "test", ctx: ctx(retry) });
     expect(retry).toHaveBeenCalledTimes(1);
     expect(retry.mock.calls[0][0].system).not.toContain("Propose");
-    expect(await db.select().from(content.contentIdeaScores)).toHaveLength(3 * DRAFT_FORMATS.length);
+    expect(await db.select().from(content.contentIdeaScores)).toHaveLength(3 * PROPOSED_FORMATS.length);
   });
 
   it("too few usable Ideas fail the fetch, never land in silver", async () => {
@@ -126,7 +126,15 @@ describe("idea parsers", () => {
     expect(() => parseIdeas(JSON.stringify({ ideas: [ok, { ...ok, sources: ["x"] }] }), offered, ["A"])).toThrow(/only 1/);
   });
   it("needs every idea x format scored, 0-100", () => {
-    expect(parseScores(grid(1), 1)).toHaveLength(DRAFT_FORMATS.length);
-    expect(() => parseScores(JSON.stringify({ scores: [{ idea: 1, format: "x-post", score: 140, why: "" }] }), 1)).toThrow(/no score for 1\/x-post/);
+    expect(parseScores(grid(1), 1)).toHaveLength(PROPOSED_FORMATS.length);
+    expect(() => parseScores(JSON.stringify({ scores: [{ idea: 1, format: "x-post", score: 140, why: "" }] }), 1)).toThrow(/no score for .*1\/x-post/);
+  });
+  it("no longer proposes articles (Thierry writes them) and allows a plain company update", () => {
+    expect(PROPOSED_FORMATS).not.toContain("substack-article");
+    expect(scoresSystem()).not.toContain("substack-article");
+    const withArticle = JSON.parse(grid(1)) as { scores: unknown[] };
+    withArticle.scores.push({ idea: 1, format: "substack-article", score: 99, why: "deep" });
+    expect(parseScores(JSON.stringify(withArticle), 1).map((s) => s.format)).not.toContain("substack-article");
+    expect(ideasSystem()).toMatch(/update on the company/);
   });
 });

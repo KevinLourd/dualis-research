@@ -1,6 +1,6 @@
 import { Badge } from "@cloudflare/kumo";
 import { LightbulbIcon } from "@phosphor-icons/react/ssr";
-import { DRAFT_FORMATS, FORMAT_LABEL } from "@/collectors/dimensions/content-drafts/format";
+import { FORMAT_LABEL, PROPOSED_FORMATS } from "@/collectors/dimensions/content-drafts/format";
 import { requestDraftAction } from "@/content/actions";
 import { canDispatch } from "@/content/dispatch";
 import { lastContentRun, listIdeas } from "@/console/content-queries";
@@ -127,7 +127,8 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
 
 function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
   const scoreOf = new Map(idea.scores.map((s) => [s.format, s]));
-  const formats = [...DRAFT_FORMATS].sort((a, b) => (scoreOf.get(b)?.score ?? -1) - (scoreOf.get(a)?.score ?? -1));
+  // An article request made before articles left the proposals still shows with its draft.
+  const formats = [...new Set<string>([...PROPOSED_FORMATS, ...idea.requests.map((r) => r.format)])].sort((a, b) => (scoreOf.get(b)?.score ?? -1) - (scoreOf.get(a)?.score ?? -1));
   const latest = (format: string): IdeaRequest | undefined => idea.requests.find((r) => r.format === format);
   return (
     <SlideOver
