@@ -14,7 +14,19 @@ export function clientPhone(): string {
   return c.phone;
 }
 
-const ASK = "Reply OK to post it, or tell me what to change (text or voice).";
+/**
+ * Who the daily posts go to (drafts, new versions, publish links) and whose answers drive the loop. Kevin only while
+ * we test (« test »); switching to Thierry = "client", on Kevin's go.
+ */
+export const POST_LOOP_ROLE: "client" | "test" = "test";
+
+export function postLoopPhone(): string {
+  const c = allowlist().find((x) => x.role === POST_LOOP_ROLE);
+  if (!c) throw new Error(`no ${POST_LOOP_ROLE} contact on the WhatsApp allowlist`);
+  return c.phone;
+}
+
+const ASK = "Reply go to post it, or tell me what to change (text or voice).";
 
 function header(d: Pick<GoldContentDraft, "format" | "accountName" | "symbol">): string {
   return `*${FORMAT_LABEL[d.format] ?? d.format}* · ${d.accountName ?? "no account yet"} · ${d.symbol}`;
@@ -32,9 +44,12 @@ export function draftMessage(d: GoldContentDraft, version = false): string {
 /** After his OK: the one-click way to publish on that channel ($0: no paid API). */
 export function publishMessage(d: GoldContentDraft): string {
   if (d.format === "substack-article") return `Approved. Copy it into the Substack editor from here: ${CONSOLE_URL}/content/drafts/${d.id}`;
-  if (d.format === "substack-note") return ["Approved. Paste it in Substack Notes (https://substack.com/notes):", "", d.body].join("\n");
+  if (d.format === "substack-note") {
+    return ["Approved. Copy the text below, open Substack Notes, paste it and add the image from my draft message:", "https://substack.com/notes", "", d.body].join("\n");
+  }
   const link = publishLink(d.format, d.body);
-  return `Approved. ${link?.label ?? "Publish"} in one click: ${link?.href ?? `${CONSOLE_URL}/content`}`;
+  const image = d.format === "x-post" ? " The text is filled in: add the image from my draft message, then post." : "";
+  return `Approved. ${link?.label ?? "Publish"} in one tap: ${link?.href ?? `${CONSOLE_URL}/content`}${image}`;
 }
 
 /** A signal: the narrative on a ticker cracked (or turned on a long), why, the sentence that weighed most, the why page. */

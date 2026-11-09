@@ -6,6 +6,7 @@ import type { DraftChart, DraftInputs } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { refreshGoldIdea, utcDay } from "@/content/ideas";
+import { PICK_SOURCE } from "../content-picks";
 import type { Dimension, PromoteResult, Source } from "../../types";
 import { activeAccounts } from "../content-accounts";
 import { voiceGuides } from "../content-voices";
@@ -156,6 +157,9 @@ export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<Promot
     const generated = parseGeneration(format, f.payloadText ?? "", offered.map((x) => x.id));
     const charts: DraftChart[] | null = format === "substack-article" ? generated.exhibitIds.map((id) => offered.find((x) => x.id === id)!.chart) : null;
     const inputKey = `idea:${req.ideaId}`;
+    // A daily pick (content-picks) goes to WhatsApp as soon as it is written: its slot is now. A click on Create draft has no slot.
+    const [asked] = await db.select({ sources: content.contentDraftRequests.sources }).from(content.contentDraftRequests).where(eq(content.contentDraftRequests.id, requestId));
+    const scheduledAt = asked?.sources.includes(PICK_SOURCE) ? new Date() : null;
     const [{ prior }] = await db
       .select({ prior: sql<number>`count(distinct ${content.contentDrafts.generationBronzeId})::int` })
       .from(content.contentDrafts)
@@ -181,7 +185,7 @@ export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<Promot
         body: generated.body,
         inputs: req.inputs,
         charts,
-        scheduledAt: null,
+        scheduledAt,
         model: req.model,
         sources: [CLAUDE_SOURCE],
         bronzeIds: [f.id],

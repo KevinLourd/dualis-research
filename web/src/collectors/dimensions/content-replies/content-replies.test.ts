@@ -12,6 +12,8 @@ import { rebuildGoldDrafts } from "../content-drafts";
 import { contentReplies } from ".";
 
 const THIERRY = "15550000001";
+/** The post loop talks to Kevin while we test (POST_LOOP_ROLE "test"). */
+const KEVIN = "15550000002";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -49,13 +51,13 @@ async function serviceSends() {
   for (const q of queued) {
     const waId = `OUT-${q.id.slice(0, 6)}`;
     await db.update(whatsappOutbox).set({ status: "sent", waMessageId: waId, sentAt: new Date() }).where(eq(whatsappOutbox.id, q.id));
-    await db.insert(goldWhatsappConversation).values({ id: crypto.randomUUID(), waMessageId: waId, contact: THIERRY, contactName: "Thierry", direction: "out", kind: "text", body: q.text, text: q.text, outboxId: q.id, sentAt: new Date(Date.now() - 60_000), sources: ["whatsapp"] });
+    await db.insert(goldWhatsappConversation).values({ id: crypto.randomUUID(), waMessageId: waId, contact: q.recipient, contactName: "Kevin", direction: "out", kind: "text", body: q.text, text: q.text, outboxId: q.id, sentAt: new Date(Date.now() - 60_000), sources: ["whatsapp"] });
   }
   return queued;
 }
 
 async function thierrySays(body: string, replyTo: string | null, waId = `IN-${crypto.randomUUID().slice(0, 6)}`) {
-  await db.insert(goldWhatsappConversation).values({ id: crypto.randomUUID(), waMessageId: waId, contact: THIERRY, contactName: "Thierry", direction: "in", kind: "text", body, text: body, replyToWaId: replyTo, sentAt: new Date(), sources: ["whatsapp"] });
+  await db.insert(goldWhatsappConversation).values({ id: crypto.randomUUID(), waMessageId: waId, contact: KEVIN, contactName: "Kevin", direction: "in", kind: "text", body, text: body, replyToWaId: replyTo, sentAt: new Date(), sources: ["whatsapp"] });
   return waId;
 }
 
@@ -89,9 +91,9 @@ describe("content-dispatch", () => {
     await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
     const out = await db.select().from(whatsappOutbox);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ recipient: THIERRY, requestedBy: "content-dispatch" });
+    expect(out[0]).toMatchObject({ recipient: KEVIN, requestedBy: "content-dispatch" });
     expect(out[0].text).toContain("$BOOT margin rose 190 bps");
-    expect(out[0].text).toContain("Reply OK to post it");
+    expect(out[0].text).toContain("Reply go to post it");
     expect(out[0].scheduledAt.getTime()).toBeGreaterThan(Date.now());
   });
 
@@ -105,6 +107,7 @@ describe("content-dispatch", () => {
     await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
     const alerts = (await db.select().from(whatsappOutbox)).filter((o) => o.text?.includes("the narrative"));
     expect(alerts).toHaveLength(1);
+    expect(alerts[0].recipient).toBe(THIERRY);
     expect(alerts[0].text).toContain("*PAL*: the narrative is cracking.");
     expect(alerts[0].text).toContain("/tickers/PAL");
     expect((await db.select().from(content.contentMessages)).map((m) => m.purpose).sort()).toEqual(["alert", "baseline", "draft"]);

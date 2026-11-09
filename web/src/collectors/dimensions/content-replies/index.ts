@@ -4,7 +4,8 @@ import * as content from "@/db/schema/content";
 import { goldWhatsappConversation } from "@/db/schema/whatsapp";
 import type { Db } from "@/db/types";
 import { setDraftStatus } from "@/content/manual";
-import { clientPhone, draftMessage, publishMessage } from "@/content/messages";
+import { draftMessage, postLoopPhone, publishMessage } from "@/content/messages";
+import { postImage } from "@/content/post-image";
 import { judge } from "@/llm/judge";
 import { enqueue } from "@/whatsapp/outbox";
 import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
@@ -79,7 +80,7 @@ function articleAnswer(format: DraftFormat, text: string): string {
 
 export const contentReplies: Dimension = {
   name: REPLIES_DIMENSION,
-  description: "Thierry's WhatsApp answers to drafts: OK posts it (one-click link), feedback rewrites it, no drops it. Each message handled once.",
+  description: "WhatsApp answers to drafts: go posts it (one-tap link), « change that » rewrites it and sends it back, no drops it. Each message handled once.",
   sources: [replyWriter],
   subjects: pickReplies,
   promote: promoteReplies,
@@ -88,7 +89,7 @@ export const contentReplies: Dimension = {
 /** Inbound messages from Thierry with a text (or transcript) not handled yet, each tied to the draft it answers. */
 export async function pickReplies(db: Db, ctx: SourceContext): Promise<string[]> {
   prepared.clear();
-  const phone = clientPhone();
+  const phone = postLoopPhone();
   const handled = new Set((await db.select({ id: content.contentReplies.waMessageId }).from(content.contentReplies)).map((r) => r.id));
   const inbound = await db
     .select()
@@ -129,7 +130,7 @@ export async function pickReplies(db: Db, ctx: SourceContext): Promise<string[]>
           subjectId: m.waMessageId,
           questionKey: INTENT_QUESTION_KEY,
           question:
-            "Thierry, the author, answered this draft post on WhatsApp. What does he want? approve = post it as is (OK, go, yes, looks good); change = he asks for any edit; dismiss = drop it, do not post; other = not about this draft.",
+            "Thierry, the author, answered this draft post on WhatsApp. What does he want? approve = post it as is (OK, go, go post, yes, looks good); change = he asks for any edit (change that, shorter, add X); dismiss = drop it, do not post; other = not about this draft.",
           input: [`Draft (${draft.format}):`, draft.title ?? "", draft.body, "", `Thierry: ${m.body}`].join("\n"),
           choices: INTENTS,
         },
@@ -167,7 +168,7 @@ async function latestVersion(db: Db, draftId: string) {
 /** One decision per inbound message: a new version + its message, the publish link, or an ack. Never twice. */
 export async function promoteReplies(db: Db, rows: BronzeFetch[]): Promise<PromoteResult> {
   let n = 0;
-  const phone = clientPhone();
+  const phone = postLoopPhone();
   for (const f of rows.filter((r) => r.source === CLAUDE_SOURCE)) {
     const req = f.request as { waMessageId: string; intent: Intent | "no-draft"; judgmentId: string | null; draftId: string | null };
     const [seen] = await db.select().from(content.contentReplies).where(eq(content.contentReplies.waMessageId, req.waMessageId));
@@ -209,7 +210,10 @@ export async function promoteReplies(db: Db, rows: BronzeFetch[]): Promise<Promo
         newDraftId = row.id;
         const [g2] = await db.select().from(content.goldContentDrafts).where(eq(content.goldContentDrafts.id, row.id));
         if (!g2) throw new Error(`new version ${row.id} missing from gold`);
-        outboxId = (await enqueue(db, { recipient: phone, text: draftMessage(g2, true), replyToWaId: req.waMessageId, requestedBy: REPLIES_DIMENSION })).id;
+        // The new version goes out with the same card: the image belongs to the Idea, the text changed.
+        const image = await postImage(db, row.ideaId, row.format);
+        const media = image.state === "ready" ? { image: image.image, imageMime: image.mime } : {};
+        outboxId = (await enqueue(db, { recipient: phone, text: draftMessage(g2, true), ...media, replyToWaId: req.waMessageId, requestedBy: REPLIES_DIMENSION })).id;
         await db.insert(content.contentMessages).values({ outboxId, bronzeId: f.id, purpose: "version", draftId: row.id, recipient: phone, scheduledAt: new Date(), sources: [CLAUDE_SOURCE] });
       }
     } else if (draft && (req.intent === "approve" || req.intent === "dismiss")) {
