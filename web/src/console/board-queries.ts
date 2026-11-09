@@ -91,15 +91,15 @@ async function readBoard(symbol?: string): Promise<BoardRow[]> {
 
 const ORDER: Record<SignalStrength, number> = { strong: 0, weak: 1, noise: 2 };
 
-/** Level A: the analysed watchlist tickers but the portfolio (it has its own page), strongest first. */
+/** Level A: every analysed ticker, portfolio names included (Kevin 2026-11-09), strongest first. */
 export async function signalBoard(): Promise<BoardRow[]> {
-  const rows = (await readBoard()).filter((r) => !r.inPortfolio && r.analysed);
+  const rows = (await readBoard()).filter((r) => r.analysed);
   return rows.sort((a, b) => ORDER[a.strength] - ORDER[b.strength] || Number(b.call !== null) - Number(a.call !== null) || a.symbol.localeCompare(b.symbol));
 }
 
 /** Inactive tab: watchlist tickers outside the analysis scope, for information only (name, quote; nothing analysed). */
 export async function inactiveBoard(): Promise<BoardRow[]> {
-  return (await readBoard()).filter((r) => !r.inPortfolio && !r.analysed);
+  return (await readBoard()).filter((r) => !r.analysed);
 }
 
 /** Level A's row for one ticker (header of the panel and of the Analysis page). */
