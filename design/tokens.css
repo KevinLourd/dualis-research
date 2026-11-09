@@ -29,6 +29,8 @@
   --chart-bar: #FFFFFF;
   --chart-bar-muted: #55555E;
   --chart-line: #E0592A;
+  --chart-light-base: #B8B6C4;
+  --chart-light-bench: #A3A0B2;
   --font-serif: "Newsreader", "Source Serif 4", Georgia, serif;
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -73,4 +75,6 @@
   --chart-bar: #FFFFFF;
   --chart-bar-muted: #55555E;
   --chart-line: #E0592A;
+  --chart-light-base: #B8B6C4;
+  --chart-light-bench: #A3A0B2;
 }
