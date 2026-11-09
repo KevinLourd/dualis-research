@@ -127,6 +127,10 @@ function yRange(input: VisualInput) {
   return { min: Math.max(0, lo - pad), max: hi + pad };
 }
 
+function withHeadroom<T extends { yAxis: { min: number; max: number } }>(ax: T): T {
+  return { ...ax, yAxis: { ...ax.yAxis, max: ax.yAxis.max + (ax.yAxis.max - ax.yAxis.min) * 0.6 } };
+}
+
 function axes(input: VisualInput, onCard: boolean) {
   const { min, max } = yRange(input);
   const ticks = monthTicks(ts(input.bars[0].date), ts(input.bars[input.bars.length - 1].date));
@@ -254,6 +258,13 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
   if (!ring) for (let dy = 0; dy <= 200; dy += 20) for (let dx = 0; dx <= 600; dx += 40) candidates.push({ x: px - boxW - gap - dx, y: plot.top + 10 + dy });
   const clear = (c: { x: number; y: number }) => obstacles.every((o) => c.x + boxW < o.x || o.x + o.w < c.x || c.y + boxH < o.y || o.y + o.h < c.y);
   const fits = (c: { x: number; y: number }) => c.x >= plot.left && c.x + boxW <= plot.right && c.y >= plot.top && c.y + boxH <= plot.bottom && clear(c);
+  // Still hidden: scan the plot, nearest free spot to the point first (the price line is an obstacle: the note never hides it).
+  if (!candidates.some(fits)) {
+    const scan: { x: number; y: number }[] = [];
+    for (let y = plot.top; y + boxH <= plot.bottom; y += 16) for (let x = plot.left; x + boxW <= plot.right; x += 24) scan.push({ x, y });
+    const dist = (c: { x: number; y: number }) => Math.hypot(c.x + boxW / 2 - px, c.y + boxH / 2 - py);
+    candidates.push(...scan.sort((a, b) => dist(a) - dist(b)));
+  }
   const box = candidates.find(fits) ?? candidates[0];
   // The arrow leaves the box edge nearest the point and stops short of it.
   const sx = Math.min(Math.max(px, box.x), box.x + boxW);
@@ -329,17 +340,23 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     grid,
-    ...axes(input, false),
+    // With a note, room above the line for it (like the bars' headroom): the line keeps the lower 60% of the plot.
+    ...(a ? withHeadroom(axes(input, false)) : axes(input, false)),
     series: series(input, frame, false),
   });
   if (a) {
     const bar = input.bars.find((b) => b.date === a.point);
     if (!bar) throw new Error(`annotation point ${a.point} is not a close of the chart`);
     const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [ts(bar.date), bar.close]) as number[];
+    // Every close of the line is an obstacle: the note never hides the price.
+    const obstacles: Rect[] = input.bars.map((b) => {
+      const [x, y] = chart.convertToPixel({ seriesIndex: 0 }, [ts(b.date), b.close]) as number[];
+      return { x: x - 4, y: y - 8, w: 8, h: 16 };
+    });
     chart.setOption({
       graphic: [
         ...(a.banner ? bannerGraphics(a.banner, newsBox) : []),
-        ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }),
+        ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, true, obstacles),
       ],
     });
   }

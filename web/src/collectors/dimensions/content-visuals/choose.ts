@@ -91,7 +91,7 @@ export const CALLOUT_SYSTEM = [
   "1. newsLine (in the BREAKING box): what just happened, the one fact in the news that matters, with its number. Faithful to the news, never a fact it does not state.",
   "2. title (big, over the chart): what it means for the stock, the alarm.",
   "3. chartLabel (small, under the title): what the bars or line measure, in plain words, e.g. Profit left for shareholders, per quarter.",
-  "4. note (on the arrow, on the point of the chart): the proof in the numbers.",
+  "4. note (on the arrow, on the point of the chart): the proof in the numbers. The arrow hits the point you pick, so the note's main number IS that point's value as listed (a note about today's price points at the latest close; « down from X » names another listed point's value, never a number missing from the list).",
   "5. priceSays: what the share price still assumes, the belief this proves wrong.",
   "The lines tell ONE story: each says something the others do not, none repeats another, and a number appears on one line only. NEVER copy a headline, a driver title or a narrative sentence: say what is interesting in it, in your own short words a retail investor gets at once (no accounting jargon like EPS, net income, common shareholders, preferred dividends or income available to common: say profit, profit per share, shareholders, payments to other investors).",
   "Answer with JSON only, no prose, no code fence:",
@@ -106,15 +106,28 @@ export function calloutPoints(input: VisualInput, choice: ChartChoice): CalloutP
       .filter((p) => typeof p.values[lead.key] === "number")
       .map((p) => ({ id: p.period, label: `${p.period.slice(0, 7)} ${lead.label} ${fmt(p.values[lead.key] as number)}` }));
   }
-  // The price: the last close of each month, and the last close.
+  // The price line draws every daily close: offer what the reader SEES on it (Kevin 2026-11-09: the note said « down from
+  // $29.84 », a month-end close, while the line peaked at 32.33), i.e. the last close (the number printed at the line's
+  // end), the 12-month high and low, and each month's last close.
+  const bars = input.bars;
+  if (!bars.length) return [];
+  const last = bars[bars.length - 1];
+  const high = bars.reduce((a, b) => (b.close > a.close ? b : a));
+  const low = bars.reduce((a, b) => (b.close < a.close ? b : a));
   const byMonth = new Map<string, { date: string; close: number }>();
-  for (const b of input.bars) byMonth.set(b.date.slice(0, 7), b);
-  return [...byMonth.values()].map((b) => ({ id: b.date, label: `${b.date} close ${fmt(b.close)}` }));
+  for (const b of bars) byMonth.set(b.date.slice(0, 7), b);
+  const tags = new Map<string, string[]>();
+  const tag = (d: string, t: string) => tags.set(d, [...(tags.get(d) ?? []), t]);
+  tag(last.date, "latest close, printed at the end of the line");
+  tag(high.date, "12-month high");
+  tag(low.date, "12-month low");
+  for (const b of byMonth.values()) if (!tags.has(b.date)) tags.set(b.date, []);
+  return bars.filter((b) => tags.has(b.date)).map((b) => ({ id: b.date, label: `${b.date} close ${fmt(b.close)}${tags.get(b.date)!.length ? ` (${tags.get(b.date)!.join(", ")})` : ""}` }));
 }
 
 export function calloutPrompt(input: VisualInput, choice: ChartChoice, points: CalloutPoint[]): string {
   const last = input.bars.at(-1);
-  const chart = choice.kind === "exhibit" ? `${choice.exhibit.title}. ${choice.exhibit.takeaway}` : `${input.companyName ?? input.symbol} share price over 12 months`;
+  const chart = choice.kind === "exhibit" ? `${choice.exhibit.title}. ${choice.exhibit.takeaway}` : `${input.companyName ?? input.symbol} share price over 12 months, one daily close per day`;
   return [
     `Idea: ${input.title}`,
     `Angle: ${input.angle}`,

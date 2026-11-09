@@ -259,6 +259,19 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(parseCallout(JSON.stringify({ ...base, note: "n — m", point: "2025-12-31", newsLine: "A hospital comes back", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1)).toEqual({ point: "2025-12-31", note: "n, m", priceSays: "p", newsLine: "A hospital comes back", title: "t", chartLabel: "c", news: { index: 0, domain: "www.ft.com" } });
     expect(timeAgo(new Date("2026-11-09T10:00:00Z"), new Date("2026-11-09T12:10:00Z"))).toBe("2h ago");
     expect(timeAgo(new Date("2026-11-06T10:00:00Z"), new Date("2026-11-09T12:00:00Z"))).toBe("3d ago");
-    expect(calloutPoints).toBeTypeOf("function");
+    // The price callout offers what the daily line shows: the latest close (its end label), the 12-month high and low.
+    const bars = [
+      { date: "2026-01-30", close: 20 },
+      { date: "2026-02-10", close: 32.33 },
+      { date: "2026-02-27", close: 29.84 },
+      { date: "2026-03-05", close: 15 },
+      { date: "2026-03-06", close: 21.88 },
+    ];
+    const pts = calloutPoints({ bars } as never, { kind: "price", reason: "r" });
+    expect(pts.find((p) => p.id === "2026-03-06")?.label).toBe("2026-03-06 close 21.88 (latest close, printed at the end of the line)");
+    expect(pts.find((p) => p.id === "2026-02-10")?.label).toContain("12-month high");
+    expect(pts.find((p) => p.id === "2026-03-05")?.label).toContain("12-month low");
+    expect(pts.map((p) => p.id)).toContain("2026-02-27");
+    expect(CALLOUT_SYSTEM).toContain("the note's main number IS that point's value");
   });
 });
