@@ -4,7 +4,7 @@ import { stripDashes } from "../thesis/structure";
 import { FACT_LABEL, peerMedian, peerPriced, type MethodSpec, type ValuationFacts } from "./methods";
 
 /** Bump when a prompt or the arithmetic changes meaning: every method and synthesis is asked again. */
-export const VALUATION_VERSION = "valuation@v3";
+export const VALUATION_VERSION = "valuation@v4";
 
 const f2 = (v: number) => (Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
 const median = (xs: number[]) => {
@@ -38,8 +38,8 @@ const mult = (x: number | null | undefined) => (x === null || x === undefined ? 
 /** The peer block of a multiple method: the company beside each peer (size, growth, margins, multiples), and each median. */
 function peerBlock(spec: MethodSpec, f: ValuationFacts): string[] {
   if (!spec.peerMultiple) return [];
-  const bases = spec.bases?.map((b) => b.id) ?? [null];
-  const medians = bases.map((b) => ({ b, m: peerMedian(spec, f, b) }));
+  const ids = spec.bases?.map((b) => b.id) ?? [null];
+  const medians = ids.map((b) => ({ b, m: peerMedian(spec, f, b) }));
   const own = f.own;
   const lines = [
     "",
@@ -66,13 +66,13 @@ export function methodPrompt(spec: MethodSpec, f: ValuationFacts, context: strin
     h?.length ? `${spec.history!.label}: ${h.map((p) => `${p.period} ${f2(p.value)}`).join("; ")} (min ${f2(Math.min(...h.map((p) => p.value)))}, median ${f2(median(h.map((p) => p.value)))}, max ${f2(Math.max(...h.map((p) => p.value)))})` : spec.history ? `${spec.history.label}: no history collected.` : null,
     now,
     ...peerBlock(spec, f),
-    spec.bases ? `Bases you can run it on (pick one): ${spec.bases.map((b) => `${b.id} = ${b.label}${f.inputs[b.id === "forward" ? "eps-forward" : b.id === "last" ? "fcf-last" : b.id === "average" ? "fcf-average" : "ebitda"] ? "" : " (not collected)"}`).join("; ")}.` : null,
+    spec.bases ? `Bases you can run it on (pick one): ${bases(spec, f).map((b) => `${b.id} = ${b.label}${f.inputs[b.id === "forward" ? "eps-forward" : b.id === "last" ? "fcf-last" : b.id === "average" ? "fcf-average" : "ebitda"] ? "" : " (not collected)"}`).join("; ")}.` : null,
     "",
     "JSON:",
     "{",
     '  "applicable": true | false,',
     '  "reason": "<only when false: one sentence why this method does not fit this company>",',
-    spec.bases ? `  "basis": ${spec.bases.map((b) => JSON.stringify(b.id)).join(" | ")},` : null,
+    spec.bases ? `  "basis": ${bases(spec, f).map((b) => JSON.stringify(b.id)).join(" | ")},` : null,
     ...assumptionJson(spec, f),
     '  "summary": "<ONE sentence: what this method says about the company, no per-share value (the code computes it)>",',
     '  "report": "<markdown, 120 to 250 words: what the method measures here, each assumption and why, what would move the value; no per-share value>"',
@@ -81,6 +81,18 @@ export function methodPrompt(spec: MethodSpec, f: ValuationFacts, context: strin
   ]
     .filter((x) => x !== null)
     .join("\n");
+}
+
+/**
+ * The bases offered: for a multiple priced off peers, only those with a peers' median (2026-11-09: P/E run on a basis
+ * no peer carried came back with no base and high).
+ */
+function bases(spec: MethodSpec, f: ValuationFacts): NonNullable<MethodSpec["bases"]> {
+  const all = spec.bases ?? [];
+  if (!spec.peerMultiple) return all;
+  // A basis is offered when a peer carries its multiple AND the company has the figure it multiplies.
+  const peered = all.filter((b) => peerMedian(spec, f, b.id) && spec.uses(f, b.id).every((k) => (f.inputs[k]?.value ?? 0) > 0));
+  return peered.length ? peered : all;
 }
 
 /** The JSON lines asking for the assumptions: a multiple with peers = low from own history + a premium for base and high. */
@@ -100,17 +112,19 @@ export type MethodAnswer = { applicable: boolean; reason: string | null; basis: 
 export function parseMethodAnswer(text: string, spec: MethodSpec, f: ValuationFacts): MethodAnswer {
   const o = JSON.parse(firstJsonObject(text)) as Record<string, unknown>;
   if (o.applicable === false) return { applicable: false, reason: isStr(o.reason) ? stripDashes(o.reason) : "Judged not to fit this company.", basis: null, assumptions: [], peerPricing: null, summary: null, report: null };
-  const basis = spec.bases ? (spec.bases.find((b) => b.id === o.basis)?.id ?? spec.bases[0].id) : null;
+  const offered = bases(spec, f);
+  const basis = spec.bases ? (offered.find((b) => b.id === o.basis)?.id ?? offered[0].id) : null;
   const median = peerMedian(spec, f, basis);
   const a = (o.assumptions ?? {}) as Record<string, Record<string, unknown>>;
   const why = (x: unknown) => (isStr(x) ? stripDashes(x) : "");
   let peerPricing: PeerPricing = null;
   const assumptions: ValuationAssumption[] = spec.assumptions.map((s) => {
     const x = a[s.key];
-    const n = (k: string) => Number(x?.[k]);
+    // A missing value is NaN, never 0 (Number(null) = 0 put P/E base and high at 0 on 2026-11-09).
+    const n = (k: string) => (typeof x?.[k] === "number" ? (x[k] as number) : Number.NaN);
     if (median && s.key === "multiple") {
       const p = (o.peers ?? {}) as Record<string, unknown>;
-      const premium = { base: Number(p.base), high: Number(p.high) };
+      const premium = { base: typeof p.base === "number" ? p.base : Number.NaN, high: typeof p.high === "number" ? p.high : Number.NaN };
       if (!x || !Number.isFinite(n("low")) || !Number.isFinite(premium.base) || !Number.isFinite(premium.high)) throw new Error(`${spec.id}: needs the own-history low multiple and the peers' base and high premium`);
       const priced = peerPriced(median.median, premium);
       peerPricing = { multiple: median.id, label: median.label, median: median.median, count: median.count, premium, why: why(p.why) };
