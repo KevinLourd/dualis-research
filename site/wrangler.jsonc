@@ -6,6 +6,11 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "workers_dev": true,
+  // dualisresearch.com: bought by Thierry 2026-11-09 on the Dualis Cloudflare account; Cloudflare creates the DNS records and certificate.
+  "routes": [
+    { "pattern": "dualisresearch.com", "custom_domain": true },
+    { "pattern": "www.dualisresearch.com", "custom_domain": true }
+  ],
   "observability": { "enabled": true }
   // Runtime secret (set by .github/workflows/deploy-site.yml): DATABASE_URL (read-only use: gold tables).
 }
