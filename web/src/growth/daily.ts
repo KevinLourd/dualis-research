@@ -70,14 +70,14 @@ export const GROWTH_PAGE_URL = "https://dualis-console.dualis-research.workers.d
 
 /** The WhatsApp caption under the chart. Short lines, figures first. */
 export function briefText(b: GrowthBrief): string {
-  const plannedToday = b.current - b.vsPlan;
-  const line = b.vsPlan > 0 ? `${fmt(b.vsPlan)} ahead of the ${fmt(plannedToday)} planned for today` : `Planned for today: ${fmt(plannedToday)}`;
   const counted = b.countedOn && b.countedOn !== b.date ? ` (counted ${dayLabel(b.countedOn)})` : "";
+  // Kevin 2026-11-09: « Planned for today: 345 » was unclear. The goal and the daily pace say it; only a lead is added.
   return [
     `*Analysis Paralysis, ${dayLabel(b.date)}*`,
     `${fmt(b.current)} subscribers${counted}, ${b.gained >= 0 ? "+" : ""}${fmt(b.gained)} since ${dayLabel(GOAL.startDate)}`,
-    `Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: ${fmt(b.remaining)} to go, ${fmt(b.perDayNeeded)} a day needed`,
-    `${line}, ${b.daysLeft} days left`,
+    `Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: ${fmt(b.remaining)} to go in ${b.daysLeft} days`,
+    `${fmt(b.perDayNeeded)} new subscribers a day needed`,
+    b.vsPlan > 0 ? `${fmt(b.vsPlan)} ahead of pace` : null,
     // A quiet day says nothing (Thierry reads this too: an empty « 0 contacted » reads as blame).
     b.yesterday.contacted + b.yesterday.recommended > 0
       ? `Yesterday: ${b.yesterday.contacted} ${b.yesterday.contacted === 1 ? "writer" : "writers"} contacted, ${b.yesterday.recommended} new ${b.yesterday.recommended === 1 ? "recommendation" : "recommendations"}`
