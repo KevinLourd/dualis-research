@@ -281,6 +281,13 @@
       "when": 1794225660099,
       "tag": "0039_narrative-state-headline",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794227577357,
+      "tag": "0040_intraday-prices",
+      "breakpoints": true
     }
   ]
 }
