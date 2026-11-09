@@ -6,6 +6,7 @@ import { contentAccounts } from "./dimensions/content-accounts";
 import { contentDispatch } from "./dimensions/content-dispatch";
 import { contentDrafts } from "./dimensions/content-drafts";
 import { contentIdeas } from "./dimensions/content-ideas";
+import { contentPicks } from "./dimensions/content-picks";
 import { contentVisuals } from "./dimensions/content-visuals";
 import { contentPosts } from "./dimensions/content-posts";
 import { coverPhotos } from "./dimensions/cover-photos";
@@ -44,17 +45,17 @@ import type { Dimension } from "./types";
  * Portfolio right after watchlist: Thierry's positions (his posts + console edits); price also fetches the S&P 500 (`^GSPC`) the Portfolio page compares against.
  * Peers (comparables + analyst targets) after consensus; Valuation (the fair value pyramid) after peers; Analysis after valuation (it reads the Fair Value); Narrative Since after analysis (the month the current story took hold); Evidence after it (every item since that month against each driver, older ones Too old); Narrative State after it (each driver's tag, then the ticker's); Signals last (fair value x the ticker's tag).
  * Cover photos right after content-posts: one photo per own article for the website covers.
- * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-drafts after it writes the drafts Thierry asked for; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
+ * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
  * Thesis confidence right after catalysts: it weighs every judged item so far (narrative holds or cracks).
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, catalysts, thesisConfidenceDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, catalysts, thesisConfidenceDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
  * collect runs `core` = everything else, the analysis chain, so it lands in minutes (Kevin 2026-11-05: speed).
  */
-export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-drafts", "content-visuals", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
+export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-picks", "content-drafts", "content-visuals", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
 
 /**
  * Stages of a collect (Kevin 2026-11-06: « comment speeder x10 »): the dimensions of one stage run at the same time,
