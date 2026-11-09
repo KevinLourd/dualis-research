@@ -95,11 +95,16 @@ describe("live test P&L", () => {
   const bench = (b: PnlBenchmark["base"], mark: PnlBenchmark["mark"] = null): PnlBenchmark => ({ bars: spx, base: b, mark });
   const spxAtClose = bench({ price: 1000, date: "2026-11-05", source: "close" });
 
-  it("a strong entry weighs 1 and a weak one the cursor's weight", () => {
+  it("one equal slot per open position: a strong one invests all of it, a weak one the cursor's share, the rest in cash", () => {
     // Day 1: A +10%, B -20%. Points: 11-05 (entry at the close: 0), 11-06.
-    expect(portfolioPnl([strongA, weakB], bars, spxAtClose, 0.5).lines[0].points[1].value).toBeCloseTo((0.1 - 0.5 * 0.2) / 1.5);
-    expect(portfolioPnl([strongA, weakB], bars, spxAtClose, 1).lines[0].points[1].value).toBeCloseTo((0.1 - 0.2) / 2);
-    expect(portfolioPnl([strongA, weakB], bars, spxAtClose, 0).lines[0].points[1].value).toBeCloseTo(0.1);
+    const day1 = (w: number, ps = [strongA, weakB]) => portfolioPnl(ps, bars, spxAtClose, w).lines[0].points[1].value;
+    expect(day1(0.5)).toBeCloseTo((0.1 - 0.5 * 0.2) / 2);
+    expect(day1(1)).toBeCloseTo((0.1 - 0.2) / 2);
+    expect(day1(0)).toBeCloseTo(0.1 / 2);
+    // A lone weak position: its share moves the book smoothly, 0 at 0.
+    expect(day1(0, [weakB])).toBeCloseTo(0);
+    expect(day1(0.05, [weakB])).toBeCloseTo(-0.01);
+    expect(day1(1, [weakB])).toBeCloseTo(-0.2);
   });
 
   it("counts the entry day from the entry price and the exit day to the exit price", () => {

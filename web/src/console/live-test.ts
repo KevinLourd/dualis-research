@@ -12,9 +12,11 @@ import type { Bar, Line } from "./portfolio-series";
  * intraday prices »): the last 5-minute bar already closed, else the last daily close printed (a signal on Sunday trades
  * at Friday's close). An open position is marked to the latest price.
  *
- * P&L: each day the open positions share the book, a strong entry weighs 1 and a weak one `weakWeight` (0-1, the page's
- * cursor, default 0.5); the book compounds their day returns, the entry day from the entry price, the exit day to the
- * exit price, today to the latest price.
+ * P&L: each day the book is split in equal slots, one per open position; a strong position invests its whole slot, a
+ * weak one `weakWeight` of it (0-1, the page's cursor, default 0.5), the rest of its slot stays in cash; the book
+ * compounds. The weight is absolute, never relative to the other positions (Kevin 2026-11-09: a lone weak position took
+ * the whole book at 0.05 and nothing at 0). The entry day runs from the entry price, the exit day to the exit price,
+ * today to the latest price.
  */
 
 export type SignalReading = { id: string; signal: "BUY" | "SELL" | "none"; strength: "strong" | "weak" | "noise"; at: Date };
@@ -169,7 +171,7 @@ export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[
       if (i > 0) {
         const prev = days[i - 1];
         let sum = 0;
-        let units = 0;
+        let slots = 0;
         for (const p of priced) {
           // Held over (prev, d]: entered on or before d, not exited on or before prev. A closed position with no exit
           // price stored yet is held to the latest price, like an open one.
@@ -177,14 +179,13 @@ export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[
           const exited = p.closedAt !== null && p.exitDate !== null && p.exitPrice !== null;
           if (exited && p.exitDate! <= prev) continue;
           const u = p.strength === "strong" ? 1 : weakWeight;
-          if (u <= 0) continue;
           const a = p.entryDate! > prev ? p.entryPrice! : closeAt(p.symbol, prev);
           const z = exited && p.exitDate! <= d ? p.exitPrice! : !exited && p.markDate === d && p.markPrice !== null ? p.markPrice : closeAt(p.symbol, d);
           if (a === null || z === null) continue;
           sum += u * positionReturn(a, z, p.side)!;
-          units += u;
+          slots += 1;
         }
-        if (units > 0) equity *= 1 + sum / units;
+        if (slots > 0) equity *= 1 + sum / slots;
       }
       return { date: d, value: equity - 1 };
     });

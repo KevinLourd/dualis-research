@@ -139,9 +139,8 @@ export type Annotation = {
   /** The point the arrow hits: an Exhibit period, or a price date. */
   point: string;
   note: string;
-  /** What the price's narrative said, and the driver this point breaks (null when the Idea cites no driver). */
+  /** What the price's narrative said. */
   priceSays: string;
-  driver: string | null;
   title: string;
   /** Under the title: what the chart measures, in plain words. */
   chartLabel: string;
@@ -190,9 +189,10 @@ function bannerGraphics(b: NonNullable<Annotation["banner"]>) {
     { type: "rect", shape: { x: x + 5, y: y + 6, width: w, height: h }, style: { fill: "rgba(0,0,0,0.45)" }, z: 10 },
     { type: "rect", shape: { x, y, width: w, height: h }, style: { fill: "#fff" }, z: 11 },
     { type: "rect", shape: { x, y, width: stampW, height: h }, style: { fill: COLOR.breaking.dark }, z: 12 },
-    { type: "text", style: { text: "BREAKING", x: x + stampW / 2, y: y + h / 2, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
+    { type: "text", style: { text: "BREAKING", x: x + stampW / 2, y: y + h / 2 - 12, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
+    { type: "text", style: { text: b.ago, x: x + stampW / 2, y: y + h / 2 + 18, fill: "#fff", fontSize: 17, fontWeight: 400, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
     ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: x + stampW + 18, y: y + 10, width: 24, height: 24 }, z: 13 }] : []),
-    { type: "text", style: { text: `${b.publisher.toUpperCase()}  ·  ${b.ago}`, x: info, y: y + 22, fill: "#555", fontSize: 17, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 13 },
+    { type: "text", style: { text: b.publisher.toUpperCase(), x: info, y: y + 22, fill: "#555", fontSize: 17, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 13 },
     { type: "text", style: { text: b.headline, x: x + stampW + 18, y: y + 56, fill: "#111", fontSize: 24, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: w - stampW - 36, overflow: "truncate" }, z: 13 },
   ];
 }
@@ -200,11 +200,10 @@ function bannerGraphics(b: NonNullable<Annotation["banner"]>) {
 /** Arrow + note box pointing at (px, py), placed where it fits inside the plot. */
 type Rect = { x: number; y: number; w: number; h: number };
 function calloutGraphics(px: number, py: number, a: Annotation, colour: string, plot: { left: number; top: number; right: number; bottom: number }, ring = true, obstacles: Rect[] = []) {
-  // Three lines: the fact, what the price said, the driver it breaks (Kevin 2026-11-09).
+  // Two lines: the fact, what the price said (Kevin 2026-11-09, the driver line removed).
   const lines = [
     { text: a.note, size: 24 },
     { text: `VS price narrative: "${a.priceSays}"`, size: 18 },
-    ...(a.driver ? [{ text: `Driver broken: ${a.driver}`, size: 18 }] : []),
   ];
   const boxW = Math.min(760, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
   const boxH = 22 + lines.reduce((t, l) => t + l.size + 10, 0);
@@ -318,14 +317,21 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const hit = a ? e.points.findIndex((p) => p.period === a.point) : -1;
   if (a && hit === -1) throw new Error(`annotation point ${a.point} is not a period of exhibit ${e.id}`);
   const accent = a ? toneColour(a.tone) : NOTE.main;
-  const grid = { left: 110, right: bars ? 56 : 170, top: (legend ? 200 : 190) + off, bottom: 92 };
+  // With an annotation and a fair value, the price card sits top right and the headline wraps beside it.
+  const card = !!a && !!input.fair && input.bars.length >= 20;
+  const cardY = off + 22;
+  const titleW = card ? W - 56 - CARD_W - 40 - 40 : W - 112 - (off ? 0 : 96);
+  const titleSize = a ? 34 : 32;
+  const titleLines = card && a ? Math.min(2, Math.ceil((a.title.length * titleSize * 0.55) / titleW)) : 1;
+  const subTop = 40 + off + (titleLines - 1) * 42 + 48;
+  const grid = { left: 110, right: bars ? 56 : 170, top: card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: a ? a.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: a ? 36 : 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
-      { text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : e.takeaway, left: 56, top: 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
+      { text: a ? a.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
+      { text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : e.takeaway, left: 56, top: card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: card ? titleW : W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
@@ -400,9 +406,10 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
       : [];
     chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
   }
-  const svg = chart.renderToSVGString();
+  let svg = chart.renderToSVGString();
   chart.dispose();
-  return off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
+  svg = off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
+  return card ? withCard(svg, signalCardSvg(input), W - 40 - CARD_W, cardY) : svg;
 }
 
 /** The 16:9 post card: the idea in words over the chart, deep indigo, the mark and the brand at the bottom. */
@@ -492,4 +499,84 @@ export async function video(input: VisualInput, fps = 30, ffmpeg = process.env.F
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+const CARD_W = 400;
+const CARD_H = 210;
+
+/**
+ * The price card pasted on the chart (Kevin 2026-11-09: « un collage du price et du range fair value, avec une flèche
+ * directionnelle qui dit BUY signal »): white card, the 12-month price line, the fair value range as a band, and an arrow
+ * from today's price toward the fair value saying the Signal (or the gap when there is none).
+ */
+export function signalCardSvg(input: VisualInput): string {
+  const fair = input.fair;
+  if (!fair) throw new Error("a price card needs a fair value");
+  const last = input.bars[input.bars.length - 1];
+  const up = last.close < fair.value;
+  const colour = up ? COLOR.long.light : COLOR.short.light;
+  const soft = up ? COLOR["long-soft"].light : COLOR["short-soft"].light;
+  const lo = fair.low ?? fair.value;
+  const hi = fair.high ?? fair.value;
+  const values = [...input.bars.map((b) => b.close), lo, hi];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = (max - min) * 0.1 || max * 0.1;
+  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: CARD_W, height: CARD_H });
+  const x0 = ts(input.bars[0].date);
+  const x1 = ts(last.date);
+  chart.setOption({
+    backgroundColor: "#fff",
+    animation: false,
+    textStyle: { fontFamily: FONT },
+    title: { text: `${input.companyName ?? input.symbol}: share price vs fair value`, left: 16, top: 12, textStyle: { color: "#333", fontSize: 15, fontWeight: 600, fontFamily: FONT } },
+    grid: { left: 16, right: 196, top: 44, bottom: 18 },
+    xAxis: { type: "time", min: x0, max: x1, show: false },
+    yAxis: { type: "value", min: Math.max(0, min - pad), max: max + pad, show: false },
+    series: [
+      {
+        type: "line",
+        data: input.bars.map((b) => [ts(b.date), b.close]),
+        symbol: "none",
+        lineStyle: { color: INDIGO, width: 3 },
+        markArea: { silent: true, itemStyle: { color: soft }, data: [[{ yAxis: lo }, { yAxis: hi }]] },
+        markLine: { silent: true, symbol: "none", label: { show: false }, lineStyle: { color: colour, type: "dashed", width: 2 }, data: [{ yAxis: fair.value }] },
+        z: 3,
+      },
+    ],
+  });
+  const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [x1, last.close]) as number[];
+  const [, fy] = chart.convertToPixel({ seriesIndex: 0 }, [x1, fair.value]) as number[];
+  const ax = px + 30;
+  const pillX = ax + 18;
+  const pillW = CARD_W - pillX - 14;
+  const head = 14;
+  const dir = fy < py ? -1 : 1;
+  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value);
+  chart.setOption({
+    graphic: [
+      { type: "circle", shape: { cx: px, cy: py, r: 6 }, style: { fill: INDIGO }, z: 10 },
+      { type: "line", shape: { x1: ax, y1: py, x2: ax, y2: fy - dir * head }, style: { stroke: colour, lineWidth: 6 }, z: 10 },
+      { type: "polygon", shape: { points: [[ax, fy], [ax - 12, fy - dir * head], [ax + 12, fy - dir * head]] }, style: { fill: colour }, z: 10 },
+      { type: "rect", shape: { x: pillX, y: (py + fy) / 2 - 20, width: pillW, height: 40, r: 6 }, style: { fill: colour }, z: 10 },
+      { type: "text", style: { text: label, x: pillX + pillW / 2, y: (py + fy) / 2, fill: "#fff", fontSize: 18, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 11 },
+      { type: "text", style: { text: "Fair value", x: 22, y: fy - 12, fill: colour, fontSize: 13, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
+      { type: "text", style: { text: `Fair value ${fmt(lo)} to ${fmt(hi)}`, x: CARD_W - 12, y: CARD_H - 14, fill: "#666", fontSize: 13, fontFamily: FONT, align: "right", verticalAlign: "middle" }, z: 11 },
+    ],
+  });
+  const svg = chart.renderToSVGString();
+  chart.dispose();
+  return svg;
+}
+
+/** Pastes the price card on the chart, slightly turned like a cut-out, with a shadow. */
+function withCard(svg: string, card: string, x: number, y: number): string {
+  // As a PNG: resvg draws no text inside a nested SVG image (no fonts there). Twice the size for a sharp card.
+  const b64 = Buffer.from(new Resvg(card, { fitTo: { mode: "zoom", value: 2 }, font: { loadSystemFonts: false, fontFiles: FONTS, defaultFontFamily: FONT } }).render().asPng()).toString("base64");
+  const cx = x + CARD_W / 2;
+  const cy = y + CARD_H / 2;
+  return svg.replace(
+    "</svg>",
+    `<g transform="rotate(-2 ${cx} ${cy})"><rect x="${x + 6}" y="${y + 8}" width="${CARD_W}" height="${CARD_H}" fill="#000" fill-opacity="0.45"/><image href="data:image/png;base64,${b64}" x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}"/></g></svg>`,
+  );
 }

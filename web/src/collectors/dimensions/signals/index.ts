@@ -51,6 +51,17 @@ export function combineTheses(states: ThesisState[]): { signal: SignalKind; stre
   return { signal: SIDE[s.side].signal, strength: s.signal as Strength, side: s.side, why: s.why, evidenceIds: s.evidenceIds.slice(0, MAX_EVIDENCE) };
 }
 
+/**
+ * The gap rule (CLAUDE.md « SELL only above, BUY only below », Kevin 2026-11-09 on MNRO: a SELL 21% under the fair
+ * value): a BUY needs the price below the fair value, a SELL above it. Otherwise no signal, the judge's why kept.
+ */
+export function onFairValueSide<T extends { signal: SignalKind; strength: Strength; side: ThesisSide | null; why: string | null; evidenceIds: string[] }>(r: T, gapPct: number | null): T {
+  if (gapPct === null) return r;
+  const wrong = (r.signal === "BUY" && gapPct >= 0) || (r.signal === "SELL" && gapPct <= 0);
+  if (!wrong) return r;
+  return { ...r, signal: "none", strength: "noise", side: null, evidenceIds: [] };
+}
+
 export function readingOf(
   fv: { value: number; currency: string | null; method: string | null; label?: string | null } | null,
   quote: { close: number; currency: string | null; date: string } | null,
@@ -60,7 +71,7 @@ export function readingOf(
   const comparable = !!fv && !!q && (!fv.currency || !q.currency || fv.currency === q.currency);
   const gapPct = comparable && fv!.value > 0 ? q!.price / fv!.value - 1 : null;
   const theses: ThesisReading[] = states.map((s) => ({ side: s.side, signal: s.signal ?? "noise", effect: s.effect, strength: s.strength, why: s.why, since: s.since }));
-  return { ...combineTheses(states), theses, fairValue: fv?.value ?? null, fairValueMethod: fv?.method ?? null, fairValueLabel: fv?.label ?? null, currency: fv?.currency ?? null, quote: q?.price ?? null, quoteDate: quote?.date ?? null, gapPct };
+  return { ...onFairValueSide(combineTheses(states), gapPct), theses, fairValue: fv?.value ?? null, fairValueMethod: fv?.method ?? null, fairValueLabel: fv?.label ?? null, currency: fv?.currency ?? null, quote: q?.price ?? null, quoteDate: quote?.date ?? null, gapPct };
 }
 
 export const rulesSource: Source = {

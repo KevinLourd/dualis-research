@@ -36,6 +36,7 @@ export function LivePnl({ positions, bars, benchmark, open, closed, won }: { pos
           <Stat label="Open positions" value={<span className="font-mono tabular text-kumo-strong">{open}</span>} />
           <Stat label="Closed positions" value={<span className="font-mono tabular text-kumo-strong">{closed}</span>} hint={`${won} with a gain`} />
         </div>
+        <div className="flex flex-col gap-2">
         <Slider
           label="Weight of a weak signal (strong = 1)"
           value={weak}
@@ -45,6 +46,8 @@ export function LivePnl({ positions, bars, benchmark, open, closed, won }: { pos
           step={0.05}
           className="w-72"
         />
+        <p className="w-72 text-sm text-kumo-subtle">Each open position gets an equal share of the book. A weak one invests this part of its share, the rest stays in cash.</p>
+        </div>
       </div>
       {pnl.lines.length > 0 && <ReturnChart lines={pnl.lines} />}
     </div>

@@ -33,6 +33,9 @@ export const completeWithSubscription: Complete = async ({ system, prompt, model
   for await (const message of stream) {
     if (message.type !== "result") continue;
     if (message.subtype !== "success") throw new Error(`Claude call failed: ${message.subtype}`);
+    // A usage limit comes back as a "success" carrying the limit message: never let it pass as an answer (it would
+    // land as a draft text or a callout).
+    if (message.is_error) throw new Error(`Claude call failed: ${message.result.slice(0, 200)}`);
     return { text: message.result, model };
   }
   throw new Error("Claude call ended without a result");
