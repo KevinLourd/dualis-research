@@ -10,7 +10,7 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentDrafts } from ".";
-import { parseGeneration, publishLink, SHORT_DISCLAIMER, stripDashes, withDisclaimer } from "./format";
+import { draftSystem, parseGeneration, publishLink, SHORT_DISCLAIMER, stripDashes, withDisclaimer } from "./format";
 
 const ARTICLE = JSON.stringify({
   title: "CareCloud found its new client",
@@ -146,6 +146,14 @@ describe("draft writer dispatch", () => {
 });
 
 describe("draft format", () => {
+  it("asks for a Note as one small paragraph with a chart, an X post smaller still", () => {
+    const note = draftSystem("substack-note", null, "Analysis Paralysis");
+    expect(note).toMatch(/one small paragraph with a chart/);
+    expect(note).toMatch(/2 to 4 sentences/);
+    expect(note).not.toMatch(/5 to 8 lines/);
+    expect(draftSystem("x-post", null, null)).toMatch(/at most 160 characters/);
+    expect(note).toMatch(/update on the company/);
+  });
   it("strips em and en dashes but keeps hyphens", () => {
     expect(stripDashes("Sales rose — new stores – carry it; same-store")).toBe("Sales rose, new stores, carry it; same-store");
   });
