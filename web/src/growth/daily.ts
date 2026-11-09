@@ -70,14 +70,20 @@ export const GROWTH_PAGE_URL = "https://dualis-console.dualis-research.workers.d
 
 /** The WhatsApp caption under the chart. Short lines, figures first. */
 export function briefText(b: GrowthBrief): string {
-  const line = b.vsPlan === 0 ? "On the line" : b.vsPlan > 0 ? `Ahead of the line by ${fmt(b.vsPlan)}` : `Behind the line by ${fmt(-b.vsPlan)}`;
+  const plannedToday = b.current - b.vsPlan;
+  const line = b.vsPlan > 0 ? `${fmt(b.vsPlan)} ahead of the ${fmt(plannedToday)} planned for today` : `Planned for today: ${fmt(plannedToday)}`;
   const counted = b.countedOn && b.countedOn !== b.date ? ` (counted ${dayLabel(b.countedOn)})` : "";
   return [
-    `*Growth, ${dayLabel(b.date)}*`,
+    `*Analysis Paralysis, ${dayLabel(b.date)}*`,
     `${fmt(b.current)} subscribers${counted}, ${b.gained >= 0 ? "+" : ""}${fmt(b.gained)} since ${dayLabel(GOAL.startDate)}`,
     `Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: ${fmt(b.remaining)} to go, ${fmt(b.perDayNeeded)} a day needed`,
     `${line}, ${b.daysLeft} days left`,
-    `Yesterday: ${b.yesterday.contacted} ${b.yesterday.contacted === 1 ? "writer" : "writers"} contacted, ${b.yesterday.recommended} new ${b.yesterday.recommended === 1 ? "recommendation" : "recommendations"}`,
+    // A quiet day says nothing (Thierry reads this too: an empty « 0 contacted » reads as blame).
+    b.yesterday.contacted + b.yesterday.recommended > 0
+      ? `Yesterday: ${b.yesterday.contacted} ${b.yesterday.contacted === 1 ? "writer" : "writers"} contacted, ${b.yesterday.recommended} new ${b.yesterday.recommended === 1 ? "recommendation" : "recommendations"}`
+      : null,
     GROWTH_PAGE_URL,
-  ].join("\n");
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
 }

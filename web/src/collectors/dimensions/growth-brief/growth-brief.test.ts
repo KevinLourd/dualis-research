@@ -46,15 +46,18 @@ describe("growth brief figures", () => {
     expect(b).toMatchObject({ current: 160, gained: 7, remaining: 993, daysLeft: 24, perDayNeeded: 42, countedOn: "2026-11-06" });
     expect(b.vsPlan).toBe(160 - 268);
     const text = briefText(b);
-    expect(text).toContain("*Growth, Nov 7*");
+    expect(text).toContain("*Analysis Paralysis, Nov 7*");
     expect(text).toContain("160 subscribers (counted Nov 6), +7 since Nov 4");
-    expect(text).toContain("Behind the line by 108, 24 days left");
+    expect(text).toContain("Planned for today: 268, 24 days left");
+    expect(text).not.toMatch(/\b(test|line|vsPlan|gold)\b/i);
     expect(text).not.toMatch(/[—–]/);
+    // No outreach yesterday: the line is left out, never « 0 writers contacted ».
+    expect(text).not.toContain("Yesterday");
   });
 });
 
 describe("growth-brief dimension", () => {
-  it("queues one message with the chart to the test contact at 08:00 Astana, once a day", async () => {
+  it("queues the brief with the chart for Kevin AND Thierry at 08:00 Astana, once a day each", async () => {
     await seed();
     const ctx = { env: {}, fetch };
     // 01:00 UTC on Nov 7 = 06:00 Nov 7 in Astana: the brief waits for 08:00 Astana (03:00 UTC).
@@ -62,17 +65,35 @@ describe("growth-brief dimension", () => {
     const report = await runDimension(db, { ...growthBriefDim, subjects: (d) => planBrief(d, undefined, new Date("2026-11-07T01:00:00Z")) }, { trigger: "test", ctx });
     expect(report.status).toBe("succeeded");
     const rows = await db.select().from(whatsappOutbox);
-    expect(rows).toHaveLength(1);
-    const [m] = rows;
-    expect(m.recipient).toBe("15550000002");
-    expect(m.requestedBy).toBe("growth-brief");
-    expect(m.scheduledAt.toISOString()).toBe("2026-11-07T03:00:00.000Z");
-    expect(m.text).toContain("Yesterday: 2 writers contacted, 1 new recommendation");
-    expect(m.imageMime).toBe("image/png");
-    expect(Buffer.from(m.image!).subarray(1, 4).toString()).toBe("PNG");
+    // Kevin (test) and Thierry (client): one row each, same text and chart.
+    expect(rows.map((r) => r.recipient).sort()).toEqual(["15550000001", "15550000002"]);
+    for (const m of rows) {
+      expect(m.requestedBy).toBe("growth-brief");
+      expect(m.scheduledAt.toISOString()).toBe("2026-11-07T03:00:00.000Z");
+      expect(m.text).toContain("Yesterday: 2 writers contacted, 1 new recommendation");
+      expect(m.imageMime).toBe("image/png");
+      expect(Buffer.from(m.image!).subarray(1, 4).toString()).toBe("PNG");
+    }
+    expect(rows[0].text).toBe(rows[1].text);
 
     // A second run the same Astana day queues nothing.
     expect(await planBrief(db, undefined, new Date("2026-11-07T05:00:00Z"))).toEqual([]);
+  });
+
+  it("queues only the recipient still missing today's brief", async () => {
+    await seed();
+    await db.insert(whatsappOutbox).values({ recipient: "15550000002", text: "x", scheduledAt: new Date("2026-11-07T03:00:00Z"), requestedBy: "growth-brief" } as never);
+    const ctx = { env: {}, fetch };
+    await runDimension(db, { ...growthBriefDim, subjects: (d) => planBrief(d, undefined, new Date("2026-11-07T01:00:00Z")) }, { trigger: "test", ctx });
+    const rows = await db.select().from(whatsappOutbox);
+    expect(rows.map((r) => r.recipient).sort()).toEqual(["15550000001", "15550000002"]);
+  });
+
+  it("a recipient added after today's brief went out waits for tomorrow", async () => {
+    await seed();
+    await db.insert(whatsappOutbox).values({ recipient: "15550000002", text: "x", scheduledAt: new Date("2026-11-07T03:00:00Z"), requestedBy: "growth-brief" } as never);
+    expect(await planBrief(db, undefined, new Date("2026-11-07T09:00:00Z"))).toEqual([]);
+    expect(await planBrief(db, undefined, new Date("2026-11-08T01:00:00Z"))).toEqual(["brief:2026-11-08"]);
   });
 
   it("queues nothing while the device is unlinked", async () => {
