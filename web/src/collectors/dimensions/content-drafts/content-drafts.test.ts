@@ -74,6 +74,10 @@ describe("content-drafts dimension", () => {
     const { system, prompt } = complete.mock.calls[0][0];
     expect(system).toContain("Account: Thierry Matin");
     expect(system).toContain("VOICE-THIERRY-LI");
+    // Breaking-news alarm, the short name, no licence to hedge (Kevin 2026-11-09: « pas assez alarmist »).
+    expect(system).toContain("🚨 CareCloud: ");
+    expect(system).toContain("Tone: alarm.");
+    expect(system).not.toMatch(/Stay honest about what is not proven|calm, precise/);
     expect(prompt).toContain("Idea: CareCloud replaced the client the market thinks it lost.");
     expect(prompt).toContain("CCLD signs a new hospital client");
     expect(prompt).toContain("Fair value: 6 USD (8x EV/EBITDA)");
@@ -149,7 +153,7 @@ describe("draft format", () => {
   it("asks for a Note as one small paragraph with a chart, an X post smaller still", () => {
     const note = draftSystem("substack-note", null, "Analysis Paralysis");
     expect(note).toMatch(/one small paragraph with a chart/);
-    expect(note).toMatch(/2 to 4 sentences/);
+    expect(note).toMatch(/2 or 3 short sentences/);
     expect(note).not.toMatch(/5 to 8 lines/);
     expect(draftSystem("x-post", null, null)).toMatch(/at most 160 characters/);
     expect(note).toMatch(/update on the company/);
