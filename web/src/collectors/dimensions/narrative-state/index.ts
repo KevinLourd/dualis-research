@@ -26,15 +26,15 @@ import { analysedSymbols } from "../watchlist";
  */
 
 export const NARRATIVE_STATE_DIMENSION = "narrative-state";
-/** v2 (2026-11-09): dates, price reactions and the fair value in the context; since + priced in in the answer. */
-export const DRIVER_STATE_QUESTION = "driver-state@v2";
+/** v3 (2026-11-09): + a 4-5 word headline with its number (Kevin: « YTD margin 30% vs 2023 »). */
+export const DRIVER_STATE_QUESTION = "driver-state@v3";
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. */
 export const THESIS_STATE_QUESTION = "thesis-state@v1";
 
-type StateVerdict = { id: string; driverId: string | null; verdict: string; probability: number; reason: string | null; judgmentId: string; evidenceIds: string[]; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; at: string };
+type StateVerdict = { id: string; driverId: string | null; verdict: string; probability: number; reason: string | null; judgmentId: string; evidenceIds: string[]; headline: string | null; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; at: string };
 export type NarrativeStatePayload = { side: ThesisSide; drivers: StateVerdict[]; thesis: StateVerdict };
 
-type Answer = { tag: string; p: number; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; why: string | null };
+type Answer = { tag: string; p: number; headline: string | null; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; why: string | null };
 
 const SYSTEM = "You judge where an equity story stands for a small-cap long/short analyst. Every number you need is in the text. Answer with JSON only, no prose, no code fence. Plain English, no em dash.";
 
@@ -48,6 +48,7 @@ export function parseAnswer(text: string, withSignal: boolean): Answer {
   return {
     tag: o.tag,
     p: o.p,
+    headline: typeof o.headline === "string" && o.headline.trim() ? stripDashes(o.headline.trim()) : null,
     since: typeof o.since === "string" && DAY.test(o.since) ? o.since : null,
     pricedIn: PRICED_IN.includes(o.pricedIn as PricedIn) ? (o.pricedIn as PricedIn) : null,
     signal: signal === null ? null : signal === "none" ? "noise" : (signal as Strength),
@@ -64,12 +65,12 @@ async function judgeOnce(db: Db, complete: Complete, req: { subjectKind: string;
   const a = parseAnswer(r.text, req.withSignal);
   await db
     .insert(judgments)
-    .values({ subjectKind: req.subjectKind, subjectId: req.subjectId, questionKey: req.questionKey, question: req.question, verdict: a.tag, probability: a.p, citedSentence: null, reason: a.why, model: r.model, raw: { since: a.since, pricedIn: a.pricedIn, signal: a.signal } })
+    .values({ subjectKind: req.subjectKind, subjectId: req.subjectId, questionKey: req.questionKey, question: req.question, verdict: a.tag, probability: a.p, citedSentence: null, reason: a.why, model: r.model, raw: { headline: a.headline, since: a.since, pricedIn: a.pricedIn, signal: a.signal } })
     .onConflictDoNothing();
   const [row] = await db.select().from(judgments).where(key);
   return row;
 }
-const rawOf = (j: typeof judgments.$inferSelect) => j.raw as { since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null };
+const rawOf = (j: typeof judgments.$inferSelect) => j.raw as { headline?: string | null; since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null };
 
 /** One driver's judged news, newest first, each with its tag, how much is priced in, and what the price did since. */
 export function driverNewsLines(rows: GoldEvidence[], driverId: string, reactions: Map<string, Parameters<typeof reactionLine>[0]> = new Map()): { lines: string[]; ids: string[] } {
@@ -132,17 +133,18 @@ export const narrativeStateSource: Source = {
         `Where does this reason stand NOW? reversal = it is turning against the story (${w.reversal}); continuation = it holds and gets stronger; noise = nothing moves it.`,
         "Weigh them with their dates: recent beats old, several weak reversals in a row can make a strong one, one strong continuation after a reversal can cancel it.",
         "since = the day of the first news of the CURRENT state (null for noise). pricedIn = how much of that state the price has already moved (none, partly, fully), read from the price lines.",
+        "headline = the current state in 4 to 5 words with its key number, like a chart label (e.g. \"YTD margin 30% vs 2023\", \"Sales growth slows to 4%\"); null for noise.",
       ].join("\n");
       const j = await judgeOnce(ctx.db, ctx.complete, {
         subjectKind: "driver-state",
         subjectId: driver.id,
         questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${question}\n${input}`)}`,
         question: `${DRIVER_STATE_QUESTION}: ${driver.title}`,
-        prompt: `${question}\n\nNews:\n${input}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "why": "<one short sentence for a reader who has not seen the news>"}`,
+        prompt: `${question}\n\nNews:\n${input}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "why": "<one short sentence for a reader who has not seen the news>"}`,
         withSignal: false,
       });
       const raw = rawOf(j);
-      drivers.push({ id: driver.id, driverId: driver.id, verdict: j.verdict, probability: j.probability, reason: j.reason, judgmentId: j.id, evidenceIds: ids, since: raw.since ?? null, pricedIn: raw.pricedIn ?? null, signal: null, at: j.createdAt.toISOString() });
+      drivers.push({ id: driver.id, driverId: driver.id, verdict: j.verdict, probability: j.probability, reason: j.reason, judgmentId: j.id, evidenceIds: ids, headline: raw.headline ?? null, since: raw.since ?? null, pricedIn: raw.pricedIn ?? null, signal: null, at: j.createdAt.toISOString() });
     }
 
     const input = d.drivers.map((x, i) => `${x.rank}. ${x.title} (${x.category}): ${drivers[i].verdict}${drivers[i].since ? ` since ${drivers[i].since}` : ""}${drivers[i].pricedIn ? `, priced in: ${drivers[i].pricedIn}` : ""}. ${drivers[i].reason ?? ""}`).join("\n");
@@ -172,7 +174,7 @@ export const narrativeStateSource: Source = {
       .flatMap((e) => e.verdicts.filter((v) => v.effect === "reversal" && d.drivers.some((x) => x.id === v.driverId)).map((v) => ({ e, v })))
       .sort((a, b) => verdictRank(a.v) - verdictRank(b.v) || b.e.eventAt.getTime() - a.e.eventAt.getTime());
     const raw = rawOf(t);
-    const thesis: StateVerdict = { id: thesisId(symbol, side), driverId: null, verdict: t.verdict, probability: t.probability, reason: t.reason, judgmentId: t.id, evidenceIds: [...new Set(reversals.map((x) => x.e.id))], since: raw.since ?? null, pricedIn: raw.pricedIn ?? null, signal: raw.signal ?? "noise", at: t.createdAt.toISOString() };
+    const thesis: StateVerdict = { id: thesisId(symbol, side), driverId: null, verdict: t.verdict, probability: t.probability, reason: t.reason, judgmentId: t.id, evidenceIds: [...new Set(reversals.map((x) => x.e.id))], headline: null, since: raw.since ?? null, pricedIn: raw.pricedIn ?? null, signal: raw.signal ?? "noise", at: t.createdAt.toISOString() };
     const payload: NarrativeStatePayload = { side, drivers, thesis };
     return { request: { symbol, side, version: d.version }, httpStatus: null, payload };
   },
@@ -201,7 +203,7 @@ export async function promoteNarrativeStates(db: Db, fetches: BronzeFetch[]): Pr
     const { symbol, side } = parseThesisId(subject);
     for (const [level, v] of [...p.drivers.map((x) => ["driver", x] as const), ["thesis", p.thesis] as const]) {
       const t = parseTag(v.verdict);
-      rows.push({ id: v.id, symbol, side, level, driverId: v.driverId, effect: t.effect, strength: t.strength, why: v.reason, probability: v.probability, evidenceIds: v.evidenceIds, since: v.since, pricedIn: v.pricedIn, signal: v.signal, judgmentId: v.judgmentId, asOf: new Date(v.at) });
+      rows.push({ id: v.id, symbol, side, level, driverId: v.driverId, effect: t.effect, strength: t.strength, why: v.reason, probability: v.probability, evidenceIds: v.evidenceIds, headline: v.headline ?? null, since: v.since, pricedIn: v.pricedIn, signal: v.signal, judgmentId: v.judgmentId, asOf: new Date(v.at) });
     }
   }
   // Every analysed ticker's states are rebuilt: a thesis that no longer exists (the price left the range) drops out.

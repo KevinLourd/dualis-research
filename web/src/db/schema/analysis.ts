@@ -266,6 +266,8 @@ export const narrativeStates = gold.table(
     probability: real("probability").notNull(),
     /** The Evidence the verdict rests on (driver: its non-noise news; ticker: the reversals behind it). */
     evidenceIds: text("evidence_ids").array().notNull(),
+    /** Driver level: the current state in 4-5 words with its number (« YTD margin 30% vs 2023 »), as the judge writes it. */
+    headline: text("headline"),
     /** The day the current state started (the first news of the turn), as the judge reads it. */
     since: text("since"),
     /** How much of that turn the price has already moved. */

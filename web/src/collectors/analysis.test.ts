@@ -70,7 +70,7 @@ const fake: Complete = async ({ prompt, system }) => {
   if (prompt.includes("Where does this reason stand NOW")) {
     calls.push("driver-state");
     const turned = prompt.includes("[reversal:strong");
-    return { text: JSON.stringify({ tag: turned ? "reversal:strong" : "noise", p: 0.8, since: turned ? "2026-11-02" : null, pricedIn: turned ? "none" : null, why: turned ? "The buyback turns the cash reason." : "No news on it." }), model: "fake" };
+    return { text: JSON.stringify({ tag: turned ? "reversal:strong" : "noise", p: 0.8, since: turned ? "2026-11-02" : null, pricedIn: turned ? "none" : null, headline: turned ? "Buyback returns 10% of cash" : null, why: turned ? "The buyback turns the cash reason." : "No news on it." }), model: "fake" };
   }
   if (prompt.includes("does this thesis give a")) {
     lastThesisPrompt = prompt;
@@ -191,7 +191,7 @@ describe("analysis dimension", () => {
     expect(calls).toEqual(["driver-state", "driver-state", "thesis-state"]);
     const states = await db.select().from(narrativeStates);
     expect(Object.fromEntries(states.map((x) => [x.id, `${x.level} ${x.effect}:${x.strength} ${x.signal ?? "-"}`]))).toEqual({ [`${SYMBOL}:long:1`]: "driver noise:noise -", [`${SYMBOL}:long:2`]: "driver reversal:strong -", [`${SYMBOL}:long`]: "thesis reversal:weak weak" });
-    expect(states.find((x) => x.id === `${SYMBOL}:long:2`)).toMatchObject({ evidenceIds: [e.id], since: "2026-11-02", pricedIn: "none" });
+    expect(states.find((x) => x.id === `${SYMBOL}:long:2`)).toMatchObject({ evidenceIds: [e.id], headline: "Buyback returns 10% of cash", since: "2026-11-02", pricedIn: "none" });
     // The thesis judge decides the signal with the fair value, its range, the price path and today's date in front of it.
     expect(lastThesisPrompt).toContain("does this thesis give a BUY NOW");
     expect(lastThesisPrompt).toContain("range 35000 to 46000");
