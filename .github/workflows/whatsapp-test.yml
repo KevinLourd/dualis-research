@@ -33,4 +33,7 @@ jobs:
       - if: inputs.signal_alerts == ''
         run: pnpm wa:test
       - if: inputs.signal_alerts != ''
-        run: pnpm wa:signal-test ${{ inputs.signal_alerts }}
+        env:
+          SIGNAL_ALERTS: ${{ inputs.signal_alerts }}
+        # Unquoted on purpose: one argument per case; an env var is never parsed as shell syntax (`>`).
+        run: pnpm wa:signal-test $SIGNAL_ALERTS
