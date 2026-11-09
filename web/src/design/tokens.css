@@ -11,6 +11,7 @@
   --dualis-short: light-dark(#B0353A, #E46B6E);
   --dualis-long-soft: light-dark(#E3F1EA, #13281F);
   --dualis-short-soft: light-dark(#F7E4E4, #2E1618);
+  --dualis-breaking: light-dark(#D7191F, #D7191F);
   --dualis-accent: light-dark(#2B2463, #B9B2EA);
   --dualis-accent-ink: light-dark(#1E1947, #D2CDF3);
   --dualis-brand-fill: light-dark(#2B2463, #5B53A8);
