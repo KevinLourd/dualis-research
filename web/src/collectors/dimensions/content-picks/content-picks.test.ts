@@ -133,8 +133,13 @@ describe("the WhatsApp post loop, end to end on Kevin's number", () => {
     expect(Buffer.from(v2.image!).equals(PNG)).toBe(true);
     expect(complete.mock.calls.at(-1)![0].prompt).toContain("change: shorter");
 
-    // « go » on version 2: approved, the X post intent with the new text.
+    // The next send check never sends version 2 again as a new draft.
     const [v2Sent] = await serviceSends();
+    const before = (await db.select().from(whatsappOutbox)).length;
+    await run(contentDispatch);
+    expect(await db.select().from(whatsappOutbox)).toHaveLength(before);
+
+    // « go » on version 2: approved, the X post intent with the new text.
     const go = await kevinSays("go", v2Sent.waId);
     await run(contentReplies);
     const publish = (await db.select().from(whatsappOutbox)).find((o) => o.replyToWaId === go)!;
