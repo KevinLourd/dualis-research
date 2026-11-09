@@ -150,6 +150,15 @@ export type Annotation = {
 };
 
 const BANNER_H = 112;
+
+/**
+ * The words over the chart: with a news inset the claim would repeat it (Kevin 2026-11-09: « enlève cette sentence car
+ * duplicate de la news »), so the chart label becomes the heading; without one, the claim heads and the label sits under.
+ */
+function heading(a: Annotation, company: string): { title: string; sub: string | null } {
+  const label = `${company}: ${a.chartLabel}`;
+  return a.banner ? { title: label, sub: null } : { title: a.title, sub: label };
+}
 const toneColour = (t: Annotation["tone"]) => (t === "long" ? COLOR.long.dark : t === "short" ? COLOR.short.dark : COLOR.accent.dark);
 
 /**
@@ -276,9 +285,9 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: a ? a.title : `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44 + off, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
+      { text: a ? heading(a, input.companyName ?? input.symbol).title : `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44 + off, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
       {
-        text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel} · ${subtitle}` : subtitle,
+        text: a ? [heading(a, input.companyName ?? input.symbol).sub, subtitle].filter(Boolean).join(" · ") : subtitle,
         left: 56,
         top: 94 + off,
         textStyle: { color: NOTE.muted, fontSize: 22, fontWeight: 400, fontFamily: FONT },
@@ -322,7 +331,8 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const cardY = off + 22;
   const titleW = card ? W - 56 - CARD_W - 40 - 40 : W - 112 - (off ? 0 : 96);
   const titleSize = a ? 34 : 32;
-  const titleLines = card && a ? Math.min(2, Math.ceil((a.title.length * titleSize * 0.55) / titleW)) : 1;
+  const head = a ? heading(a, input.companyName ?? input.symbol) : null;
+  const titleLines = card && head ? Math.min(2, Math.ceil((head.title.length * titleSize * 0.55) / titleW)) : 1;
   const subTop = 40 + off + (titleLines - 1) * 42 + 48;
   const grid = { left: 110, right: bars ? 56 : 170, top: card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off, bottom: 92 };
   chart.setOption({
@@ -330,8 +340,8 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: a ? a.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
-      { text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : e.takeaway, left: 56, top: card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: card ? titleW : W - 112 - 96, overflow: "break" } },
+      { text: head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
+      { text: head ? (head.sub ?? "") : e.takeaway, left: 56, top: card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: card ? titleW : W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend

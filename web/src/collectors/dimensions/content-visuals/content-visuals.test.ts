@@ -61,7 +61,7 @@ function fakeJudge(verdict: string) {
       const point = [...prompt.split("Points (id: value):\n")[1].matchAll(/^- (\S+): .*$/gm)].map((m) => m[1]);
       const news = prompt.includes("Reuters") ? { index: 0, domain: "reuters.com" } : null;
       const ids = point.filter((id) => /^\d{4}-\d{2}-\d{2}$/.test(id));
-      return { text: JSON.stringify({ point: ids.at(-1), note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: news ? "CareCloud wins a big hospital back" : null, title: "Look: clients just hit a record", chartLabel: "Hospitals that pay us", news }), model: "fake" };
+      return { text: JSON.stringify({ point: ids.at(-1), note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: news ? "CareCloud wins a big hospital back" : null, title: "Clients just hit a record", chartLabel: "Hospitals that pay us", news }), model: "fake" };
     }
     prompts.push(prompt);
     return { text: JSON.stringify({ verdict, probability: 0.8, cited_sentence: null, reason: "The client count is the striking turn." }), model: "fake" };
@@ -193,7 +193,7 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const [chart] = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, ideaId)).then((r) => r.filter((v) => v.kind === "chart"));
     expect(chart.status).toBe("ok");
     const rows = await db.select().from(bronzeFetches).where(eq(bronzeFetches.subject, `idea:${ideaId}#chart`));
-    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: "CareCloud wins a big hospital back", title: "Look: clients just hit a record", chartLabel: "Hospitals that pay us", news: { index: 0, domain: "reuters.com" } });
+    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: "CareCloud wins a big hospital back", title: "Clients just hit a record", chartLabel: "Hospitals that pay us", news: { index: 0, domain: "reuters.com" } });
     // The callout saw the points and the news with its publisher.
     expect(judge.callouts[0]).toContain("- 2025-12-31: 2025-12 Hospital clients 45");
     expect(judge.callouts[0]).toContain("- 0: Reuters: CCLD signs a new hospital client");
@@ -202,6 +202,8 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(judge.callouts[0]).toContain("- 0: Client loss: Revenue fell 20%.");
     // Told to write, never to copy.
     expect(judge.callouts[0]).not.toContain("copied exactly");
+    // The headline is the claim alone (Kevin 2026-11-09: no « Look: »).
+    expect(CALLOUT_SYSTEM).not.toContain("starts with Look:");
   });
 
   it("colours the one point by the story's side and draws arrow, note and news strip", async () => {
@@ -212,10 +214,13 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(toneOf(input)).toBe("long");
     const banner = { headline: "CareCloud signs a new hospital client", publisher: "Reuters", logo: PNG_1PX.toString("base64"), ago: "2h ago" };
     const say = { priceSays: "The biggest client is gone", chartLabel: "Hospitals that pay us" };
-    const svg = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Look: clients just hit a record", tone: "long", banner });
-    for (const t of ["CareCloud: Hospitals that pay us", "Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "Look: clients just hit a record", "BREAKING", "REUTERS", "2h ago", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
+    const svg = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner });
+    for (const t of ["CareCloud: Hospitals that pay us", "Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "BREAKING", "REUTERS", "2h ago", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
     expect(svg).toContain(COLOR.breaking.dark);
     expect(svg).not.toContain("Driver broken");
+    // With a news inset the claim is not repeated over the chart; without one it heads it.
+    expect(svg).not.toContain("Clients just hit a record");
+    expect(exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner: null })).toContain("Clients just hit a record");
     // The price card is pasted on top (a PNG), and says the ticker's Signal.
     expect(svg).toContain('<image href="data:image/png;base64,');
     expect(input.signal).toBe("BUY");
@@ -228,7 +233,7 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(opportunity(12, 8, 10, false)).toBe("16-34% downside");
     expect(signalCardSvg({ ...input, signal: null })).toContain("below fair value");
     expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
-    const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Look: 32% under fair value", tone: "short", banner: null });
+    const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "short", banner: null });
     expect(price).toContain("Sold off");
     expect(price.toLowerCase()).toContain(COLOR.short.dark.toLowerCase());
     expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", ...say, title: "y", tone: "long", banner: null })).toThrow(/not a period/);
