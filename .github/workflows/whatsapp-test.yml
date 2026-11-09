@@ -1,8 +1,14 @@
 name: WhatsApp test
 
 # Queues a test text + image to Kevin's number (never Thierry); the service sends them once the device is linked.
+# With `signal_alerts` (e.g. "101160.KQ:none/noise>BUY/weak CCLD:BUY/weak>BUY/strong"): test Signal Change alerts instead.
 on:
   workflow_dispatch:
+    inputs:
+      signal_alerts:
+        description: "Signal alert test cases (SYMBOL:FROM/STRENGTH>TO/STRENGTH, space separated); empty = the plain test message"
+        required: false
+        default: ""
 
 jobs:
   queue:
@@ -24,4 +30,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm wa:test
+      - if: inputs.signal_alerts == ''
+        run: pnpm wa:test
+      - if: inputs.signal_alerts != ''
+        env:
+          SIGNAL_ALERTS: ${{ inputs.signal_alerts }}
+        # Unquoted on purpose: one argument per case; an env var is never parsed as shell syntax (`>`).
+        run: pnpm wa:signal-test $SIGNAL_ALERTS

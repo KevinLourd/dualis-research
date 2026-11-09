@@ -9,7 +9,7 @@ import { completeWithSubscription } from "@/llm/complete";
  * Collector dimensions that must react faster than the daily GitHub cron, run inside this service with the same
  * context as `pnpm collect` (Kevin's Claude subscription, never the paid API key).
  * - content-replies: Thierry's answers to a draft, a few seconds after his message (voice: after its transcript).
- * - content-dispatch: drafts at their slot + thesis alerts, on the idle tick.
+ * - content-dispatch: drafts at their slot, on the idle tick (Signal Change alerts: `signal-alerts`, in the collect).
  */
 export const ON_INBOUND: Dimension = contentReplies;
 export const ON_IDLE_TICK: Dimension = contentDispatch;

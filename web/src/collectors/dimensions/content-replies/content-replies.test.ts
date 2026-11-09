@@ -97,25 +97,11 @@ describe("content-dispatch", () => {
     expect(out[0].scheduledAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("a Signal Change is the alert (one engine); the first pass and one older than a day are the baseline, no message", async () => {
+  it("sends no Signal Change alert (that is signal-alerts, with its picture)", async () => {
     await link("linked");
-    const base = { fromSignal: "none" as const, fromStrength: "noise" as const, evidenceIds: [] };
-    // First pass: what already exists is the baseline (no burst when the engine switches).
-    await db.insert(signalChanges).values({ id: crypto.randomUUID(), symbol: "NVRI", toSignal: "SELL", toStrength: "strong", at: new Date(), updateNote: "existing", ...base });
+    await db.insert(signalChanges).values({ id: crypto.randomUUID(), symbol: "PAL", fromSignal: "none", fromStrength: "noise", toSignal: "SELL", toStrength: "strong", at: new Date(), updateNote: "Orders slowed.", evidenceIds: [] });
     await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
-    expect((await db.select().from(whatsappOutbox)).filter((o) => o.text?.includes("was no signal"))).toHaveLength(0);
-    await db.insert(signalChanges).values([
-      { id: crypto.randomUUID(), symbol: "MNRO", toSignal: "BUY", toStrength: "weak", at: new Date(Date.now() - 3 * 86400_000), updateNote: "old", ...base },
-      { id: crypto.randomUUID(), symbol: "PAL", toSignal: "SELL", toStrength: "strong", at: new Date(), updateNote: "Orders slowed.", ...base },
-    ]);
-    await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
-    const alerts = (await db.select().from(whatsappOutbox)).filter((o) => o.text?.includes("was no signal"));
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0].recipient).toBe(THIERRY);
-    expect(alerts[0].text).toContain("*PAL*: SELL (strong crack), was no signal.");
-    expect(alerts[0].text).toContain("Orders slowed.");
-    expect(alerts[0].text).toContain("/tickers/PAL");
-    expect((await db.select().from(content.contentMessages)).map((m) => m.purpose).sort()).toEqual(["alert", "baseline", "baseline", "draft"]);
+    expect((await db.select().from(whatsappOutbox)).filter((o) => o.text?.includes("*PAL*"))).toHaveLength(0);
   });
 });
 

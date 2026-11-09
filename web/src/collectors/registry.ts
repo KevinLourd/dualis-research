@@ -23,6 +23,7 @@ import { marketReactionDim } from "./dimensions/market-reaction";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { narrativeSinceDim } from "./dimensions/narrative-since";
 import { signalsDim } from "./dimensions/signals";
+import { signalAlertsDim } from "./dimensions/signal-alerts";
 import { growthBriefDim } from "./dimensions/growth-brief";
 import { growthOutreach } from "./dimensions/growth-outreach";
 import { substackNetwork } from "./dimensions/substack-network";
@@ -48,8 +49,9 @@ import type { Dimension } from "./types";
  * Intraday price (5-minute bars, Yahoo) alone in its stage right after price (Yahoo rate limit): it moves gold.quotes to the latest 5-minute price, so EV, valuation, every judge and the live test read the real price, and market reaction the price at the minute a news item lands.
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
+ * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -76,6 +78,7 @@ export const STAGES: readonly (readonly string[])[] = [
   ["evidence"],
   ["narrative-state"],
   ["signals"],
+  ["signal-alerts"],
   ...GROWTH_DIMENSIONS.map((d) => [d]),
 ];
 
