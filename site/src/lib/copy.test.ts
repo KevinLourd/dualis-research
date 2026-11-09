@@ -27,6 +27,15 @@ describe("site copy and colours", () => {
     expect(files.filter((f) => /"[^"\n]*, never [^"\n]*"|>[^<\n]*, never [^<\n]*</.test(strip(f.text))).map((f) => f.path)).toEqual([]);
   });
 
+  // Thierry 2026-11-06: "Every position starts as a published report. I don't know if that's going to be true. Some
+  // positions I just have are notes... Some positions come from a friend." No line ties a position to a report.
+  it.each(["Every position starts as a published report", "buys what he writes up", "traces back to a report", "behind each position"])(
+    "never ties a position to a report: %s",
+    (line) => {
+      expect(files.filter((f) => f.text.includes(line)).map((f) => f.path)).toEqual([]);
+    },
+  );
+
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.
   it.each(["#eceaf5", "#f5f4f9", "#b9b2ea", "#8c82d8", "#e3e1ec"])("never paints the light purple %s", (hex) => {
     expect(files.filter((f) => f.text.toLowerCase().includes(hex)).map((f) => f.path)).toEqual([]);
