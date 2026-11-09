@@ -70,20 +70,17 @@ export const GROWTH_PAGE_URL = "https://dualis-console.dualis-research.workers.d
 
 /** The WhatsApp caption under the chart. Short lines, figures first. */
 export function briefText(b: GrowthBrief): string {
-  const plannedToday = b.current - b.vsPlan;
-  const line = b.vsPlan > 0 ? `${fmt(b.vsPlan)} ahead of the ${fmt(plannedToday)} planned for today` : `Planned for today: ${fmt(plannedToday)}`;
-  const counted = b.countedOn && b.countedOn !== b.date ? ` (counted ${dayLabel(b.countedOn)})` : "";
+  // Kevin's own layout, 2026-11-09: the brand + day as title, the win first, then what each day needs from now on.
+  const since = b.countedOn ?? b.date;
+  const days = Math.max(1, Math.round((Date.parse(`${since}T00:00:00Z`) - Date.parse(`${GOAL.startDate}T00:00:00Z`)) / 86_400_000));
+  const perDay = Math.round(b.gained / days);
   return [
-    `*Analysis Paralysis, ${dayLabel(b.date)}*`,
-    `${fmt(b.current)} subscribers${counted}, ${b.gained >= 0 ? "+" : ""}${fmt(b.gained)} since ${dayLabel(GOAL.startDate)}`,
-    `Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: ${fmt(b.remaining)} to go, ${fmt(b.perDayNeeded)} a day needed`,
-    `${line}, ${b.daysLeft} days left`,
-    // A quiet day says nothing (Thierry reads this too: an empty « 0 contacted » reads as blame).
-    b.yesterday.contacted + b.yesterday.recommended > 0
-      ? `Yesterday: ${b.yesterday.contacted} ${b.yesterday.contacted === 1 ? "writer" : "writers"} contacted, ${b.yesterday.recommended} new ${b.yesterday.recommended === 1 ? "recommendation" : "recommendations"}`
-      : null,
-    GROWTH_PAGE_URL,
-  ]
-    .filter((l) => l !== null)
-    .join("\n");
+    `*Dualis Research - ${dayLabel(b.date)}*`,
+    "",
+    `🎉Celebration: ${fmt(b.current)} subscribers, ${perDay >= 0 ? "+" : ""}${fmt(perDay)}/day since ${dayLabel(GOAL.startDate)}`,
+    "",
+    `💪Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: +${fmt(b.perDayNeeded)}/day from now on`,
+    "",
+    `Details: ${GROWTH_PAGE_URL}`,
+  ].join("\n");
 }

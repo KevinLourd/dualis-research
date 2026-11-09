@@ -71,4 +71,14 @@ html, body { background: var(--surface); }
 .legend .sw.muted { border-top-color: var(--muted); }
 .legend .sw.long { border-top-color: var(--long); }
 .legend .sw.short { border-top-color: var(--short); }
+.legend .sw.series-1 { border-top-color: var(--chart-series-1); }
+.legend .sw.series-2 { border-top-color: var(--chart-series-2); }
+.legend .sw.series-3 { border-top-color: var(--chart-series-3); }
+.legend .sw.series-4 { border-top-color: var(--chart-series-4); }
+.legend .sw.series-5 { border-top-color: var(--chart-series-5); }
+.legend .sw.series-6 { border-top-color: var(--chart-series-6); }
+.legend .sw.series-7 { border-top-color: var(--chart-series-7); }
+.legend .sw.series-8 { border-top-color: var(--chart-series-8); }
+.legend .sw.series-9 { border-top-color: var(--chart-series-9); }
+.legend .sw.series-10 { border-top-color: var(--chart-series-10); }
 .legend .sw.dashed { border-top-style: dashed; }

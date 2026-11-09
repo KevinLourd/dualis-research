@@ -87,7 +87,7 @@ Subtitle: [One line: the trade and the main number, e.g. "Long EXMP. Base value 
 
 Prices as of [YYYY-MM-DD] close. Estimates are Dualis Research's own, built from company filings and [other sources]. Valuation uses [method, e.g. EV/EBITDA on 2028 estimates] across bear, base and bull scenarios.
 
-[BUTTON: Subscribe, caption "Every idea, weighed from both sides."]
+[BUTTON: Subscribe, caption "Independent research for buy-side opportunities."]
 
 ---
 

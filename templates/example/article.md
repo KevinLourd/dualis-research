@@ -90,7 +90,7 @@ The gap between bear and bull is mostly margin: 11.2% against 17.1%. Our base ca
 
 Prices as of 2026-11-04 close. EXAMPLE: the company, ticker and every figure in this note are invented to show the Dualis format. Valuation uses EV/EBITDA on 2028 estimates across bear, base and bull scenarios.
 
-[BUTTON: Subscribe, caption "Every idea, weighed from both sides."]
+[BUTTON: Subscribe, caption "Independent research for buy-side opportunities."]
 
 ---
 

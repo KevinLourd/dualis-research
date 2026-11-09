@@ -38,7 +38,7 @@ Every image ends with the Dualis footer (mark, name, ticker, date). Long green a
 ```json
 {
   "outDir": "images",
-  "logo": "split-disc",
+  "logo": "dualis-mark",
   "article": { "company": "", "thesis": "", "ticker": "", "exchange": "", "price": "", "marketCap": "",
                "position": "LONG", "target": "", "upside": "+37%", "horizon": "18 months", "date": "YYYY-MM-DD", "example": false },
   "images": [
@@ -56,8 +56,8 @@ Every image ends with the Dualis footer (mark, name, ticker, date). Long green a
 
 - `signed: true` colours `+` values green and `-` values red (upside rows).
 - `emphasis: true` makes a row bold (value per share).
-- Chart colours: `brand` (default), `muted`, `long`, `short`. A gap in a series is `null`.
-- `logo` is one of `split-disc`, `mirrored-d`, `crossed-ticks` (from `design/assets/Logos/`) until Thierry picks one.
+- Chart colours: `brand` (default), `muted`, `long`, `short`, and `series-1` to `series-10` (the design system palette) for a chart with many series. A gap in a series is `null`.
+- `logo` is a file of `design/assets/Logos/` without `.svg`: `dualis-mark` (default, Solomon's knot) or `dualis-seal`.
 - Em and en dashes in the spec are replaced by commas.
 
 Rendering needs Google Chrome in `/Applications` (or `CHROME_PATH`) and internet for the Google Fonts. If Chrome fails, the script falls back to macOS `qlmanage`.
