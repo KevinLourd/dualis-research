@@ -86,7 +86,7 @@ describe("content-dispatch", () => {
   it("queues each draft once at its slot, skips slots too far ahead or long missed", async () => {
     await link("linked");
     await addDraft(db, 120); // too far ahead: next run
-    await addDraft(db, -300); // missed by 5 hours: skipped
+    await addDraft(db, -800); // missed by 13 hours: skipped
     await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
     await runDimension(db, contentDispatch, { trigger: "test", ctx: ctx(fakeComplete("other")) });
     const out = await db.select().from(whatsappOutbox);
