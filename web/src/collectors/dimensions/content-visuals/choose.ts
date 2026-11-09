@@ -76,8 +76,6 @@ export type Callout = {
   chartLabel: string;
   /** What the price's narrative said, the claim this point contradicts (Kevin 2026-11-09: « VS price narrative said XXX »). */
   priceSays: string;
-  /** The reason behind the price this point breaks, in plain words (never the driver's title); null only when the Idea cites no driver. */
-  driver: string | null;
   /** The news fact that matters, rewritten in plain words (never the headline copied); null without news. */
   newsLine: string | null;
   /** Index in `input.news` of the most prestigious source, with its web domain (for its logo); null without news. */
@@ -95,10 +93,9 @@ export const CALLOUT_SYSTEM = [
   "3. chartLabel (small, under the title): what the bars or line measure, in plain words, e.g. Profit left for shareholders, per quarter.",
   "4. note (on the arrow, on the point of the chart): the proof in the numbers.",
   "5. priceSays: what the share price still assumes, the belief this proves wrong.",
-  "6. driver: the reason behind the price that just broke, said as a cause in plain words.",
   "The lines tell ONE story: each says something the others do not, none repeats another, and a number appears on one line only. NEVER copy a headline, a driver title or a narrative sentence: say what is interesting in it, in your own short words a retail investor gets at once (no accounting jargon like EPS, net income, common shareholders, preferred dividends or income available to common: say profit, profit per share, shareholders, payments to other investors).",
   "Answer with JSON only, no prose, no code fence:",
-  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, starts with Look:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "driverIndex": <index of the driver below this breaks, or null when none is listed>, "driver": "<3 to 8 words, or null when none is listed>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
+  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, starts with Look:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
   "No em or en dash, no emoji. Use only numbers you can read below.",
 ].join("\n");
 
@@ -136,7 +133,7 @@ export function calloutPrompt(input: VisualInput, choice: ChartChoice, points: C
 }
 
 /** Reads the callout answer; throws with the reason when it is not the JSON asked for. */
-export function parseCallout(text: string, points: CalloutPoint[], newsCount: number, drivers: string[]): Callout {
+export function parseCallout(text: string, points: CalloutPoint[], newsCount: number): Callout {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end <= start) throw new Error("callout answer holds no JSON object");
@@ -153,13 +150,8 @@ export function parseCallout(text: string, points: CalloutPoint[], newsCount: nu
     if (!n || typeof n.index !== "number" || n.index < 0 || n.index >= newsCount) throw new Error("callout answer has no valid news index");
     news = { index: n.index, domain: str(n.domain, "news domain").replace(/^https?:\/\//, "").replace(/\/.*$/, "") };
   }
-  let driver: string | null = null;
-  if (drivers.length > 0) {
-    if (typeof o.driverIndex !== "number" || !drivers[o.driverIndex]) throw new Error("callout answer has no valid driverIndex");
-    driver = str(o.driver, "driver");
-  }
   const newsLine = newsCount > 0 ? str(o.newsLine, "newsLine") : null;
-  return { point, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), driver, newsLine, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), news };
+  return { point, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), news };
 }
 
 /** One call per chart drawn (the render is made once per visuals version; the answer is kept in its bronze request). */
@@ -167,5 +159,5 @@ export async function writeCallout(input: VisualInput, choice: ChartChoice, comp
   if (!complete) throw new Error("no LLM in the collector context: the chart's arrow and note are written by Claude");
   const points = calloutPoints(input, choice);
   const { text } = await complete({ system: CALLOUT_SYSTEM, prompt: calloutPrompt(input, choice, points) });
-  return parseCallout(text, points, input.news.length, input.drivers.map((d) => d.title));
+  return parseCallout(text, points, input.news.length);
 }

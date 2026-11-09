@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
-import { evidence, exhibits, type ExhibitPoint, type ExhibitSeries, fairValues, narrativeDrivers, narratives, type ThesisSide } from "@/db/schema/analysis";
+import { evidence, exhibits, type ExhibitPoint, type ExhibitSeries, fairValues, narrativeDrivers, narratives, signals, type ThesisSide } from "@/db/schema/analysis";
 import * as content from "@/db/schema/content";
 import { companyProfiles, priceBars } from "@/db/schema/gold";
 import type { Db } from "@/db/types";
@@ -21,6 +21,8 @@ export type VisualInput = {
   /** The drivers the Idea rests on, each with its thesis side, and the narrative of each side: what the price says. */
   drivers: { title: string; summary: string | null; side: ThesisSide }[];
   narratives: { side: ThesisSide; text: string }[];
+  /** The ticker's current Signal (gold.signals): the price card's arrow says it. */
+  signal: "BUY" | "SELL" | null;
   /** How the Idea is told: the chart judge reads it with the title. */
   angle: string;
   /** Exhibits of the Narrative Drivers the Idea cites (directly, or through the Evidence it cites), numbers from gold. */
@@ -70,6 +72,7 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
         db.select().from(exhibits).where(inArray(exhibits.driverId, driverIds)).orderBy(asc(exhibits.number)),
       ])
     : [[], []];
+  const [sig] = await db.select({ signal: signals.signal }).from(signals).where(eq(signals.symbol, symbol));
   const storyRows = await db.select({ side: narratives.side, text: narratives.text }).from(narratives).where(eq(narratives.symbol, symbol));
   const newsUrl = evidenceIds.map((id) => items.find((e) => e.id === id)?.url).find((u): u is string => !!u) ?? null;
   return {
@@ -86,6 +89,7 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
       .map((e) => ({ headline: e.headline, publisher: e.publisher, url: e.url, at: e.at, why: e.why, citedSentence: e.citedSentence })),
     drivers: drivers.map((d) => ({ title: d.title, summary: d.summary, side: d.side })),
     narratives: storyRows.map((n) => ({ side: n.side, text: n.text })),
+    signal: sig && sig.signal !== "none" ? sig.signal : null,
     angle: idea.angle,
     exhibits: driverExhibits
       .filter((e) => e.points.some((p) => Object.values(p.values).some((v) => v !== null)))
