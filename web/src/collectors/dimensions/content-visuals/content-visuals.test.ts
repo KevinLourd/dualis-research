@@ -236,6 +236,12 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "short", banner: null });
     expect(price).toContain("Sold off");
     expect(price.toLowerCase()).toContain(COLOR.short.dark.toLowerCase());
+    // The price chart has the driver charts' layout: the Signal and the way to the range top right, the BREAKING card.
+    for (const t of ["BUY signal", "% opportunity", "32% under fair value"]) expect(price).toContain(t);
+    const priceNews = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "long", banner });
+    for (const t of ["BREAKING", "REUTERS", "CareCloud signs a new", "CareCloud: Hospitals that pay us", "BUY signal"]) expect(priceNews).toContain(t);
+    expect(priceNews).not.toContain("32% under fair value");
+    if (process.env.RENDER_SAMPLE) (await import("node:fs")).writeFileSync(process.env.RENDER_SAMPLE, priceNews);
     expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", ...say, title: "y", tone: "long", banner: null })).toThrow(/not a period/);
   });
 

@@ -5,6 +5,7 @@ import { updateDraftStatus } from "@/content/actions";
 import { CopyButton } from "@/console/content-ui";
 import { relativeTime, utc } from "@/console/format";
 import { SlideOver } from "@/console/slide-over";
+import { VisualZoom } from "@/console/visual-zoom";
 import { Fact, FactList, Missing } from "@/console/ui";
 import type { GoldContentDraft, GoldContentVisual } from "@/db/schema/content";
 
@@ -152,7 +153,7 @@ function StatusForm({ id, status, label, variant }: { id: string; status: string
 
 const VISUAL_WORD: Record<string, string> = { montage: "Post card", video: "Video", chart: "Chart", capture: "News capture" };
 
-/** The Idea's visuals, ready to attach to the post: each one shown, with its download. A failed one says why. */
+/** The Idea's visuals, ready to attach to the post: a click enlarges one, with its Download. A failed one says why. */
 function Visuals({ visuals, name }: { visuals: GoldContentVisual[]; name: string }) {
   return (
     <section className="flex flex-col gap-3">
@@ -168,24 +169,20 @@ function Visuals({ visuals, name }: { visuals: GoldContentVisual[]; name: string
                 <span className="text-sm font-medium text-kumo-default">{VISUAL_WORD[v.kind] ?? v.kind}</span>
                 {v.status === "ok" ? (
                   <>
-                    {v.mime === "video/mp4" ? (
-                      <video src={src} controls muted loop playsInline preload="metadata" className="aspect-video w-full rounded-md bg-black ring-1 ring-kumo-hairline" />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element -- a private file streamed by our own route, never optimised
-                      <img src={src} alt={`${VISUAL_WORD[v.kind]} for ${name}`} loading="lazy" className="aspect-video w-full rounded-md object-cover ring-1 ring-kumo-hairline" />
-                    )}
-                    <span className="flex items-center justify-between gap-2 text-xs text-kumo-subtle">
-                      {v.sourceUrl ? (
-                        <a href={v.sourceUrl} target="_blank" rel="noreferrer" className="truncate hover:underline">
-                          {v.caption}
-                        </a>
-                      ) : (
-                        <span className="truncate">{v.caption}</span>
-                      )}
-                      <a href={`${src}?download=1&name=${encodeURIComponent(name)}`} className="shrink-0 font-medium text-kumo-link hover:underline">
-                        Download
+                    <VisualZoom
+                      src={src}
+                      video={v.mime === "video/mp4"}
+                      title={`${VISUAL_WORD[v.kind] ?? v.kind}: ${name}`}
+                      alt={`${VISUAL_WORD[v.kind]} for ${name}`}
+                      downloadHref={`${src}?download=1&name=${encodeURIComponent(name)}`}
+                    />
+                    {v.sourceUrl ? (
+                      <a href={v.sourceUrl} target="_blank" rel="noreferrer" className="truncate text-xs text-kumo-subtle hover:underline">
+                        {v.caption}
                       </a>
-                    </span>
+                    ) : (
+                      <span className="truncate text-xs text-kumo-subtle">{v.caption}</span>
+                    )}
                   </>
                 ) : (
                   <span className="text-sm text-kumo-subtle">Not made: {v.error}</span>

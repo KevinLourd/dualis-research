@@ -82,6 +82,10 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
       ],
       symbol: "none",
       lineStyle: { color: onCard ? LAVENDER : NOTE.muted, width: 2, type: "dashed", opacity: frame.reveal },
+      // The Note chart shades the fair value range, low to high (Kevin 2026-11-09), like the console and the site.
+      ...(!onCard && f.low != null && f.high != null && f.high > f.low
+        ? { markArea: { silent: true, itemStyle: { color: "rgba(255,255,255,0.08)" }, label: { show: false }, data: [[{ yAxis: f.low }, { yAxis: f.high }]] } }
+        : {}),
       endLabel: {
         show: true,
         formatter: `Fair value ${fmt(f.value)}`,
@@ -97,7 +101,8 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
 }
 
 function yRange(input: VisualInput) {
-  const values = [...input.bars.map((b) => b.close), ...(input.fair ? [input.fair.value] : [])];
+  const f = input.fair;
+  const values = [...input.bars.map((b) => b.close), ...(f ? [f.value, f.low ?? f.value, f.high ?? f.value] : [])];
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const pad = (hi - lo) * 0.12 || hi * 0.1;
@@ -274,24 +279,33 @@ function withMark(svg: string, x: number, y: number, size: number): string {
   return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${MARK}" x="${x}" y="${y}" width="${size}" height="${size}"/></svg>`);
 }
 
-/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow and news strip. */
+/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow, news card and signal stamp. */
 export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation | null = null): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const last = input.bars[input.bars.length - 1];
-  const off = a?.banner ? BANNER_H : 0;
+  const company = input.companyName ?? input.symbol;
   const subtitle = input.fair ? `Last 12 months · ${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}` : "Last 12 months";
-  const grid = { left: 96, right: 200, top: 160 + off, bottom: 92 };
+  // Same layout as the driver charts (Kevin 2026-11-09): the big BREAKING card top left, the Signal and the way to the fair
+  // value range top right, the chart label small above the chart, the mark bottom right.
+  const news = !!a?.banner;
+  const stamp = !!a && !!input.fair;
+  const top = 28;
+  const newsBox = { x: 40, y: top, w: stamp ? W - 40 - STAMP_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
+  const labelTop = newsBox.y + newsBox.h + 26;
+  const head = a ? heading(a, company) : null;
+  const titleW = stamp ? W - 56 - STAMP_W - 40 - 40 : W - 112 - 96;
+  const grid = { left: 96, right: 200, top: news ? labelTop + 28 + 44 : stamp ? top + STAMP_H + 40 : 160, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: a ? heading(a, input.companyName ?? input.symbol).title : `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44 + off, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
+      { text: news ? "" : head ? head.title : `${company} share price vs fair value`, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: stamp ? "break" : "truncate" } },
       {
-        text: a ? [heading(a, input.companyName ?? input.symbol).sub, subtitle].filter(Boolean).join(" · ") : subtitle,
+        text: news && head ? `${head.title} · ${subtitle}` : head ? [head.sub, subtitle].filter(Boolean).join(" · ") : subtitle,
         left: 56,
-        top: 94 + off,
-        textStyle: { color: NOTE.muted, fontSize: 22, fontWeight: 400, fontFamily: FONT },
+        top: news ? labelTop : stamp ? grid.top - 44 : 94,
+        textStyle: { color: NOTE.muted, fontSize: news ? 21 : 22, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : titleW, overflow: "truncate" },
       },
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
@@ -303,11 +317,40 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     const bar = input.bars.find((b) => b.date === a.point);
     if (!bar) throw new Error(`annotation point ${a.point} is not a close of the chart`);
     const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [ts(bar.date), bar.close]) as number[];
-    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom })] });
+    chart.setOption({
+      graphic: [
+        ...(a.banner ? bannerGraphics(a.banner, newsBox) : []),
+        ...(stamp ? signalStampGraphics(input, W - 40 - STAMP_W, top) : []),
+        ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }),
+      ],
+    });
   }
   const svg = chart.renderToSVGString();
   chart.dispose();
-  return off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
+  return stamp ? withMark(svg, W - 56 - 40, H - 62, 40) : withMark(svg, W - 56 - 72, 40, 72);
+}
+
+const STAMP_W = 300;
+const STAMP_H = 200;
+
+/**
+ * The Signal and the way to the fair value range on the price chart (Kevin 2026-11-09, his pick: the words only, the
+ * pasted price card would draw this same chart a second time): « SELL signal » on its colour, « 15-40% downside » under it.
+ */
+function signalStampGraphics(input: VisualInput, x: number, y: number) {
+  const fair = input.fair;
+  if (!fair) throw new Error("a signal stamp needs a fair value");
+  const last = input.bars[input.bars.length - 1];
+  const up = last.close < fair.value;
+  const colour = up ? COLOR.long.dark : COLOR.short.dark;
+  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value);
+  const pillH = 96;
+  return [
+    { type: "rect", shape: { x: x + 5, y: y + 6, width: STAMP_W, height: pillH, r: 10 }, style: { fill: "rgba(0,0,0,0.45)" }, z: 10 },
+    { type: "rect", shape: { x, y, width: STAMP_W, height: pillH, r: 10 }, style: { fill: colour }, z: 11 },
+    { type: "text", style: { text: label, x: x + STAMP_W / 2, y: y + pillH / 2, fill: "#fff", fontSize: input.signal ? 40 : 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 12 },
+    { type: "text", style: { text: opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up), x: x + STAMP_W / 2, y: y + pillH + 46, fill: colour, fontSize: 32, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 12 },
+  ];
 }
 
 /**
