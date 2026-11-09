@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { alertMessage } from "./messages";
-import { evidenceStrength, gapOf, positionReturn, signalHeadline, stateWord, tagWord } from "./signal-words";
+import { signalAlert } from "./messages";
+import { gapOf, positionReturn, signalWords, tagWord } from "./signal-words";
 
 describe("signal words (Thierry's terms)", () => {
-  it("a cracking story reads inflecting on a long, cracking on a short or a watched name", () => {
-    expect(stateWord("cracking", "long")).toBe("Inflecting");
-    expect(stateWord("cracking", "short")).toBe("Cracking");
-    expect(stateWord("cracking", "watch")).toBe("Cracking");
-    expect(stateWord("holds", "long")).toBe("Holds");
-    expect(signalHeadline("PAL", "holds", "short")).toBe("*PAL*: the narrative holds again.");
+  it("a BUY is an inflection, a SELL a crack", () => {
+    expect(signalWords("BUY", "strong")).toBe("BUY (strong inflection)");
+    expect(signalWords("SELL", "weak")).toBe("SELL (weak crack)");
+    expect(signalWords("none", "noise")).toBe("no signal");
   });
 
   it("the gap is price vs HIS fair value, above or below, and nothing without his number", () => {
@@ -18,23 +16,13 @@ describe("signal words (Thierry's terms)", () => {
     expect(gapOf(null, 24)).toBeNull();
   });
 
-  it("the WhatsApp signal says the turn, why, the evidence and links the why page", () => {
-    const text = alertMessage({ id: "x", symbol: "4238.T", fromState: "holds", toState: "cracking", reason: "Orders turn.", citedEvidence: "Orders rose 12%." }, "long");
-    expect(text.split("\n")).toEqual([
-      "*4238.T*: the narrative is inflecting.",
-      "Orders turn.",
-      "Evidence: Orders rose 12%.",
-      expect.stringMatching(/^Why: https:\/\/.+\/tickers\/4238\.T$/),
-    ]);
+  it("the WhatsApp signal is the Signal Change: the new signal, its Update Note, the why page", () => {
+    const text = signalAlert({ symbol: "4238.T", fromSignal: "none", fromStrength: "noise", toSignal: "BUY", toStrength: "strong", updateNote: "Orders turn up." }, "Miraial");
+    expect(text.split("\n")).toEqual(["*4238.T* (Miraial): BUY (strong inflection), was no signal.", "Orders turn up.", expect.stringMatching(/^Why: https:\/\/.+\/tickers\/4238\.T$/)]);
   });
 });
 
-describe("evidence strength, position return", () => {
-  it("a contradicting news is Strong from 0.7, Weak below; a continuing one is Noise", () => {
-    expect(evidenceStrength("contradicts", 0.8)).toBe("strong");
-    expect(evidenceStrength("contradicts", 0.5)).toBe("weak");
-    expect(evidenceStrength("continues", 0.9)).toBe("noise");
-  });
+describe("position return", () => {
 
   it("a short's return flips sign; no entry price, no return", () => {
     expect(positionReturn(100, 120, "long")).toBeCloseTo(0.2);

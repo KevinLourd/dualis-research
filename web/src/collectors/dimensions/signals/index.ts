@@ -86,9 +86,8 @@ const sameState = (a: { signal: string; strength: string }, b: { signal: string;
 /** Bump when the Update Note prompt changes: every past note is written again once (Kevin 2026-11-06: one sentence). */
 export const NOTE_VERSION = "note@v2";
 
-/** "BUY (weak inflection)": a BUY is a bad story inflecting, a SELL a loved one cracking. */
-export const signalWords = (signal: string, strength: string) =>
-  signal === "none" ? "no signal" : `${signal} (${strength} ${signal === "BUY" ? "inflection" : "crack"})`;
+export { signalWords } from "@/content/signal-words";
+import { signalWords } from "@/content/signal-words";
 
 export const NOTE_SYSTEM = "You write one-line signal notes for a small-cap long/short analyst. Plain English, subject verb complement, one sentence, at most 20 words. No em dash.";
 

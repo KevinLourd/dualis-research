@@ -1,11 +1,11 @@
 import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { thesisTransitions } from "@/db/schema/catalysts";
-import { tickers } from "@/db/schema/gold";
+import { signalChanges } from "@/db/schema/analysis";
+import { companyProfiles } from "@/db/schema/gold";
 import * as content from "@/db/schema/content";
 import { whatsappLink } from "@/db/schema/whatsapp";
 import type { Db } from "@/db/types";
-import { alertMessage, clientPhone, draftMessage, postLoopPhone } from "@/content/messages";
+import { clientPhone, draftMessage, postLoopPhone, signalAlert } from "@/content/messages";
 import { postImage } from "@/content/post-image";
 import { enqueue } from "@/whatsapp/outbox";
 import type { Dimension, PromoteResult, Source } from "../../types";
@@ -19,7 +19,7 @@ const AHEAD_MIN = 35;
  * the day's 2 posts still go out when the device is linked again the same day.
  */
 const LATE_MIN = 12 * 60;
-/** First run: transitions older than this are the baseline, recorded as known without a message. */
+/** A Signal Change older than this and never sent is the baseline (recorded as known, no message): no burst of old news. */
 const BASELINE_HOURS = 24;
 /** A draft waits this long for its card (content-visuals runs right after the writer), then goes without an image. */
 const IMAGE_WAIT_MIN = 60;
@@ -41,7 +41,7 @@ export const dispatchPlan: Source = {
 
 export const contentDispatch: Dimension = {
   name: DISPATCH_DIMENSION,
-  description: "WhatsApp: each draft at its slot with its card (Kevin while we test), and every change of confidence in a thesis (Thierry).",
+  description: "WhatsApp: each draft at its slot with its card (Kevin while we test), and every Signal Change with its Update Note (Thierry).",
   sources: [dispatchPlan],
   subjects: planDispatch,
   promote: promoteDispatch,
@@ -92,13 +92,15 @@ export async function planDispatch(db: Db): Promise<string[]> {
     out.push(key);
   }
 
-  const firstRun = !sent.some((s) => s.purpose === "alert" || s.purpose === "baseline");
-  const transitions = await db.select().from(thesisTransitions);
-  const positionOf = new Map((await db.select({ symbol: tickers.symbol, position: tickers.position }).from(tickers)).map((r) => [r.symbol, r.position]));
-  for (const t of transitions.filter((t) => !knownTransitions.has(t.id)).sort((a, b) => a.at.getTime() - b.at.getTime())) {
-    const key = `transition:${t.id}`;
-    const old = firstRun && t.at.getTime() < now - BASELINE_HOURS * 3600_000;
-    planned.set(key, { purpose: old ? "baseline" : "alert", recipient, text: alertMessage(t, positionOf.get(t.symbol) ?? null), scheduledAt: new Date(now).toISOString(), draftId: null, transitionId: t.id });
+  // One engine (Kevin 2026-11-09): the alert is the Signal Change (gold.signal_changes, with its Update Note).
+  const changes = await db.select().from(signalChanges);
+  const nameOf = new Map((await db.select({ symbol: companyProfiles.symbol, name: companyProfiles.name }).from(companyProfiles)).map((r) => [r.symbol, r.name]));
+  // First pass over Signal Changes (none recorded yet): every existing one is the baseline, never a burst to Thierry.
+  const firstPass = !changes.some((c) => knownTransitions.has(c.id));
+  for (const c of changes.filter((c) => !knownTransitions.has(c.id)).sort((a, b) => a.at.getTime() - b.at.getTime())) {
+    const key = `signal:${c.id}`;
+    const old = firstPass || c.at.getTime() < now - BASELINE_HOURS * 3600_000;
+    planned.set(key, { purpose: old ? "baseline" : "alert", recipient, text: signalAlert(c, nameOf.get(c.symbol) ?? null), scheduledAt: new Date(now).toISOString(), draftId: null, transitionId: c.id });
     out.push(key);
   }
   return out;

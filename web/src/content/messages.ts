@@ -1,7 +1,7 @@
 import { FORMAT_LABEL, publishLink } from "@/collectors/dimensions/content-drafts/format";
 import type { GoldContentDraft } from "@/db/schema/content";
 import { allowlist } from "@/whatsapp/allowlist";
-import { signalHeadline } from "./signal-words";
+import { signalWords } from "./signal-words";
 
 /** Pure WhatsApp texts the content dimensions send Thierry (the service adds the "Dualis Research" line on top). */
 
@@ -52,16 +52,12 @@ export function publishMessage(d: GoldContentDraft): string {
   return `Approved. ${link?.label ?? "Publish"} in one tap: ${link?.href ?? `${CONSOLE_URL}/content`}${image}`;
 }
 
-/** A signal: the narrative on a ticker cracked (or turned on a long), why, the sentence that weighed most, the why page. */
-export function alertMessage(
-  t: { symbol: string; fromState: string; toState: string; reason: string | null; citedEvidence: string | null; id: string },
-  position: string | null,
-): string {
+/** A Signal Change: the new signal, its one-line Update Note, the page that shows why. */
+export function signalAlert(c: { symbol: string; fromSignal: string; fromStrength: string; toSignal: string; toStrength: string; updateNote: string | null }, name: string | null): string {
   return [
-    signalHeadline(t.symbol, t.toState, position),
-    t.reason ?? "",
-    t.citedEvidence ? `Evidence: ${t.citedEvidence}` : "",
-    `Why: ${CONSOLE_URL}/tickers/${encodeURIComponent(t.symbol)}`,
+    `*${c.symbol}*${name ? ` (${name})` : ""}: ${signalWords(c.toSignal, c.toStrength)}, was ${signalWords(c.fromSignal, c.fromStrength)}.`,
+    c.updateNote ?? "",
+    `Why: ${CONSOLE_URL}/tickers/${encodeURIComponent(c.symbol)}`,
   ]
     .filter(Boolean)
     .join("\n");

@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { signalChanges } from "@/db/schema/analysis";
 import * as content from "@/db/schema/content";
 import { goldWhatsappConversation, whatsappLink, whatsappOutbox } from "@/db/schema/whatsapp";
 import type { Db } from "@/db/types";
@@ -72,6 +73,8 @@ beforeEach(async () => {
   ({ db, close } = await testDb());
   complete.mockClear();
   await seedAnalysedTicker(db, "CCLD", { name: "CareCloud" });
+  // The seeded Signal Change is two days old: the baseline, no alert in this post-loop test (alerts: content-replies.test).
+  await db.update(signalChanges).set({ at: new Date(Date.now() - 2 * 86400_000) });
   ideaA = await addIdea(1, "CareCloud replaced its lost client.", [{ format: "x-post", score: 90 }, { format: "substack-note", score: 80 }, { format: "substack-article", score: 99 }]);
   ideaB = await addIdea(2, "CareCloud margins turn.", [{ format: "substack-note", score: 70 }, { format: "x-post", score: 40 }]);
   await db.insert(whatsappLink).values({ id: "default", status: "linked" });
