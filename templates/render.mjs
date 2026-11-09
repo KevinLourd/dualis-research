@@ -40,7 +40,7 @@ function tokensCss(theme = "light") {
   return `:root{${lines.join("")}}`;
 }
 
-function logoSvg(name = "split-disc") {
+function logoSvg(name = "dualis-mark") {
   const p = join(ROOT, "design/assets/Logos", `${name}.svg`);
   return readFileSync(p, "utf8").replace(/#2b2463/gi, "currentColor");
 }
@@ -163,7 +163,7 @@ function chartSvg(img) {
   const xl = labels
     .map((s, i) => (i % every === 0 || i === labels.length - 1 ? `<text x="${X(i)}" y="${H - 8}" class="xt"${i === n - 1 ? ' text-anchor="end" dx="8"' : ""}>${esc(s)}</text>` : ""))
     .join("");
-  const colorOf = { brand: "var(--brand)", muted: "var(--muted)", long: "var(--long)", short: "var(--short)", ink: "var(--ink)" };
+  const colorOf = { brand: "var(--brand)", muted: "var(--muted)", long: "var(--long)", short: "var(--short)", ink: "var(--ink)", ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`series-${i + 1}`, `var(--chart-series-${i + 1})`])) };
   const lines = series
     .map((s, si) => {
       const pts = s.values.map((v, i) => (v == null ? null : `${X(i)},${Y(v)}`)).filter(Boolean).join(" ");
