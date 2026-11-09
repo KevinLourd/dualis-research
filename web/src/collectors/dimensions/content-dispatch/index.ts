@@ -73,8 +73,8 @@ export async function planDispatch(db: Db): Promise<string[]> {
       ),
     );
   for (const d of due.filter((d) => !sentDrafts.has(d.id)).sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())) {
-    const image = await postImage(db, d.ideaId);
-    if (image.state === "waiting" && d.createdAt.getTime() > now - IMAGE_WAIT_MIN * 60_000) continue;
+    const image = await postImage(db, d.ideaId, d.format, d.createdAt.getTime() > now - IMAGE_WAIT_MIN * 60_000);
+    if (image.state === "waiting") continue;
     const key = `draft:${d.id}`;
     planned.set(key, {
       purpose: "draft",

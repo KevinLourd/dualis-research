@@ -211,7 +211,7 @@ export async function promoteReplies(db: Db, rows: BronzeFetch[]): Promise<Promo
         const [g2] = await db.select().from(content.goldContentDrafts).where(eq(content.goldContentDrafts.id, row.id));
         if (!g2) throw new Error(`new version ${row.id} missing from gold`);
         // The new version goes out with the same card: the image belongs to the Idea, the text changed.
-        const image = await postImage(db, row.ideaId);
+        const image = await postImage(db, row.ideaId, row.format);
         const media = image.state === "ready" ? { image: image.image, imageMime: image.mime } : {};
         outboxId = (await enqueue(db, { recipient: phone, text: draftMessage(g2, true), ...media, replyToWaId: req.waMessageId, requestedBy: REPLIES_DIMENSION })).id;
         await db.insert(content.contentMessages).values({ outboxId, bronzeId: f.id, purpose: "version", draftId: row.id, recipient: phone, scheduledAt: new Date(), sources: [CLAUDE_SOURCE] });

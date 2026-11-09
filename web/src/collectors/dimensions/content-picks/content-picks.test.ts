@@ -32,9 +32,9 @@ async function addIdea(rank: number, title: string, scores: { format: string; sc
 }
 
 /** A card as content-visuals stores it. */
-const addCard = (ideaId: string, status: "ok" | "failed") =>
+const addCard = (ideaId: string, status: "ok" | "failed", kind: "montage" | "chart" = "montage") =>
   db.insert(content.contentVisuals).values({
-    ideaId, kind: "montage", version: "v-test", status, error: status === "failed" ? "boom" : null, mime: status === "ok" ? "image/png" : null,
+    ideaId, kind, version: "v-test", status, error: status === "failed" ? "boom" : null, mime: status === "ok" ? "image/png" : null,
     file: status === "ok" ? PNG : null, sizeBytes: status === "ok" ? PNG.length : null, sources: ["render"], bronzeIds: [],
   });
 
@@ -107,10 +107,14 @@ describe("the WhatsApp post loop, end to end on Kevin's number", () => {
     expect(await db.select().from(whatsappOutbox)).toHaveLength(0);
 
     await addCard(ideaA, "ok");
-    await addCard(ideaB, "failed");
+    await addCard(ideaB, "ok"); // the Note waits for its chart, never the card
+    await run(contentDispatch);
+    expect(await serviceSends()).toHaveLength(1);
+    await addCard(ideaB, "failed", "chart");
     await run(contentDispatch);
     await run(contentDispatch);
-    const sent = await serviceSends();
+    await serviceSends();
+    const sent = (await db.select().from(whatsappOutbox)).map((q) => ({ ...q, waId: q.waMessageId ?? "" }));
     expect(sent).toHaveLength(2);
     expect(sent.every((s) => s.recipient === KEVIN)).toBe(true);
     const x = sent.find((s) => s.text?.includes("X post"))!;
@@ -118,7 +122,7 @@ describe("the WhatsApp post loop, end to end on Kevin's number", () => {
     expect(Buffer.from(x.image!).equals(PNG)).toBe(true);
     expect(x.text).toContain("Reply go to post it");
     const note = sent.find((s) => s.text?.includes("Substack Note"))!;
-    expect(note.image).toBeNull(); // its card failed: the text goes alone
+    expect(Buffer.from(note.image!).equals(PNG)).toBe(true); // its chart failed: the card stands in
 
     // « change: shorter » on the X draft: version 2 comes back quoting him, with the same card.
     const change = await kevinSays("change: shorter", x.waId);
