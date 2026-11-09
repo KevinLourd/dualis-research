@@ -1,11 +1,9 @@
-import { desc, eq } from "drizzle-orm";
-import { goldCatalysts } from "@/db/schema/catalysts";
+import { eq } from "drizzle-orm";
 import { consensus } from "@/db/schema/consensus";
 import { fairValues } from "@/db/schema/analysis";
 import { valuations } from "@/db/schema/financials";
 import { valuationReports } from "@/db/schema/valuation";
 import * as gold from "@/db/schema/gold";
-import { theses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
 import { itemsOf } from "../evidence/items";
 import { seriesCatalog, seriesMenu, type StoredSeries } from "./series";
@@ -57,12 +55,10 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const [ticker] = await db.select().from(gold.tickers).where(eq(gold.tickers.symbol, symbol));
   const [profile] = await db.select().from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
   const [quote] = await db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol));
-  const [thesis] = await db.select().from(theses).where(eq(theses.symbol, symbol));
   const [valuation] = await db.select().from(valuations).where(eq(valuations.symbol, symbol));
   const cons = await db.select().from(consensus).where(eq(consensus.symbol, symbol));
   const [fairValue] = await db.select().from(fairValues).where(eq(fairValues.symbol, symbol));
   const [vreport] = await db.select({ summary: valuationReports.summary }).from(valuationReports).where(eq(valuationReports.symbol, symbol));
-  const cats = await db.select().from(goldCatalysts).where(eq(goldCatalysts.symbol, symbol)).orderBy(desc(goldCatalysts.eventAt)).limit(12);
   const catalog = await seriesCatalog(db, symbol);
   const currency = valuation?.currency ?? profile?.currency ?? null;
   const segments = [...catalog.values()].filter((s) => s.key.startsWith("line:segment:"));
@@ -75,8 +71,6 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     `Company: ${profile?.name ?? symbol} (${symbol}), market ${ticker?.market ?? "?"}, ${[profile?.sector, profile?.industry].filter(Boolean).join(" / ") || "sector unknown"}.`,
     profile?.description ? `Description: ${profile.description.slice(0, 600)}` : null,
     `Analyst position: ${ticker?.position ?? "watch"}${ticker?.inPortfolio ? ", in his portfolio" : ""}.`,
-    `Narrative on file (what the price tells): ${thesis?.narrative ?? "none"}`,
-    `Analyst's view of it: ${thesis?.summary ?? "none"}`,
     ticker?.thesisNote ? `Analyst's note: ${ticker.thesisNote}` : null,
     "",
     `Reported financials, fiscal years (${currency ?? "currency unknown"}; B = billion, M = million):`,
@@ -94,17 +88,14 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     closes.length ? `Price path, month-end closes (${price!.currency ?? ""}): ${closes.map(([m, v]) => `${m} ${fmt(v, "per-share")}`).join("; ")}` : "Price path: none collected.",
     "Analyst consensus history: only the current consensus is collected (no revisions).",
     "",
-    "News and filings of the last 12 months (newest first):",
-    items.length ? items.map((i) => `- ${i.at.toISOString().slice(0, 10)} ${i.kind}${i.publisher ? ` (${i.publisher})` : ""}: ${i.title}`).join("\n") : "none",
-    "",
-    "Evidence judged so far (news and filings vs the narrative):",
-    cats.length ? cats.map((c) => `- ${c.eventDay} ${c.kind}: "${c.headline}" ${c.direction} the narrative${c.reason ? `: ${c.reason}` : ""}`).join("\n") : "none",
-    "",
     "Stored chart series (key | label | span), the ONLY data an exhibit can show:",
     seriesMenu(catalog) || "none",
   ]
     .filter((x) => x !== null)
     .join("\n");
+  // The news are context, never a reason to rewrite the story (Kevin 2026-11-09: 19 narratives in 3 days on NVRI, one
+  // per news): they stay out of the hash; each one is judged against the narrative by `evidence` instead.
+  const news = ["News and filings of the last 12 months (newest first):", items.length ? items.map((i) => `- ${i.at.toISOString().slice(0, 10)} ${i.kind}${i.publisher ? ` (${i.publisher})` : ""}: ${i.title}`).join("\n") : "none"].join("\n");
 
   const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency } : null;
   const fvLine = fairValue
@@ -115,7 +106,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const bucket = q && q.close > 0 ? Math.round(Math.log(q.close) / Math.log(1.15)) : "none";
   return {
     symbol,
-    text: `${priceLine}\n${fvLine}\n${stable}`,
+    text: `${priceLine}\n${fvLine}\n${stable}\n\n${news}`,
     hash: fnv(`${stable}\nprice-bucket:${bucket}\nfair-value-bucket:${fvBucket}`),
     catalog,
     quote: q,

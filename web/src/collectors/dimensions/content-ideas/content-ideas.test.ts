@@ -13,7 +13,7 @@ import { ideasSystem, parseIdeas, parseScores, scoresSystem } from "./prompt";
 
 const IDEAS = JSON.stringify({
   ideas: [
-    { symbol: "CCLD", title: "CareCloud replaced the client the market thinks it lost.", angle: "Reuters reports a new hospital client.", sources: ["evidence:CCLD|news:n1", "driver:CCLD:1"] },
+    { symbol: "CCLD", title: "CareCloud replaced the client the market thinks it lost.", angle: "Reuters reports a new hospital client.", sources: ["evidence:CCLD|news:n1", "driver:CCLD:long:1"] },
     { symbol: "CCLD", title: "CareCloud trades a third below its fair value.", angle: "4 USD vs 6.", sources: ["fair-value:CCLD"] },
     { symbol: null, title: "Small caps with a new client beat the story.", angle: "One example this week.", sources: ["signal:CCLD", "not-offered:1"] },
     { symbol: "NOPE", title: "Unknown ticker.", angle: "Dropped.", sources: ["signal:CCLD"] },
@@ -56,7 +56,7 @@ describe("content-ideas dimension", () => {
     // 5 proposed: an unknown ticker and one with no offered source are dropped; an unknown source id is dropped, its idea kept.
     expect(ideas.map((i) => i.title)).toHaveLength(3);
     const first = ideas.find((i) => i.rank === 1)!;
-    expect(first.sourceRefs.map((s) => s.ref)).toEqual(["evidence:CCLD|news:n1", "driver:CCLD:1"]);
+    expect(first.sourceRefs.map((s) => s.ref)).toEqual(["evidence:CCLD|news:n1", "driver:CCLD:long:1"]);
     expect(first.sourceRefs[0]).toMatchObject({ kind: "evidence", symbol: "CCLD", label: "CCLD signs a new hospital client" });
     expect(await db.select().from(content.contentIdeaScores)).toHaveLength(3 * PROPOSED_FORMATS.length);
 

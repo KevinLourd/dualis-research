@@ -7,7 +7,7 @@ import type { Db } from "@/db/types";
 
 export const SINCE_SUBJECT_KIND = "narrative-since";
 /** Bump when the question changes meaning: every ticker is asked again. */
-export const SINCE_QUESTION = "narrative-since@v1";
+export const SINCE_QUESTION = "narrative-since@v2";
 /** The oldest month a story can start: news older than this is always "Too old". */
 export const SINCE_CAP_MONTHS = 6;
 
@@ -29,10 +29,10 @@ export const monthStart = (month: string) => new Date(`${month}-01T00:00:00Z`);
 /** The cap: first day of the month `SINCE_CAP_MONTHS` ago. Used when a ticker has no judgment yet. */
 export const sinceCap = (now = new Date()) => monthStart(sinceChoices(now)[0]);
 
-/** The stored month per ticker for its current narrative version; tickers without one are absent. */
+/** The stored month per thesis (`<symbol>:<side>`) for its current narrative version; theses without one are absent. */
 export async function narrativeSinceOf(db: Db, symbols: string[]): Promise<Map<string, { since: Date; judgmentId: string }>> {
   if (symbols.length === 0) return new Map();
-  const versions = await db.select({ symbol: narratives.symbol, version: narratives.version }).from(narratives).where(inArray(narratives.symbol, symbols));
+  const versions = await db.select({ id: narratives.id, version: narratives.version }).from(narratives).where(inArray(narratives.symbol, symbols));
   const keys = versions.map((v) => sinceKey(v.version));
   if (keys.length === 0) return new Map();
   const j = silver.judgments;
@@ -40,9 +40,8 @@ export async function narrativeSinceOf(db: Db, symbols: string[]): Promise<Map<s
     .select({ id: j.id, subjectId: j.subjectId, questionKey: j.questionKey, verdict: j.verdict })
     .from(j)
     .where(and(eq(j.subjectKind, SINCE_SUBJECT_KIND), inArray(j.questionKey, keys)));
-  const want = new Map(versions.map((v) => [v.symbol, sinceKey(v.version)]));
+  const want = new Map(versions.map((v) => [v.id, sinceKey(v.version)]));
   const out = new Map<string, { since: Date; judgmentId: string }>();
   for (const r of rows) if (want.get(r.subjectId) === r.questionKey) out.set(r.subjectId, { since: monthStart(r.verdict), judgmentId: r.id });
   return out;
 }
-

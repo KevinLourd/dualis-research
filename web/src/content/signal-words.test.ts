@@ -45,10 +45,10 @@ describe("evidence strength, position return", () => {
 });
 
 describe("tagWord", () => {
-  it("a reversal reads Inflection below fair value, Crack above", () => {
-    expect(tagWord("reversal", "strong", -0.14)).toBe("Strong inflection");
-    expect(tagWord("reversal", "weak", 0.2)).toBe("Weak crack");
-    expect(tagWord("continuation", "strong", -0.1)).toBe("Strong continuation");
-    expect(tagWord("noise", "noise", 0.1)).toBe("Noise");
+  it("a reversal reads Inflection on the long thesis, Crack on the short one", () => {
+    expect(tagWord("reversal", "strong", "long")).toBe("Strong inflection");
+    expect(tagWord("reversal", "weak", "short")).toBe("Weak crack");
+    expect(tagWord("continuation", "strong", "long")).toBe("Strong continuation");
+    expect(tagWord("noise", "noise", "short")).toBe("Noise");
   });
 });

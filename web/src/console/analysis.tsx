@@ -2,7 +2,7 @@ import { Badge, Button, Input } from "@cloudflare/kumo";
 import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, FileTextIcon, QuestionIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import { evidenceStrength } from "@/content/signal-words";
-import type { GoldEvidence, GoldExhibit } from "@/db/schema/analysis";
+import type { GoldEvidence, GoldExhibit, GoldNarrativeState, ThesisSide } from "@/db/schema/analysis";
 import type { GoldCatalyst } from "@/db/schema/catalysts";
 import type { GoldConsensus } from "@/db/schema/consensus";
 import { type DriverWithExhibits, getTickerAnalysis, getValuation } from "./analysis-queries";
@@ -17,7 +17,6 @@ import { ExhibitChart } from "./driver-chart";
 import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
-import { EditableText } from "./editable-text";
 import { day, price, relativeTime, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section, StateBadge, StateChange } from "./signal";
@@ -31,15 +30,18 @@ import { ComingNext } from "./ui";
  * the Analysis page (`?item=`) with its detail and sources.
  */
 
-export const itemHref = (symbol: string, item: string) => `/tickers/${encodeURIComponent(symbol)}?item=${encodeURIComponent(item)}`;
+/** An item of the Analysis page; `thesis` keeps the shown thesis behind the item's panel. */
+export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | null) => `/tickers/${encodeURIComponent(symbol)}?item=${encodeURIComponent(item)}${thesis ? `&thesis=${thesis}` : ""}`;
 
-export async function analysisData(symbol: string) {
+export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
+
+export async function analysisData(symbol: string, thesis: ThesisSide | null = null) {
   const [row, data, why, consensus, objects, chart, valuation] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
     getWhy(symbol),
     consensusOf(symbol),
-    getTickerAnalysis(symbol),
+    getTickerAnalysis(symbol, thesis),
     priceVsFairValue(symbol),
     getValuation(symbol),
   ]);
@@ -48,8 +50,6 @@ export async function analysisData(symbol: string) {
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
-/** quote / fair value - 1 as the board row holds it (negative = below fair value), or null. */
-export const gapPctOf = (row: Pick<BoardRow, "gap">) => (row.gap ? (row.gap.side === "below" ? -row.gap.pct : row.gap.pct) : null);
 
 /** A's facts, each figure opening its own detail: those cards carry a caret and a stronger ring, so they read as buttons. */
 function Facts({ row, wide, range }: { row: BoardRow; wide: boolean; range: { low: number; high: number } | null }) {
@@ -199,16 +199,17 @@ export function Exhibit({ symbol, exhibit, linked = true }: { symbol: string; ex
 }
 
 /** News judged against ONE driver: its tag against that driver, the headline (opens its panel). */
-export function EvidenceRows({ symbol, rows, driverId, gapPct }: { symbol: string; rows: GoldEvidence[]; driverId: string; gapPct: number | null }) {
+export function EvidenceRows({ symbol, rows, driverId, side }: { symbol: string; rows: GoldEvidence[]; driverId: string; side: ThesisSide }) {
   return (
     <ol className="flex flex-col gap-1">
       {rows.map((e) => {
         const v = e.verdicts.find((x) => x.driverId === driverId);
         return (
         <li key={e.id}>
-          <Link href={itemHref(symbol, `news:${e.id}`)} scroll={false} className="-mx-3 flex flex-col gap-1 rounded-lg px-3 py-2.5 transition-colors hover:bg-kumo-tint">
+          <Link href={itemHref(symbol, `news:${e.id}`, side)} scroll={false} className="-mx-3 flex flex-col gap-1 rounded-lg px-3 py-2.5 transition-colors hover:bg-kumo-tint">
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-kumo-subtle">
-              {v && <TagBadge effect={v.effect} strength={v.strength} gapPct={gapPct} />}
+              {v && <TagBadge effect={v.effect} strength={v.strength} side={side} />}
+              {v?.pricedIn && v.effect !== "noise" && <span>{PRICED_WORD[v.pricedIn]}</span>}
               <span className="tabular">{day(e.eventDay)}</span>
               {e.publisher && <span>{e.publisher}</span>}
             </span>
@@ -221,39 +222,104 @@ export function EvidenceRows({ symbol, rows, driverId, gapPct }: { symbol: strin
   );
 }
 
-/** Narrative Drivers at a glance: category, the driver's tag, how many news bear on it, title. Text, exhibits and news open in the driver's panel. */
-function Drivers({ symbol, drivers, gapPct }: { symbol: string; drivers: DriverWithExhibits[]; gapPct: number | null }) {
+/** How much of a turn the price already moved, in plain words. */
+export const PRICED_WORD: Record<string, string> = { none: "Not in the price yet", partly: "Partly in the price", fully: "Already in the price" };
+
+/** A state's timing: since when it holds, how much the price already moved, and when the judge last looked. */
+function StateTiming({ state }: { state: GoldNarrativeState }) {
   return (
-    <ol className="flex flex-col divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
-      {drivers.map((d) => {
-        return (
-          <li key={d.id}>
-            <Link href={itemHref(symbol, `driver:${d.id}`)} scroll={false} className="flex flex-col gap-2 px-4 py-3.5 transition-colors hover:bg-kumo-tint">
-              <span className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{d.category}</Badge>
-                {d.state && <TagBadge effect={d.state.effect} strength={d.state.strength} gapPct={gapPct} />}
-                {d.evidence.length > 0 && <span className="text-sm text-kumo-subtle">{d.evidence.length} news</span>}
-              </span>
-              <span className="text-lg font-semibold text-kumo-strong">{d.title}</span>
-              {d.summary && <span className="max-w-prose text-base text-kumo-default">{d.summary}</span>}
-            </Link>
-          </li>
-        );
-      })}
-    </ol>
+    <span className="flex flex-col gap-0.5 text-sm text-kumo-subtle md:items-end">
+      {state.since && state.effect !== "noise" && <span className="tabular">Since {day(state.since)}</span>}
+      {state.pricedIn && state.effect !== "noise" && <span>{PRICED_WORD[state.pricedIn]}</span>}
+      <time dateTime={state.asOf.toISOString()} title={utc(state.asOf)} className="tabular">
+        Checked {relativeTime(state.asOf)}
+      </time>
+    </span>
   );
 }
 
-export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
+/**
+ * Narrative Drivers at a glance (Kevin 2026-11-09): the driver (category, title, one sentence) on the left, its Status
+ * on the right (its tag, since when, how much is in the price, when it was last judged). Text, exhibits and news open
+ * in the driver's panel.
+ */
+function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
+  return (
+    <div className="flex flex-col rounded-lg ring-1 ring-kumo-hairline">
+      <div className="grid grid-cols-[1fr_auto] gap-6 border-b border-kumo-hairline px-4 py-2 text-sm font-medium text-kumo-subtle">
+        <span>Driver</span>
+        <span className="w-44 text-right">Status</span>
+      </div>
+      <ol className="flex flex-col divide-y divide-kumo-hairline">
+        {drivers.map((d) => (
+          <li key={d.id}>
+            <Link href={itemHref(symbol, `driver:${d.id}`, thesis)} scroll={false} className="grid grid-cols-[1fr_auto] gap-6 px-4 py-3.5 transition-colors hover:bg-kumo-tint">
+              <span className="flex flex-col gap-2">
+                <span className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{d.category}</Badge>
+                  {d.evidence.length > 0 && <span className="text-sm text-kumo-subtle">{d.evidence.length} news</span>}
+                </span>
+                <span className="text-lg font-semibold text-kumo-strong">{d.title}</span>
+                {d.summary && <span className="max-w-prose text-base text-kumo-default">{d.summary}</span>}
+              </span>
+              <span className="flex w-44 flex-col items-end gap-1.5">
+                {d.state ? (
+                  <>
+                    <TagBadge effect={d.state.effect} strength={d.state.strength} side={side} />
+                    <StateTiming state={d.state} />
+                  </>
+                ) : (
+                  <span className="text-sm text-kumo-subtle">Not judged yet</span>
+                )}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** The two theses when the price sits inside the fair value range: each with its tag; the shown one is selected. */
+function ThesisTabs({ objects, href }: { objects: Analysis["objects"]; href: (side: ThesisSide) => string }) {
+  if (objects.theses.length < 2) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="max-w-prose text-base text-kumo-default">
+        The price sits inside the fair value range, so two stories compete. A signal shows only when one of them signals alone.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {objects.theses.map((t) => {
+          const active = t.side === objects.side;
+          return (
+            <Link
+              key={t.side}
+              href={href(t.side)}
+              scroll={false}
+              aria-current={active ? "true" : undefined}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 ring-1 transition-colors ${active ? "bg-kumo-tint ring-kumo-brand" : "ring-kumo-line hover:bg-kumo-tint"}`}
+            >
+              <span className="text-base font-medium text-kumo-strong">{t.side === "long" ? "Long thesis" : "Short thesis"}</span>
+              {t.state ? <TagBadge effect={t.state.effect} strength={t.state.strength} side={t.side} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Analysis; variant: "panel" | "page"; thesisHref: (side: ThesisSide) => string }) {
   const { row, data, why, consensus, objects, chart, valuation } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const { thesis, latest, state, evidence } = why;
   const symbol = row.symbol;
-  // Thierry's own words win; else the analysis' narrative; else the first thesis draft.
-  const own = thesis?.narrative && (thesis.narrativeState === "edited" || thesis.narrativeState === "thierry") ? thesis.narrative : null;
-  const narrative = own ?? objects.narrative?.text ?? thesis?.narrative ?? null;
+  // The analysis writes the narrative; nobody edits it by hand (Kevin 2026-11-09).
+  const narrative = objects.narrative?.text ?? null;
   const position = data.ticker.position;
-  const gapPct = gapPctOf(row);
+  const side = objects.side;
+  // Item links keep the shown thesis only when two compete (one thesis = the default).
+  const keep = objects.theses.length > 1 ? side : null;
   const gap = variant === "page" ? "gap-14" : "gap-10";
   return (
     <div className={`flex flex-col ${gap}`}>
@@ -268,23 +334,26 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
         <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} />
       )}
 
-      <Section title="Narrative">
+      <Section title={side ? (side === "long" ? "Narrative · long thesis" : "Narrative · short thesis") : "Narrative"}>
+        <ThesisTabs objects={objects} href={thesisHref} />
         {narrative ? (
-          // Plain text that turns into a same-size textarea on click, autosaved as Thierry's own version.
           <>
-            <EditableText symbol={symbol} field="narrative" value={narrative} label="Narrative" className={`max-w-prose leading-snug text-kumo-strong ${variant === "page" ? "text-2xl" : "text-xl"}`} />
+            <p className={`max-w-prose leading-snug text-kumo-strong ${variant === "page" ? "text-2xl" : "text-xl"}`}>{narrative}</p>
             {(objects.narrative?.detail || objects.rationale) && (
-              <Link href={itemHref(symbol, "narrative")} scroll={false} className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-kumo-link hover:underline">
+              <Link href={itemHref(symbol, "narrative", keep)} scroll={false} className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-kumo-link hover:underline">
                 <QuestionIcon size={16} aria-hidden /> Why
               </Link>
             )}
           </>
         ) : (
-          <p className="text-lg text-kumo-subtle">Not drafted yet. The next morning run drafts it for you to edit.</p>
+          <p className="text-lg text-kumo-subtle">Not drafted yet. The next run writes it once the ticker has a fair value.</p>
         )}
-        {objects.narrativeState ? (
+        {objects.narrativeState && side ? (
           <div className="flex flex-col gap-2">
-            <TagBadge effect={objects.narrativeState.effect} strength={objects.narrativeState.strength} gapPct={gapPct} />
+            <span className="flex flex-wrap items-center gap-3">
+              <TagBadge effect={objects.narrativeState.effect} strength={objects.narrativeState.strength} side={side} />
+              <StateTiming state={objects.narrativeState} />
+            </span>
             {objects.narrativeState.why && <p className="max-w-prose text-base leading-relaxed text-kumo-default">{objects.narrativeState.why}</p>}
           </div>
         ) : objects.signal ? null : latest ? (
@@ -308,8 +377,8 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
       </Section>
 
       <Section title="Narrative drivers">
-        {objects.drivers.length > 0 ? (
-          <Drivers symbol={symbol} drivers={objects.drivers} gapPct={gapPct} />
+        {objects.drivers.length > 0 && side ? (
+          <Drivers symbol={symbol} drivers={objects.drivers} side={side} thesis={keep} />
         ) : (
           <ComingNext
             size="sm"
@@ -345,7 +414,7 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
           )}
           {objects.drivers.length > 0 && objects.evidence.length > 0 && (
             <Section title={`News · ${objects.evidence.length}`}>
-              <NewsTable rows={newsRows(symbol, objects)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} gapPct={gapPct} />
+              <NewsTable rows={newsRows(symbol, objects, keep)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} side={side} />
             </Section>
           )}
           <Section title="Your fair value">
@@ -383,21 +452,26 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
   );
 }
 
-/** The News table's rows: importance = the strongest tag the item carries on any driver. */
-function newsRows(symbol: string, objects: Analysis["objects"]): NewsRow[] {
-  return objects.evidence.map((e) => ({
-    id: e.id,
-    href: itemHref(symbol, `news:${e.id}`),
-    day: day(e.eventDay),
-    headline: e.headline,
-    publisher: e.publisher,
-    strength: e.effect === "too-old" ? "too-old" : e.strength,
-    tags: objects.drivers.map((d) => {
-      if (e.effect === "too-old") return { effect: "too-old", strength: "noise" };
-      const v = e.verdicts.find((x) => x.driverId === d.id);
-      return v ? { effect: v.effect, strength: v.strength } : null;
-    }),
-  }));
+/** The News table's rows for the shown thesis: importance = the strongest tag the item carries on one of its drivers. */
+function newsRows(symbol: string, objects: Analysis["objects"], keep: ThesisSide | null): NewsRow[] {
+  const ids = new Set(objects.drivers.map((d) => d.id));
+  return objects.evidence.map((e) => {
+    const mine = e.verdicts.filter((v) => ids.has(v.driverId));
+    const top = mine.some((v) => v.strength === "strong") ? "strong" : mine.some((v) => v.strength === "weak") ? "weak" : "noise";
+    return {
+      id: e.id,
+      href: itemHref(symbol, `news:${e.id}`, keep),
+      day: day(e.eventDay),
+      headline: e.headline,
+      publisher: e.publisher,
+      strength: e.effect === "too-old" || (mine.length === 0 && e.verdicts.length > 0) ? "too-old" : top,
+      tags: objects.drivers.map((d) => {
+        if (e.effect === "too-old") return { effect: "too-old", strength: "noise" };
+        const v = e.verdicts.find((x) => x.driverId === d.id);
+        return v ? { effect: v.effect, strength: v.strength } : null;
+      }),
+    };
+  });
 }
 
 /** Title of the panel / page: the company and its ticker. */

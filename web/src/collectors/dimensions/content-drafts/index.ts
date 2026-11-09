@@ -13,6 +13,7 @@ import { voiceGuides } from "../content-voices";
 import { chartOptions, type ChartOption } from "./charts";
 import { DRAFT_FORMATS, type DraftFormat, draftPrompt, draftSystem, type IdeaContext, parseGeneration, PROMPT_VERSION, withDisclaimer } from "./format";
 
+import { publicSide } from "../analysis/sides";
 export const DRAFTS_DIMENSION = "content-drafts";
 export const CLAUDE_SOURCE = "claude";
 
@@ -51,13 +52,15 @@ async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: stri
   const evidenceIds = refs("evidence");
   const driverIds = refs("driver");
   const changeIds = refs("change");
-  const [[n], [s], ev, drv, ch] = await Promise.all([
+  const [narrs, [s], ev, drv, ch] = await Promise.all([
     db.select().from(narratives).where(eq(narratives.symbol, symbol)),
     db.select().from(signals).where(eq(signals.symbol, symbol)),
     evidenceIds.length ? db.select().from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
     db.select().from(narrativeDrivers).where(driverIds.length ? inArray(narrativeDrivers.id, driverIds) : eq(narrativeDrivers.symbol, symbol)),
     changeIds.length ? db.select().from(signalChanges).where(inArray(signalChanges.id, changeIds)) : [],
   ]);
+  const side = publicSide(s, narrs);
+  const n = narrs.find((x) => x.side === side);
   return {
     narrative: n?.detail ? `${n.text} ${n.detail}` : (n?.text ?? null),
     signal: s ? (s.signal === "none" ? "no signal" : `${s.signal}, ${s.strength}`) : null,
@@ -66,7 +69,7 @@ async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: stri
         ? `${s.fairValue} ${s.currency ?? ""}${s.fairValueLabel ? ` (${s.fairValueLabel})` : ""}; quote ${s.quote ?? "?"} on ${s.quoteDate ?? "?"}${s.gapPct !== null ? `, ${Math.round(s.gapPct * 100)}% vs fair value` : ""}`
         : null,
     evidence: ev.map((e) => ({ headline: e.headline, publisher: e.publisher, day: e.eventDay, why: e.why, url: e.url })),
-    drivers: drv.map((d) => ({ title: d.title, summary: d.summary })),
+    drivers: drv.filter((d) => driverIds.length > 0 || d.side === side).map((d) => ({ title: d.title, summary: d.summary })),
     signalChanges: ch.map((c) => ({ label: `${c.fromSignal} ${c.fromStrength} to ${c.toSignal} ${c.toStrength} on ${utcDay(c.at)}`, note: c.updateNote })),
   };
 }

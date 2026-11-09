@@ -2,7 +2,7 @@ import { cache } from "react";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { evidenceStrength, type SignalCall, type SignalStrength } from "@/content/signal-words";
 import { getDb } from "@/db/client";
-import { evidence as goldEvidence, exhibits, fairValues, narrativeDrivers, narrativeStates, signals } from "@/db/schema/analysis";
+import { evidence as goldEvidence, exhibits, fairValues, marketReactions, narrativeDrivers, narrativeStates, signals, type ThesisSide } from "@/db/schema/analysis";
 import { goldCatalysts } from "@/db/schema/catalysts";
 import { consensus } from "@/db/schema/consensus";
 import { companyProfiles, filings, priceBars, quotes, tickers } from "@/db/schema/gold";
@@ -33,10 +33,10 @@ export type BoardRow = {
   gap: { pct: number; side: "below" | "above" } | null;
   call: SignalCall | null;
   strength: SignalStrength;
-  /** The ticker's tag as shown (Kevin 2026-11-06: "Weak inflection", never a bare "Weak"): the signal's reversal, else the narrative's own tag. */
+  /** The ticker's tag as shown (Kevin 2026-11-06: "Weak inflection", never a bare "Weak"): the signal's reversal, else its only thesis' tag. */
   tag: { effect: string; strength: string } | null;
-  /** quote / fair value - 1 (negative = below), the side a reversal reads on (Inflection below, Crack above). */
-  gapPct: number | null;
+  /** The thesis the tag reads on (long = Inflection, short = Crack): the signalling one, else the only one; null when two compete silently. */
+  side: ThesisSide | null;
   since: Date | null;
 };
 
@@ -54,19 +54,18 @@ async function readBoard(symbol?: string): Promise<BoardRow[]> {
       quoteCurrency: quotes.currency,
       quoteDate: quotes.date,
       signal: signals,
-      state: { effect: narrativeStates.effect, strength: narrativeStates.strength },
     })
     .from(tickers)
     .leftJoin(companyProfiles, eq(companyProfiles.symbol, tickers.symbol))
     .leftJoin(quotes, eq(quotes.symbol, tickers.symbol))
     .leftJoin(signals, eq(signals.symbol, tickers.symbol))
-    .leftJoin(narrativeStates, and(eq(narrativeStates.symbol, tickers.symbol), eq(narrativeStates.level, "ticker")))
     .where(symbol ? eq(tickers.symbol, symbol) : undefined)
     .orderBy(asc(tickers.symbol));
   return rows.map((r) => {
     const s = r.signal;
     // The quote the signal was judged on, so the call, the gap and the price shown always agree.
     const close = s?.quote ?? r.close;
+    const only = s && s.theses.length === 1 ? s.theses[0] : null;
     return {
       symbol: r.symbol,
       name: r.name,
@@ -84,8 +83,8 @@ async function readBoard(symbol?: string): Promise<BoardRow[]> {
       gap: s?.gapPct === null || s?.gapPct === undefined ? null : { pct: Math.abs(s.gapPct), side: s.gapPct < 0 ? "below" : "above" },
       call: s && s.signal !== "none" ? s.signal : null,
       strength: s?.strength ?? "noise",
-      tag: s && s.signal !== "none" ? { effect: "reversal", strength: s.strength } : (r.state?.effect ? { effect: r.state.effect, strength: r.state.strength! } : null),
-      gapPct: s?.gapPct ?? null,
+      tag: s && s.signal !== "none" ? { effect: "reversal", strength: s.strength } : only ? { effect: only.effect, strength: only.strength } : null,
+      side: s?.side ?? only?.side ?? null,
       since: s?.since ?? null,
     };
   });
@@ -139,20 +138,21 @@ export async function evidenceDetail(symbol: string, id: string) {
     catalyst.filingIds.length ? db.select().from(filings).where(inArray(filings.id, catalyst.filingIds)).orderBy(desc(filings.filedAt)) : [],
     db.select().from(goldEvidence).where(eq(goldEvidence.id, id)),
   ]);
-  const [[driver], [exhibit], drivers, [signal]] = await Promise.all([
+  const [[driver], [exhibit], drivers, [reaction]] = await Promise.all([
     judged?.driverId ? db.select().from(narrativeDrivers).where(eq(narrativeDrivers.id, judged.driverId)) : [],
     judged?.exhibitId ? db.select().from(exhibits).where(eq(exhibits.id, judged.exhibitId)) : [],
-    judged ? db.select().from(narrativeDrivers).where(eq(narrativeDrivers.symbol, symbol)).orderBy(asc(narrativeDrivers.rank)) : [],
-    db.select({ gapPct: signals.gapPct }).from(signals).where(eq(signals.symbol, symbol)),
+    judged ? db.select().from(narrativeDrivers).where(eq(narrativeDrivers.symbol, symbol)).orderBy(asc(narrativeDrivers.side), asc(narrativeDrivers.rank)) : [],
+    db.select().from(marketReactions).where(eq(marketReactions.id, id)),
   ]);
   return {
     catalyst,
     // Judged against a Narrative Driver (gold.evidence) when the ticker has drivers; else the narrative-level judgment.
     evidence: judged ?? null,
     driver: driver ?? null,
-    /** Every driver of the ticker, to show the item's verdict against each. */
+    /** Every driver of the ticker's theses, to show the item's verdict against each. */
     drivers,
-    gapPct: signal?.gapPct ?? null,
+    /** What the price did around the item, and the fair value then and now. */
+    reaction: reaction ?? null,
     exhibit: exhibit ?? null,
     strength: judged?.strength ?? evidenceStrength(catalyst.direction, catalyst.probability),
     articles,
@@ -177,14 +177,14 @@ export async function priceDetail(symbol: string) {
 /** Level C: one Narrative Driver with its exhibits, its tag, and every news whose verdict against IT is not noise. */
 export async function driverDetail(symbol: string, id: string) {
   const db = getDb();
-  const [[driver], xs, ev, [state], [signal]] = await Promise.all([
+  const [[driver], xs, ev, [state], reactions] = await Promise.all([
     db.select().from(narrativeDrivers).where(and(eq(narrativeDrivers.symbol, symbol), eq(narrativeDrivers.id, id))),
     db.select().from(exhibits).where(eq(exhibits.driverId, id)).orderBy(asc(exhibits.rank)),
     db.select().from(goldEvidence).where(eq(goldEvidence.symbol, symbol)).orderBy(desc(goldEvidence.eventAt)),
     db.select().from(narrativeStates).where(eq(narrativeStates.id, id)),
-    db.select({ gapPct: signals.gapPct }).from(signals).where(eq(signals.symbol, symbol)),
+    db.select().from(marketReactions).where(eq(marketReactions.symbol, symbol)),
   ]);
-  return driver ? { driver, exhibits: xs, evidence: ev.filter((e) => e.verdicts.some((v) => v.driverId === id && v.effect !== "noise")), state: state ?? null, gapPct: signal?.gapPct ?? null } : null;
+  return driver ? { driver, exhibits: xs, evidence: ev.filter((e) => e.verdicts.some((v) => v.driverId === id && v.effect !== "noise")), state: state ?? null, side: driver.side, reactions: new Map(reactions.map((r) => [r.id, r])) } : null;
 }
 
 /** Level C: one Exhibit and the driver it supports. */

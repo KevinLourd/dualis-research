@@ -16,7 +16,7 @@ import { TagBadge } from "./tag-badge";
 export type NewsRow = { id: string; href: string; day: string; headline: string; publisher: string | null; strength: "strong" | "weak" | "noise" | "too-old"; tags: ({ effect: string; strength: string } | null)[] };
 type Tab = "strong" | "weak" | "noise" | "too-old";
 
-export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers: { rank: number; title: string }[]; gapPct: number | null }) {
+export function NewsTable({ rows, drivers, side }: { rows: NewsRow[]; drivers: { rank: number; title: string }[]; side: "long" | "short" | null }) {
   const count = (t: Tab) => rows.filter((r) => r.strength === t).length;
   const [tab, setTab] = useState<Tab>(count("strong") ? "strong" : count("weak") ? "weak" : "noise");
   const shown = rows.filter((r) => r.strength === tab);
@@ -65,7 +65,7 @@ export function NewsTable({ rows, drivers, gapPct }: { rows: NewsRow[]; drivers:
                   </KTableCell>
                   {r.tags.map((t, i) => (
                     <KTableCell key={i} className="pr-4 align-top">
-                      {t ? <TagBadge effect={t.effect} strength={t.strength} gapPct={gapPct} /> : <span className="text-kumo-subtle">–</span>}
+                      {t ? <TagBadge effect={t.effect} strength={t.strength} side={side} /> : <span className="text-kumo-subtle">–</span>}
                     </KTableCell>
                   ))}
                 </KTableRow>

@@ -1,15 +1,15 @@
-import { DRIVER_CATEGORIES, type AnalysisAnswer, type ExhibitSpec, type RationaleAnswer, type RationaleSource } from "@/db/schema/analysis";
+import { DRIVER_CATEGORIES, type AnalysisAnswer, type ThesisSide, type ExhibitSpec, type RationaleAnswer, type RationaleSource } from "@/db/schema/analysis";
 import { firstJsonObject } from "@/llm/judge";
 import { stripDashes } from "../thesis/structure";
 
-/** Bump when a prompt changes meaning: every ticker is analysed again. */
-export const ANALYSIS_VERSION = "analysis@v6";
+/** Bump when a prompt changes meaning: every ticker is analysed again. v7 (Kevin 2026-11-09): one analysis per thesis side. */
+export const ANALYSIS_VERSION = "analysis@v7";
 
 const METHOD = [
   "The analyst's method: he does not believe in one true value. The price reflects the market's NARRATIVE; the FAIR VALUE is what the business is worth if its plan works.",
-  "The fair value is GIVEN in the facts (weighted from several valuation methods, with its range): never compute another one.",
-  "The NARRATIVE explains the gap between the price and the fair value: price below fair value = the pessimistic story that explains the discount; price above = the optimistic story that explains the premium.",
-  "Long = price below fair value while that bad narrative inflects. Short = price above fair value while that loved narrative cracks.",
+  "The fair value is GIVEN in the facts (weighted from several valuation methods, with its range low to high): never compute another one.",
+  "A ticker has a LONG thesis and a SHORT thesis. The long thesis is the PESSIMISTIC story the market holds, the reason the price sits at or below fair value; its turn (an inflection) is a buy. The short thesis is the OPTIMISTIC story, the reason the price sits at or above fair value; its turn (a crack) is a sell.",
+  "Price below the fair value range: only the long thesis is written. Above it: only the short one. Inside the range: both are written, each on its own, and they compete.",
 ].join(" ");
 
 export const ANALYSIS_SYSTEM = [
@@ -19,23 +19,52 @@ export const ANALYSIS_SYSTEM = [
   "Answer with JSON only, no prose, no code fence.",
 ].join(" ");
 
-export function analysisPrompt(factsText: string): string {
+const SIDE_WORDS: Record<ThesisSide, { thesis: string; story: string; tone: string; against: string; consensus: string }> = {
+  long: {
+    thesis: "the LONG thesis",
+    story: "the PESSIMISTIC story the market tells about the company, the reason the price sits at or below the fair value",
+    tone: "a reason for pessimism (debt, a missed guide, a shrinking market, a dilution...)",
+    against: "A fact that goes AGAINST this story (a record quarter under a gloomy story) is never a driver: it is the news that may turn one.",
+    consensus: "analysts expect a decline or keep cutting estimates; a company no analyst follows (no consensus in the facts) is also a reason for the discount",
+  },
+  short: {
+    thesis: "the SHORT thesis",
+    story: "the OPTIMISTIC story the market tells about the company, the reason the price sits at or above the fair value",
+    tone: "a reason for optimism (fast growth, a hot theme, a big contract, rising margins...)",
+    against: "A fact that goes AGAINST this story (a missed quarter under a glowing story) is never a driver: it is the news that may crack one.",
+    consensus: "analysts bake in strong growth or keep raising estimates",
+  },
+};
+
+/** The previous version of the same thesis, kept word for word unless the facts changed what the market believes. */
+export type PreviousThesis = { narrative: string; narrativeDetail?: string | null; drivers: { category: string; title: string; summary?: string | null; text: string }[] };
+
+export function analysisPrompt(factsText: string, side: ThesisSide, previous: PreviousThesis | null = null): string {
+  const w = SIDE_WORDS[side];
   return [
     "Facts (all from the collected data):",
     factsText,
     "",
-    "Write the analysis of this ticker as JSON:",
+    ...(previous
+      ? [
+          `Your previous version of ${w.thesis}:`,
+          JSON.stringify(previous, null, 1),
+          "Keep it WORD FOR WORD (same narrative, same drivers in the same order, same words) unless the facts above changed what the market believes. A new news item is not a reason to rewrite the story: news are judged against it separately. Rewrite only what the facts made wrong.",
+          "",
+        ]
+      : []),
+    `Write ${w.thesis} of this ticker as JSON:`,
     "{",
-    '  "narrative": "<ONE short plain sentence, subject verb complement: the story the market tells about the company that explains why the price sits below (or above) your fair value, at most one figure, e.g. The market sees Kyungbang as a dying textile maker.>",',
-    '  "narrativeDetail": "<3 to 5 sentences: why the price sits where it does versus that fair value, so far, with the figures>",',
-    '  "drivers": [ 1 to 5, the REASONS the market holds that narrative, most important first:',
+    `  "narrative": "<ONE short plain sentence, subject verb complement: ${w.story}, at most one figure, e.g. ${side === "long" ? "The market sees Kyungbang as a dying textile maker." : "The market sees Lifeway as a kefir brand that keeps growing fast."}>",`,
+    '  "narrativeDetail": "<3 to 5 sentences: why the market holds this story and where the price sits versus the fair value and its range, with the figures>",',
+    '  "drivers": [ 1 to 5, the REASONS the market holds that story, most important first:',
     `    {"category": <one of: ${DRIVER_CATEGORIES.map((c) => JSON.stringify(c)).join(", ")}>, "title": "<5 to 9 words, the reason itself>", "summary": "<ONE short plain sentence, subject verb complement, no figure>", "text": "<2 to 3 sentences with the reported figures>",`,
     '     "exhibits": [1 or 2 charts that show it: {"title": "<chart title>", "chart": "bar" | "line", "series": [<1 to 3 keys from the stored chart series list, same period type>], "takeaway": "<one line: what the chart shows>"}]}',
     "  ]",
     "}",
-    "Every driver SUPPORTS the narrative: it is a reason the market believes the story. Price below fair value: each driver is a reason for pessimism (debt, a missed guide, a shrinking market, a dilution...). Price above: each is a reason for optimism. A fact that goes AGAINST the narrative (a record quarter under a gloomy story) is never a driver: it is the news that may reverse one.",
+    `Every driver SUPPORTS the narrative: it is a reason the market believes the story, ${w.tone}. ${w.against}`,
     "Drivers are every reason the market really holds, and only those: 1 to 5, as many as there are. Never invent a reason to fill the list, and never leave one out: a reason left out is a reason whose reversal no news can show.",
-    `"Consensus expectations" is a driver when the analyst consensus agrees with the narrative, even when it only follows another reason (estimates cut because the cycle turns down): below fair value, analysts expect a decline or keep cutting estimates; above, they bake in strong growth or keep raising them. A company no analyst follows (no consensus in the facts) is also a reason for the discount. When the consensus goes against the price sitting below (or above) fair value, it is not a driver of this narrative.`,
+    `"Consensus expectations" is a driver when the analyst consensus agrees with the narrative, even when it only follows another reason: ${w.consensus}. When the consensus goes against this story, it is not one of its drivers.`,
     "Each driver needs at least one exhibit whose series keys appear EXACTLY in the stored chart series list.",
   ].join("\n");
 }
@@ -46,12 +75,12 @@ export const REPORT_SYSTEM = [
   "Every figure comes from the facts given. No rating, no % upside, no time horizon, no price target other than the fair value. No em dash, no en dash. Markdown only.",
 ].join(" ");
 
-export function reportPrompt(factsText: string, analysis: AnalysisAnswer, exhibits: { number: number; title: string; takeaway: string }[], name: string): string {
+export function reportPrompt(factsText: string, analysis: AnalysisAnswer, exhibits: { number: number; title: string; takeaway: string }[], name: string, side: ThesisSide): string {
   return [
     "Facts:",
     factsText,
     "",
-    "The analysis already written (fair value, narrative, drivers):",
+    `The analysis already written for ${SIDE_WORDS[side].thesis} (narrative, drivers):`,
     JSON.stringify(analysis, null, 1),
     "",
     "Exhibits available (charts drawn from the stored data), cite each where it supports the text by writing [EXHIBIT n] on its own line:",

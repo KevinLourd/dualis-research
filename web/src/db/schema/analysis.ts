@@ -39,8 +39,20 @@ export function parseTag(tag: string): { effect: EvidenceEffect; strength: Stren
   return { effect: effect as EvidenceEffect, strength: strength as Strength };
 }
 /** One news item judged against one driver. */
-export type EvidenceVerdict = { driverId: string; rank: number; effect: EvidenceEffect; strength: Strength; probability: number; why: string | null; citedSentence: string | null; judgmentId: string };
+export type EvidenceVerdict = { driverId: string; side?: ThesisSide; rank: number; effect: EvidenceEffect; strength: Strength; probability: number; why: string | null; citedSentence: string | null; judgmentId: string; pricedIn?: PricedIn | null };
 export type SignalKind = "BUY" | "SELL" | "none";
+/** How much of a news item's (or a driver's) turn the price has already moved, as the judge reads it. */
+export type PricedIn = "none" | "partly" | "fully";
+export const PRICED_IN: readonly PricedIn[] = ["none", "partly", "fully"];
+
+/**
+ * Thesis side (Kevin 2026-11-09): the LONG thesis = the pessimistic story the market holds (why the price sits at or
+ * below fair value; its turn is an inflection, a BUY); the SHORT thesis = the optimistic story (why it sits at or above;
+ * its turn is a crack, a SELL). Price below the fair value range: long only; above it: short only; inside the range:
+ * BOTH theses are written and judged in competition, and only one that signals alone surfaces (`signals`).
+ */
+export type ThesisSide = "long" | "short";
+export const THESIS_SIDES: readonly ThesisSide[] = ["long", "short"];
 
 /** Chart spec the model picks: series keys from the catalogue of stored series (`analysis/series.ts`). */
 export type ExhibitSpec = { title: string; chart: "bar" | "line"; series: string[]; takeaway: string };
@@ -54,6 +66,8 @@ export const analyses = silver.table(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     symbol: text("symbol").notNull(),
+    /** The thesis this analysis writes (null on rows before the two theses: never read). */
+    side: text("side").$type<ThesisSide>(),
     /** Hash of everything the analysis read: same inputs, never asked twice. */
     inputHash: text("input_hash").notNull(),
     /** Parsed answer: fair value, narrative, drivers with exhibit specs, report. */
@@ -115,12 +129,16 @@ export type GoldFairValue = typeof fairValues.$inferSelect;
 
 /** Narrative: why the price sits where it does vs the fair value, so far. One paragraph. */
 export const narratives = gold.table("narratives", {
-  symbol: text("symbol").primaryKey(),
+  /** `<symbol>:<side>`: one narrative per thesis. */
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  side: text("side").$type<ThesisSide>().notNull(),
   /** ONE plain sentence (Kevin: « phrase simple: sujet verbe complément »). */
   text: text("text").notNull(),
   /** The longer why (3-5 sentences, figures), for the item panel. */
   detail: text("detail"),
-  version: uuid("version").notNull(),
+  /** Hash of the narrative and its drivers' words: a rewrite with the same words keeps every judgment built on it. */
+  version: text("version").notNull(),
   asOf: timestamp("as_of", { withTimezone: true }).notNull(),
   rebuiltAt,
 });
@@ -133,12 +151,15 @@ export type GoldNarrative = typeof narratives.$inferSelect;
  * `<symbol>:rationale`.
  */
 export const narrativeRationales = gold.table("narrative_rationales", {
-  symbol: text("symbol").primaryKey(),
+  /** `<symbol>:<side>`. */
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  side: text("side").$type<ThesisSide>().notNull(),
   /** One or two sentences: the rationale in short. */
   summary: text("summary").notNull(),
   claims: jsonb("claims").$type<RationaleClaim[]>().notNull(),
   exhibitIds: text("exhibit_ids").array().notNull(),
-  version: uuid("version").notNull(),
+  version: text("version").notNull(),
   asOf: timestamp("as_of", { withTimezone: true }).notNull(),
   rebuiltAt,
 });
@@ -146,20 +167,21 @@ export type GoldNarrativeRationale = typeof narrativeRationales.$inferSelect;
 
 /**
  * Narrative Driver: a reason the market holds the narrative (below fair value: why it is pessimistic; above: why it is
- * optimistic). 1 to 5 per ticker, each in ONE Driver Category. id = `<symbol>:<rank>`.
+ * optimistic). 1 to 5 per thesis, each in ONE Driver Category. id = `<symbol>:<side>:<rank>`.
  */
 export const narrativeDrivers = gold.table(
   "narrative_drivers",
   {
     id: text("id").primaryKey(),
     symbol: text("symbol").notNull(),
+    side: text("side").$type<ThesisSide>().notNull(),
     rank: integer("rank").notNull(),
     category: text("category").$type<DriverCategory>().notNull(),
     title: text("title").notNull(),
     /** ONE plain sentence shown under the title; `text` = the full description (item panel). */
     summary: text("summary"),
     text: text("text").notNull(),
-    version: uuid("version").notNull(),
+    version: text("version").notNull(),
     rebuiltAt,
   },
   (t) => [index("gold_narrative_drivers_symbol").on(t.symbol)],
@@ -225,16 +247,18 @@ export const evidence = gold.table(
 export type GoldEvidence = typeof evidence.$inferSelect;
 
 /**
- * Narrative State (dimension `narrative-state`): where each driver stands given all its judged news (level `driver`,
- * id = driver id), then where the whole narrative stands given its drivers (level `ticker`, id = symbol). Same five tags
- * as the news; the LLM weighs them (several weak reversals can make a strong one).
+ * Narrative State (dimension `narrative-state`): where each driver stands given all its judged news, their dates and
+ * what the price did since (level `driver`, id = driver id), then where the whole thesis stands and whether it signals
+ * NOW, given its drivers, the fair value (base, low, high) and the price path (level `thesis`, id = `<symbol>:<side>`).
+ * Same five tags as the news; the LLM weighs them (several weak reversals can make a strong one).
  */
 export const narrativeStates = gold.table(
   "narrative_states",
   {
     id: text("id").primaryKey(),
     symbol: text("symbol").notNull(),
-    level: text("level").$type<"driver" | "ticker">().notNull(),
+    side: text("side").$type<ThesisSide>().notNull(),
+    level: text("level").$type<"driver" | "thesis">().notNull(),
     driverId: text("driver_id"),
     effect: text("effect").$type<EvidenceEffect>().notNull(),
     strength: text("strength").$type<Strength>().notNull(),
@@ -242,7 +266,14 @@ export const narrativeStates = gold.table(
     probability: real("probability").notNull(),
     /** The Evidence the verdict rests on (driver: its non-noise news; ticker: the reversals behind it). */
     evidenceIds: text("evidence_ids").array().notNull(),
+    /** The day the current state started (the first news of the turn), as the judge reads it. */
+    since: text("since"),
+    /** How much of that turn the price has already moved. */
+    pricedIn: text("priced_in").$type<PricedIn>(),
+    /** Thesis level only: the signal this thesis gives NOW (strong / weak) or none, decided by the judge. */
+    signal: text("signal").$type<Strength>(),
     judgmentId: uuid("judgment_id").notNull(),
+    /** When the judge made this verdict (never the time of the run that re-read it). */
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
     rebuiltAt,
   },
@@ -250,14 +281,24 @@ export const narrativeStates = gold.table(
 );
 export type GoldNarrativeState = typeof narrativeStates.$inferSelect;
 
+/** One thesis' reading, kept on the ticker's signal so the board shows both when they compete. */
+export type ThesisReading = { side: ThesisSide; signal: Strength; effect: EvidenceEffect; strength: Strength; why: string | null; since: string | null };
+
 /**
- * Signal per ticker, from Fair Value, Quote and the ticker's Narrative State: BUY = the narrative in reversal with the
- * price BELOW fair value; SELL = in reversal with the price ABOVE; else none. Strength = the state's strength.
+ * Signal per ticker (Kevin 2026-11-09): the judge decides per thesis (narrative-state, level `thesis`) whether it signals
+ * now: a long thesis can give a BUY, a short one a SELL. One thesis (price outside the fair value range): its signal.
+ * Two theses (price inside the range): the signal of the one that signals alone; both or neither = no signal.
  */
 export const signals = gold.table("signals", {
   symbol: text("symbol").primaryKey(),
   signal: text("signal").$type<SignalKind>().notNull(),
   strength: text("strength").$type<Strength>().notNull(),
+  /** The thesis the signal comes from (null = no signal). */
+  side: text("side").$type<ThesisSide>(),
+  /** Why, in the judge's words (the signalling thesis; or why none surfaces). */
+  why: text("why"),
+  /** Every current thesis' reading: one outside the fair value range, two inside. */
+  theses: jsonb("theses").$type<ThesisReading[]>().notNull().default([]),
   fairValue: doublePrecision("fair_value"),
   fairValueMethod: text("fair_value_method"),
   /** Short method label ("5.9x EV/EBITDA, 4-year median"); the method above is the full calculation. */
@@ -319,13 +360,78 @@ export type GoldSignalChange = typeof signalChanges.$inferSelect;
 
 /** Research Report: equity-research style, markdown, `[EXHIBIT n]` markers = gold.exhibits.number of the ticker. */
 export const researchReports = gold.table("research_reports", {
-  symbol: text("symbol").primaryKey(),
+  /** `<symbol>:<side>`: one report per thesis. */
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  side: text("side").$type<ThesisSide>().notNull(),
   title: text("title").notNull(),
   markdown: text("markdown").notNull(),
   exhibitIds: text("exhibit_ids").array().notNull(),
-  version: uuid("version").notNull(),
+  version: text("version").notNull(),
   asOf: timestamp("as_of", { withTimezone: true }).notNull(),
   model: text("model").notNull(),
   rebuiltAt,
 });
 export type GoldResearchReport = typeof researchReports.$inferSelect;
+
+/**
+ * Fair Value History (Kevin 2026-11-09): the fair value as it stood each day (base, low, high), from every valuation
+ * synthesis (silver.valuation_syntheses, the last of each day). Point-in-time: what a judge reads "at the news date".
+ */
+export const fairValueHistory = gold.table(
+  "fair_value_history",
+  {
+    /** `<symbol>|<YYYY-MM-DD>`. */
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    day: text("day").notNull(),
+    value: doublePrecision("value").notNull(),
+    low: doublePrecision("low"),
+    high: doublePrecision("high"),
+    currency: text("currency"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_fair_value_history_symbol").on(t.symbol, t.day)],
+);
+export type GoldFairValueHistory = typeof fairValueHistory.$inferSelect;
+
+/**
+ * Market Reaction (Kevin 2026-11-09): what the price did around one news item or filing, computed by code from the
+ * stored closes: the close before, the next close, five closes later and today, each vs the S&P 500 over the same days,
+ * and the fair value (base, low, high) at the news date and today. id = the Evidence id `<symbol>|<kind>:<item id>`.
+ */
+export const marketReactions = gold.table(
+  "market_reactions",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    eventDay: text("event_day").notNull(),
+    currency: text("currency"),
+    /** Last close before the event day. */
+    beforeDay: text("before_day"),
+    closeBefore: doublePrecision("close_before"),
+    /** First close on or after the event day, and five closes after it. */
+    closeNext: doublePrecision("close_next"),
+    close5d: doublePrecision("close_5d"),
+    nowDay: text("now_day"),
+    closeNow: doublePrecision("close_now"),
+    /** Returns from the close before (ratio), and the same for the S&P 500. */
+    returnNext: doublePrecision("return_next"),
+    return5d: doublePrecision("return_5d"),
+    returnNow: doublePrecision("return_now"),
+    benchNext: doublePrecision("bench_next"),
+    bench5d: doublePrecision("bench_5d"),
+    benchNow: doublePrecision("bench_now"),
+    /** Fair value as it stood at the event (the first one computed when the event is older; `fv_day` says which). */
+    fvDay: text("fv_day"),
+    fvThen: doublePrecision("fv_then"),
+    fvLowThen: doublePrecision("fv_low_then"),
+    fvHighThen: doublePrecision("fv_high_then"),
+    fvNow: doublePrecision("fv_now"),
+    fvLowNow: doublePrecision("fv_low_now"),
+    fvHighNow: doublePrecision("fv_high_now"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_market_reactions_symbol").on(t.symbol, t.eventDay)],
+);
+export type GoldMarketReaction = typeof marketReactions.$inferSelect;
