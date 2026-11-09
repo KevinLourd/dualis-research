@@ -60,7 +60,8 @@ export async function planDispatch(db: Db): Promise<string[]> {
   const postRecipient = postLoopPhone();
   const now = Date.now();
   const sent = await db.select({ draftId: content.contentMessages.draftId, transitionId: content.contentMessages.transitionId, purpose: content.contentMessages.purpose }).from(content.contentMessages);
-  const sentDrafts = new Set(sent.filter((s) => s.purpose === "draft").map((s) => s.draftId));
+  // A version sent back after « change that » is already on his phone: never sent again as a new draft.
+  const sentDrafts = new Set(sent.filter((s) => s.purpose === "draft" || s.purpose === "version").map((s) => s.draftId));
   const knownTransitions = new Set(sent.map((s) => s.transitionId).filter(Boolean));
   const out: string[] = [];
 
