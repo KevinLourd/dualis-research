@@ -50,7 +50,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
       </div>
       {analysis && (
         <SlideOver title={analysisTitle(analysis.row)} subtitle={analysis.row.symbol} closeHref={base} size="lg">
-          <AnalysisBody analysis={analysis} variant="panel" thesisHref={(side) => `${panelHref(analysis.row.symbol)}&thesis=${side}`} />
+          <AnalysisBody analysis={analysis} variant="panel" />
         </SlideOver>
       )}
     </>
