@@ -7,12 +7,12 @@ import { sourceLabel } from "./source-labels";
 
 export function PageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <header className="flex items-end justify-between gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-kumo-strong">{title}</h1>
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h1 className="text-2xl font-semibold break-words text-kumo-strong">{title}</h1>
         {description && <p className="max-w-prose text-base text-kumo-subtle">{description}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
@@ -21,11 +21,11 @@ export function PageHeader({ title, description, actions }: { title: React.React
 export function Card({ title, action, children, className }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <KLayerCard className={className}>
-      <KLayerCardSecondary className="flex items-center justify-between">
+      <KLayerCardSecondary className="flex flex-wrap items-center justify-between gap-2">
         <span>{title}</span>
         {action}
       </KLayerCardSecondary>
-      <KLayerCardPrimary className="p-0">{children}</KLayerCardPrimary>
+      <KLayerCardPrimary className="overflow-x-auto p-0">{children}</KLayerCardPrimary>
     </KLayerCard>
   );
 }
@@ -98,7 +98,7 @@ export function FactList({ children }: { children: React.ReactNode }) {
 
 export function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_1fr] gap-3 px-4 py-2.5 text-base">
+    <div className="grid grid-cols-[100px_1fr] gap-3 sm:grid-cols-[120px_1fr] px-4 py-2.5 text-base">
       <dt className="text-kumo-subtle">{label}</dt>
       <dd className="flex min-w-0 flex-wrap items-baseline justify-between gap-2 text-kumo-default">{children}</dd>
     </div>

@@ -18,17 +18,17 @@ export default async function TickerLayout({ children, params }: { children: Rea
           <KBreadcrumbsCurrent>{ticker.symbol}</KBreadcrumbsCurrent>
         </KBreadcrumbs>
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-4">
             <CompanyLogo src={profile?.logoUrl ?? null} name={profile?.name ?? ticker.symbol} size={48} />
-            <div>
+            <div className="min-w-0">
               <p className="font-mono text-[13px] font-semibold text-kumo-subtle">
                 {ticker.symbol}
                 {profile?.exchange && <span className="font-sans font-normal"> · {profile.exchange}</span>}
               </p>
-              <h1 className="text-2xl font-semibold text-kumo-strong">{profile?.name ?? ticker.symbol}</h1>
+              <h1 className="text-2xl font-semibold break-words text-kumo-strong">{profile?.name ?? ticker.symbol}</h1>
             </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {quote && <LastPrice quote={{ ...quote, currency: quote.currency ?? profile?.currency ?? null }} />}
             <PositionTags inPortfolio={ticker.inPortfolio} position={ticker.position} />
           </div>

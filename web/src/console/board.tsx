@@ -62,7 +62,7 @@ export function FairValue({ row }: { row: Pick<BoardRow, "fairValue" | "fairValu
 /** One row per ticker: the whole row opens the panel, the company name opens the full Analysis page. */
 export function SignalTable({ rows, panelHref }: { rows: BoardRow[]; panelHref: (symbol: string) => string }) {
   return (
-    <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
+    <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
       <KTable className="table-fixed">
         <KTableHeader>
           <KTableRow>
@@ -108,7 +108,7 @@ export function SignalTable({ rows, panelHref }: { rows: BoardRow[]; panelHref: 
 /** Inactive tab: watchlist tickers outside the analysis scope. Name and quote only, for information: nothing is analysed. */
 export function InactiveTable({ rows }: { rows: BoardRow[] }) {
   return (
-    <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
+    <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
       <KTable className="table-fixed">
         <KTableHeader>
           <KTableRow>

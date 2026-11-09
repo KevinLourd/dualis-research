@@ -18,7 +18,7 @@ export default async function TickersPage() {
     <>
       <PageHeader title="Tickers" description={`${rows.length} companies on the watchlist. Open one to see its narrative and the news judged against it.`} />
       <TableSearch placeholder="Search a company or ticker">
-      <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
+      <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
         <KTable>
           <KTableHeader>
             <KTableRow>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BRAND, DISCLAIMER, subscribeHref } from "@/lib/model";
 import { Mark } from "./mark";
+import { NavMenu } from "./nav-menu";
 import { Social } from "./social";
 import { SubscribeButton } from "./subscribe-button";
 
@@ -38,6 +39,7 @@ export function Header({ substackUrl }: { substackUrl: string | null }) {
             </a>
           )}
         </div>
+        <NavMenu links={NAV} />
       </div>
     </header>
   );

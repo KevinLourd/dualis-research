@@ -31,3 +31,10 @@
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Phone: a table keeps readable columns and scrolls sideways inside its frame (never squeezed to 390 px). */
+@media (max-width: 767px) {
+  .overflow-x-auto > table {
+    min-width: 600px;
+  }
+}

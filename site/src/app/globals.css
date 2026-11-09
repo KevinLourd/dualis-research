@@ -217,6 +217,78 @@ p {
   gap: 12px;
   margin-left: 24px;
 }
+/* Mobile menu: hidden on desktop, a full-width list under the header on small screens. */
+.nav-menu {
+  display: none;
+}
+.nav-menu summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+.nav-menu-icon,
+.nav-menu-icon::before,
+.nav-menu-icon::after {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: currentColor;
+}
+.nav-menu-icon {
+  position: relative;
+}
+.nav-menu-icon::before,
+.nav-menu-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+.nav-menu-icon::before {
+  top: -7px;
+}
+.nav-menu-icon::after {
+  top: 7px;
+}
+.nav-menu[open] .nav-menu-icon {
+  background: transparent;
+}
+.nav-menu[open] .nav-menu-icon::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+.nav-menu[open] .nav-menu-icon::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+.nav-menu-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-bottom: 1px solid var(--rule);
+  padding: 8px 20px 20px;
+  height: calc(100svh - 76px);
+  overflow-y: auto;
+}
+.nav-menu-panel a {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+  text-decoration: none;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 18px;
+  color: var(--ink);
+}
 
 /* Page band: a deep indigo statement block, white type (Kevin 2026-11-06: dark professional purple). */
 .band {
@@ -1774,6 +1846,13 @@ a.call-card:hover {
   }
   .bar-actions .btn-outline {
     display: none;
+  }
+  .nav-menu {
+    display: block;
+    margin-left: 4px;
+  }
+  .bar {
+    gap: 16px;
   }
   .split-grid,
   .triple,

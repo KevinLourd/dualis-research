@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@cloudflare/kumo";
+import { Sidebar, useSidebar } from "@cloudflare/kumo";
 import {
   DatabaseIcon,
   GearSixIcon,
@@ -11,6 +11,7 @@ import {
   TrendUpIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { Logo } from "./logo";
 
 const RESEARCH = [
@@ -27,6 +28,11 @@ function isActive(pathname: string, href: string) {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+  // Phone: the sidebar is a sheet; it closes once a link has changed the page.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
   return (
     <Sidebar>
       <Sidebar.Header>

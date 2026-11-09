@@ -160,7 +160,7 @@ function Visuals({ visuals, name }: { visuals: GoldContentVisual[]; name: string
       {visuals.length === 0 ? (
         <p className="text-base text-kumo-subtle">Being made with the draft: they show here in a minute or two.</p>
       ) : (
-        <ul className="grid grid-cols-2 gap-4">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {visuals.map((v) => {
             const src = `/api/visuals/${v.id}`;
             return (
