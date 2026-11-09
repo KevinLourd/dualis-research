@@ -35,5 +35,11 @@ project `dualis-wa`, never inside the host's other stacks; `mem_limit 1500m`. Mo
 line (`command="/root/dualis-wa/deploy-hook.sh",no-pty,...`) and change the three `WA_DEPLOY_*` secrets.
 
 ## Test
+**Test the reply loop yourself, never ask Kevin to type it** (Kevin 2026-11-09 « tu peux faire les tests toi-même ? »).
+First check the device is `linked` (`ops.whatsapp_link`) and the draft row is `sent` in `app.whatsapp_outbox`, BEFORE
+telling anyone a message is on its way (2026-11-09: it had never been linked, nothing ever left). Then insert his answer
+as a `gold.whatsapp_conversation` row (contact = the test number, direction `in`, `reply_to_wa_id` = the draft's
+`wa_message_id`, `wa_message_id` `TEST-…`, sources `{test}`), run `collect.yml` with `content-replies`, read the new
+outbox row, and delete the `TEST-` rows after. Scripts run inside the container from `/app/wa` (it has `postgres`).
 `WhatsApp test` workflow (or `pnpm wa:test` in `web/`) queues a text + image to Kevin. Shared logic tests:
 `web/src/whatsapp/whatsapp.test.ts` (PGlite). Transcription on a file: `pnpm build && pnpm transcribe note.ogg`.
