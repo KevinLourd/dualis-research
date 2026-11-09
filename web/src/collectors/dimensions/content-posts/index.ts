@@ -23,6 +23,7 @@ export const REFERENCE_PUBLICATIONS = [
   { host: "www.archetype-research.com", name: "Archetype Capital", author: null },
   { host: "deepvaluecapitalbykyler.substack.com", name: "DeepValue Capital", author: "Kyler Johnson" },
   { host: "www.byronstreetresearch.com", name: "Liger Cub (Byron Street Research)", author: "Liger Cub" },
+  { host: "multibaggerideas.substack.com", name: "Multibagger Ideas", author: "Multibagger Ideas" },
 ] as const;
 
 const HEADERS = { "user-agent": "DualisResearch/1.0 (+https://github.com/KevinLourd/dualis-research)" };

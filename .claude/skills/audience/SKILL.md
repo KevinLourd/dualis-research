@@ -21,6 +21,8 @@ His 37 tickers: micro and small caps (mostly under US$2B, many under US$300M), s
 
 **Our edge for them**: Thierry's "play winnable games" (2026-11-04): English coverage of Japan, Korea, Canada and Europe small caps with filings read at source (TDnet, DART, EDINET...), and the narrative-vs-fundamental read (long when a beaten-down story inflects, short when a hyped one cracks). Few writers cover this; it is the hook.
 
+**Proof the model pays**: Multibagger Ideas (@multibaggerideas), small caps nobody covers, 0 to 42K readers and 515 paid in 20 months (~$1M/yr, Thierry 2026-11-09); copy his posting (`daily-content`), too big to ask for a swap now.
+
 **Not our reader**: beginners, options/crypto/day traders, macro-headline followers. Kobeissi / Unusual_Whales style reach brings followers who never pay; use their format, not their audience.
 
 ## Top 3 borrowed channels (ranked by paid-subscriber yield)

@@ -12,7 +12,7 @@ export const ARTICLE_DISCLAIMER =
 
 export const X_LIMIT = 280;
 
-export const PROMPT_VERSION = "drafts-v4";
+export const PROMPT_VERSION = "drafts-v5";
 
 const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
@@ -26,10 +26,14 @@ const GAME = [
 const FORMAT_RULES: Record<DraftFormat, string> = {
   "x-post": "Format: one X post, at most 240 characters, the ticker as a $cashtag once. Answer with the post text only.",
   "linkedin-post": "Format: one LinkedIn post, 600 to 1200 characters, short paragraphs, ends with one question to the reader. Answer with the post text only.",
-  "substack-note": "Format: one Substack Note, 300 to 700 characters, conversational, like a note to subscribers. Answer with the note text only.",
+  "substack-note": [
+    "Format: one Substack Note, 300 to 700 characters, built like the Notes of Multibagger Ideas (a small-cap Substack that grew to 42,000 readers): 5 to 8 lines, one sentence each, a blank line between lines.",
+    "Open on the number or a one-line claim. Then the few facts that make it land. Close on one line that says what it means, starting with \"The point:\" or \"The maths:\" when it fits.",
+    "Answer with the note text only.",
+  ].join("\n"),
   "substack-article": [
     "Format: one full Substack article, 900 to 1500 words, in this section order with these exact headings: ## 1. The business, ## 2. What the market believes, ## 3. What changed, ## 4. Bull vs Bear, ## 5. What would prove us wrong.",
-    "Title states a view (a claim, never a topic). Subtitle in one line.",
+    "Title states a view with its figures (a claim, never a topic), like \"20% Recurring Revenue Growth, Record Customer Wins, Down 56%\". Subtitle in one line.",
     "Use the exhibits offered: put [EXHIBIT <id>] on its own line where a chart helps, at most 3, each one an id from the list. The id is for that marker only: in the text call them Exhibit 1, 2, 3 in order of appearance. Each exhibit prints its own title and source line under it, so never write a source line for it.",
     "Where a figure is missing, write what we would need to know, never a guess.",
     'Answer with JSON only, no prose, no code fence: {"title": "...", "subtitle": "...", "body": "<markdown>"}',
