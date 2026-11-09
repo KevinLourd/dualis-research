@@ -68,7 +68,7 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
             <Stat label="Trades" hint={`${stats.trades - stats.closed} open`}>
               <span className="font-mono tabular">{stats.trades}</span>
             </Stat>
-            <Stat label="Winners">
+            <Stat label="Winners" hint={stats.flat ? `${stats.flat} not moved yet` : undefined}>
               <span className="font-mono tabular">{stats.winners === null ? "–" : `${Math.round(stats.winners * 100)}%`}</span>
             </Stat>
             <Stat label="Best / worst" hint={stats.worst ? `${stats.worst.symbol} ${signedPct(stats.worst.return)}` : undefined}>
