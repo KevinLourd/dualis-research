@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CallsBoard, CtaBand } from "@/components/blocks";
-import { PokerScene } from "@/components/poker-scene";
 import { MARKETS } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
 import { WINNABLE } from "@/lib/winnable";
@@ -10,8 +9,7 @@ export const metadata: Metadata = { title: "Company" };
 
 /**
  * Company (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
- * Altas's photo hero and statement with three columns; Thierry's tables (where he holds the edge) as cards beside
- * the « pick the table » poker scene; the calls scoreboard; Thierry's line (his photo lives on About).
+ * Altas's photo hero and statement with three columns; Thierry's tables (where he holds the edge) as cards; the calls scoreboard; Thierry's line (his photo lives on About).
  * Thierry 2026-11-06: the price vs value figure « doesn't fit the style of the website » (removed), and the two best
  * calls should not shout: one quiet block of rows under a small label, no headline.
  */
@@ -68,9 +66,8 @@ export default async function Company() {
             <div>
               <h2 className="h-bold">What we look for</h2>
               <p className="tables-intro">A good poker player picks the table first. We pick the markets where we hold the edge.</p>
-              <p className="band-thread">{WINNABLE.company.line}</p>
+              <p className="band-thread">{WINNABLE.company}</p>
             </div>
-            <PokerScene variant="company" label={WINNABLE.company.label} className="tables-canvas" />
           </div>
           <div className="look-for">
             {LOOK_FOR.map((c) => (

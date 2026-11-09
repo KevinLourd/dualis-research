@@ -11,7 +11,7 @@ export default async function About() {
   const posts = (await getPublications()).slice(0, 3);
   return (
     <div className="about-page">
-      <PageBand label="About" line="The analyst behind the research." scene="about" />
+      <PageBand label="About" line="The analyst behind the research." thread="about" />
       <section className="wrap">
         <article className="person">
           <div className="person-photo">

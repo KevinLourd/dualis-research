@@ -1890,12 +1890,7 @@ h2 + .lead,
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-/* « Play winnable games » (Kevin 2026-11-09): one poker scene of points per page, drawn on a canvas (poker-scene.tsx). */
-.poker-scene {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+/* « Play winnable games » (Thierry 2026-11-06): one short line of the analogy per page. */
 .band-thread {
   margin-top: 18px;
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -1905,40 +1900,11 @@ h2 + .lead,
   text-transform: uppercase;
   color: var(--on-deep);
 }
-.band-scene .band-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 64px);
-  align-items: center;
-  padding-top: clamp(40px, 5vw, 64px);
-  padding-bottom: clamp(40px, 5vw, 64px);
-}
-.band-canvas {
-  height: clamp(260px, 26vw, 360px);
-}
-.hero-scene {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 42%;
-  background: radial-gradient(closest-side, rgba(20, 16, 52, 0.78), rgba(20, 16, 52, 0));
-}
-.hero-canvas {
-  position: absolute;
-  top: 10%;
-  left: 0;
-  width: 96%;
-  height: 78%;
-}
 .hero .band-thread {
   margin-top: 28px;
 }
 .tables-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: clamp(24px, 4vw, 64px);
-  align-items: center;
+  max-width: 720px;
 }
 .tables-intro {
   margin-top: 16px;
@@ -1946,41 +1912,11 @@ h2 + .lead,
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.88);
 }
-.tables-canvas {
-  height: clamp(240px, 24vw, 340px);
-}
 .section.deep.tables .lf-card {
   border-color: transparent;
 }
 .section.deep.tables .lf-card h3 {
   color: var(--ink);
-}
-@media (max-width: 960px) {
-  .band-scene .band-inner,
-  .tables-head {
-    grid-template-columns: 1fr;
-  }
-  .band-canvas,
-  .tables-canvas {
-    height: 220px;
-  }
-  .band-scene .band-inner {
-    gap: 8px;
-  }
-  .hero-scene {
-    top: auto;
-    width: 100%;
-    height: 42%;
-  }
-  .hero-canvas {
-    top: 0;
-    width: 100%;
-    height: 100%;
-  }
-  .hero-inner {
-    align-self: flex-start;
-    padding-top: 10vh;
-  }
 }
 /* Two deep sections in a row (Company: the tables, then the track record): one hairline between them. */
 .section.deep + .section.deep {
