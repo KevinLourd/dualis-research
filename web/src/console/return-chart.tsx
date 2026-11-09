@@ -7,6 +7,7 @@ import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
 import type { Line } from "./portfolio-series";
+import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, BrushComponent, ToolboxComponent, CanvasRenderer]);
@@ -31,7 +32,7 @@ export function ReturnChart({ lines }: { lines: Line[] }) {
   const summary = lines.map((l) => `${l.name} ${pct(l.points.at(-1)?.value ?? 0)}`).join(", ");
   return (
     <div className="flex flex-col gap-3">
-    <TimeseriesChart
+    <FitWidth><TimeseriesChart
       echarts={echarts}
       isDarkMode={dark}
       height={320}
@@ -43,7 +44,7 @@ export function ReturnChart({ lines }: { lines: Line[] }) {
       xAxisTickCount={6}
       yAxisTickCount={5}
       ariaDescription={`Return since entry: ${summary}.`}
-    />
+    /></FitWidth>
       <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         {lines.map((l, k) => (
           <li key={l.name} className="inline-flex items-center gap-2">

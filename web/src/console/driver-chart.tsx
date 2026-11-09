@@ -7,6 +7,7 @@ import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
 import { type ExhibitPeriod, type ExhibitUnit, formatExhibitValue, formatUnit, monthYear, periodLabel } from "./exhibit-format";
+import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
 echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, CanvasRenderer]);
@@ -127,7 +128,7 @@ export function DriverExhibit({
         </span>
       </figcaption>
       <div className="border-t border-kumo-line pt-1">
-        <Chart echarts={echarts} options={options as never} height={200} isDarkMode={dark} />
+        <FitWidth><Chart echarts={echarts} options={options as never} height={200} isDarkMode={dark} /></FitWidth>
       </div>
       <p className="border-t border-kumo-hairline pt-1 text-[10px] text-kumo-subtle">
         Source: {sources.map((s) => SOURCE_LABEL[s] ?? s).join("; ") || "not collected"}; Dualis Research.
@@ -215,7 +216,7 @@ export function ExhibitChart({
         )}
       </figcaption>
       <div className="border-t border-kumo-line pt-1">
-        <Chart echarts={echarts} options={options as never} height={height} isDarkMode={dark} />
+        <FitWidth><Chart echarts={echarts} options={options as never} height={height} isDarkMode={dark} /></FitWidth>
       </div>
       {series.length > 1 && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-kumo-default">

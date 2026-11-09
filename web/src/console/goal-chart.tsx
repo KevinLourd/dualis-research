@@ -6,6 +6,7 @@ import { AriaComponent, BrushComponent, GridComponent, MarkLineComponent, Toolbo
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
+import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, BrushComponent, ToolboxComponent, CanvasRenderer]);
@@ -20,7 +21,7 @@ export function GoalChart({ actual, plan }: { actual: { date: string; value: num
   const fmt = (v: number) => new Intl.NumberFormat("en-US").format(Math.round(v));
   const last = actual.at(-1);
   return (
-    <TimeseriesChart
+    <FitWidth><TimeseriesChart
       echarts={echarts}
       isDarkMode={dark}
       height={220}
@@ -34,6 +35,6 @@ export function GoalChart({ actual, plan }: { actual: { date: string; value: num
       xAxisTickCount={5}
       yAxisTickCount={4}
       ariaDescription={last ? `Subscribers: ${fmt(last.value)} on ${last.date}, goal ${fmt(plan.at(-1)?.value ?? 0)} by ${plan.at(-1)?.date}.` : "No subscriber count yet"}
-    />
+    /></FitWidth>
   );
 }

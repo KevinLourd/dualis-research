@@ -69,7 +69,7 @@ export function TableSearch({
           {counts.shown} of {counts.total}
         </span>
       )}
-      <InputGroup size="sm" className={tabs ? "w-full sm:w-64" : "w-full max-w-sm"}>
+      <InputGroup size="sm" className={tabs ? "w-full md:w-64" : "w-full max-w-sm"}>
           <InputGroup.Addon>
             <MagnifyingGlassIcon size={16} />
           </InputGroup.Addon>
@@ -88,8 +88,8 @@ export function TableSearch({
   return (
     <div className="flex flex-col gap-4">
       {tabs ? (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="max-w-full min-w-0 flex-1 overflow-x-auto">{tabs}</div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+          <div className="min-w-0 flex-1 overflow-x-auto">{tabs}</div>
           {box}
         </div>
       ) : (

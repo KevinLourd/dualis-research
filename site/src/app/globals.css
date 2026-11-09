@@ -230,6 +230,7 @@ p {
   margin-right: -10px;
   cursor: pointer;
   color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
 }
 .nav-menu summary::-webkit-details-marker {
   display: none;

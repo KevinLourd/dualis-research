@@ -63,7 +63,7 @@ export function FairValue({ row }: { row: Pick<BoardRow, "fairValue" | "fairValu
 export function SignalTable({ rows, panelHref }: { rows: BoardRow[]; panelHref: (symbol: string) => string }) {
   return (
     <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
-      <KTable className="table-fixed">
+      <KTable className="table-fixed max-md:min-w-[760px] max-md:table-auto">
         <KTableHeader>
           <KTableRow>
             <KTableHead className="w-32 pl-6">Signal</KTableHead>
@@ -109,7 +109,7 @@ export function SignalTable({ rows, panelHref }: { rows: BoardRow[]; panelHref: 
 export function InactiveTable({ rows }: { rows: BoardRow[] }) {
   return (
     <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
-      <KTable className="table-fixed">
+      <KTable className="table-fixed max-md:min-w-[760px] max-md:table-auto">
         <KTableHeader>
           <KTableRow>
             <KTableHead className="pl-6">Company</KTableHead>

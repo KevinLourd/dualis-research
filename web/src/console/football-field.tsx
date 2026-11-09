@@ -6,6 +6,7 @@ import { AriaComponent, GridComponent, MarkLineComponent, TooltipComponent } fro
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { FONT, INK } from "./driver-chart";
+import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
 echarts.use([BarChart, ScatterChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, CanvasRenderer]);
@@ -63,7 +64,7 @@ export function FootballField({ rows, fairValue, currency }: { rows: FieldRow[];
         <span className="text-[11px] text-kumo-subtle">Value per share{currency ? `, ${currency}` : ""}: low to high, dot = base case, weight in brackets</span>
       </figcaption>
       <div className="border-t border-kumo-line pt-1">
-        <Chart echarts={echarts} options={options as never} height={Math.max(160, 44 * rows.length + 40)} isDarkMode={dark} />
+        <FitWidth><Chart echarts={echarts} options={options as never} height={Math.max(160, 44 * rows.length + 40)} isDarkMode={dark} /></FitWidth>
       </div>
     </figure>
   );
