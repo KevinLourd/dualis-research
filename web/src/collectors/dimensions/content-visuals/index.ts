@@ -21,7 +21,8 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v10 (Kevin 2026-11-09): with news, the BREAKING card fills the top left big, the chart label stays small.
 // v11 (Kevin 2026-11-09): the price vs fair value chart gets the same layout: BREAKING card, signal top right, range shaded.
 // v12 (Kevin 2026-11-09): the price chart takes the driver charts' pasted price card; month axis « Sep-25 », one per tick.
-export const VISUALS_VERSION = "visuals-v12";
+// v13 (Kevin 2026-11-09): the price callout picks among what the line shows (latest close, 12-month high and low), its number = the point it hits.
+export const VISUALS_VERSION = "visuals-v13";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
