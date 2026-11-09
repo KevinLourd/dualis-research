@@ -65,6 +65,12 @@ describe("live test P&L", () => {
     expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 0).lines[0].points[1].value).toBeCloseTo(0.1);
   });
 
+  it("rebases the S&P at the close known when the first signal fired, like an entry", () => {
+    const pnl = portfolioPnl([strongA], { A, B }, spx, "2026-11-06T08:00:00.000Z", 0.5);
+    expect(pnl.lines[1].points[0]).toEqual({ date: "2026-11-05", value: 0 });
+    expect(pnl.benchmarkReturn).toBeCloseTo(0.03);
+  });
+
   it("compounds day returns, stops a position at its exit, rebases the S&P at the first signal day", () => {
     const closed = { ...strongA, exitDate: "2026-11-06", closedAt: new Date("2026-11-06T22:00:00Z") };
     const pnl = portfolioPnl([closed], bars, spx, "2026-11-05", 0.5);

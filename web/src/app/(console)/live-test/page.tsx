@@ -79,7 +79,7 @@ function held(from: Date, to: Date): string {
 export default async function LiveTestPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: raw } = await searchParams;
   const tab: LiveTab = raw === "closed" || raw === "history" ? raw : "open";
-  const { start, events, positions, bars, benchmark, companies } = await liveTestView();
+  const { start, startAt, events, positions, bars, benchmark, companies } = await liveTestView();
   const open = positions.filter((p) => p.closedAt === null);
   const closed = positions.filter((p) => p.closedAt !== null);
   const now = new Date();
@@ -93,7 +93,7 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
           positions={positions.map((p) => ({ symbol: p.symbol, side: p.side, strength: p.strength, entryDate: p.entryDate, exitDate: p.exitDate, closedAt: p.closedAt }))}
           bars={bars}
           benchmark={benchmark}
-          start={start}
+          start={startAt}
           open={open.length}
           closed={closed.length}
           won={closed.filter((p) => (p.return ?? 0) > 0).length}
