@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { signalChanges } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
@@ -27,6 +27,11 @@ export const ALERT_SOURCE = "signal-alerts";
 export const ALERT_ROLES: readonly ("client" | "test")[] = ["test", "client"];
 /** A change older than this is never sent (a run missed it: stale news). */
 const MAX_AGE_HOURS = 24;
+/**
+ * The same reading (ticker x signal x strength) is sent at most once per this window (Kevin 2026-11-09, his pick « A »):
+ * a signal that flickers off and back on (Miraial: no signal -> SELL weak 3 times on Nov 9) is one alert, not three.
+ */
+const REPEAT_HOURS = 24;
 
 type Planned = { changeId: string; recipient: string; text: string; input: AlertInput };
 const planned = new Map<string, Planned>();
@@ -69,12 +74,21 @@ export async function planAlerts(db: Db, _ctx?: unknown, now = new Date()): Prom
     .select({ transitionId: content.contentMessages.transitionId, recipient: content.contentMessages.recipient, sources: content.contentMessages.sources })
     .from(content.contentMessages)
     .where(inArray(content.contentMessages.transitionId, changes.map((c) => c.id)));
+  // Readings each recipient already got in the repeat window (ticker x signal x strength), whatever change carried them.
+  const recent = await db
+    .select({ recipient: content.contentMessages.recipient, symbol: signalChanges.symbol, toSignal: signalChanges.toSignal, toStrength: signalChanges.toStrength })
+    .from(content.contentMessages)
+    .innerJoin(signalChanges, eq(sql`${signalChanges.id}::text`, content.contentMessages.transitionId))
+    .where(and(eq(content.contentMessages.purpose, "alert"), gte(content.contentMessages.createdAt, new Date(now.getTime() - REPEAT_HOURS * 3600_000))));
+  const reading = (r: string, c: { symbol: string; toSignal: string; toStrength: string }) => `${r}|${c.symbol}|${c.toSignal}|${c.toStrength}`;
+  const got = new Set(recent.map((x) => reading(x.recipient, x)));
   const to = recipients();
   const out: string[] = [];
   for (const c of changes.sort((a, b) => a.at.getTime() - b.at.getTime())) {
     // Already handled by the old text-only alert (content-dispatch, before 2026-11-09): never a second message.
     if (sent.some((s) => s.transitionId === c.id && !s.sources.includes(ALERT_SOURCE))) continue;
-    const todo = to.filter((r) => !sent.some((s) => s.transitionId === c.id && s.recipient === r));
+    const todo = to.filter((r) => !sent.some((s) => s.transitionId === c.id && s.recipient === r) && !got.has(reading(r, c)));
+    for (const r of todo) got.add(reading(r, c));
     if (todo.length === 0) continue;
     const input = await alertInput(db, c, now);
     const text = signalAlert(c, input.name);

@@ -60,6 +60,20 @@ describe("signal-alerts", () => {
     expect(msgs.filter((m) => m.transitionId === up.id).map((m) => m.purpose)).toEqual(["alert", "alert"]);
   });
 
+  it("a signal that flickers off and back on within a day is one alert; a stronger reading still alerts", async () => {
+    const first = change("CCLD", ["none", "noise"], ["SELL", "weak"], 3);
+    await db.insert(signalChanges).values(first);
+    await run();
+    await db.insert(signalChanges).values([change("CCLD", ["SELL", "weak"], ["none", "noise"], 2), change("CCLD", ["none", "noise"], ["SELL", "weak"], 1)]);
+    await run();
+    expect(await db.select().from(whatsappOutbox)).toHaveLength(2);
+    await db.insert(signalChanges).values(change("CCLD", ["SELL", "weak"], ["SELL", "strong"]));
+    await run();
+    const out = await db.select().from(whatsappOutbox);
+    expect(out).toHaveLength(4);
+    expect(out.filter((o) => o.text?.includes("SELL (strong crack)"))).toHaveLength(2);
+  });
+
   it("queues nothing while the WhatsApp device is not linked", async () => {
     await db.update(whatsappLink).set({ status: "waiting-for-scan" });
     await db.insert(signalChanges).values(change("CCLD", ["none", "noise"], ["BUY", "strong"]));
