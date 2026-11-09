@@ -1,6 +1,6 @@
 # Dualis Research
 
-**The brand is DUALIS Research, no T (Kevin 2026-11-05), infra ids included** (renamed 2026-11-05): repo `KevinLourd/dualis-research` (PUBLIC since 2026-11-06, restarted without history; the old history is the private `KevinLourd/dualis-research-archive`, Actions off), Workers `dualis-site` (https://dualis-site.dualis-research.workers.dev) and `dualis-console` (https://dualis-console.dualis-research.workers.dev), box compose project + container `dualis-wa` in `/root/dualis-wa` (volume `dualis-wa_data` = the WhatsApp session).
+**The brand is DUALIS Research, no T (Kevin 2026-11-05), infra ids included** (renamed 2026-11-05): repo `KevinLourd/dualis-research` (PUBLIC since 2026-11-06, restarted without history; the old history is the private `KevinLourd/dualis-research-archive`, Actions off), Workers `dualis-site` (https://dualisresearch.com since 2026-11-09, + www; also https://dualis-site.dualis-research.workers.dev) and `dualis-console` (https://dualis-console.dualis-research.workers.dev), box compose project + container `dualis-wa` in `/root/dualis-wa` (volume `dualis-wa_data` = the WhatsApp session).
 
 Independent equity research brand for **Thierry Matin** (client, friend, product owner). Kevin Lourd builds it (Nov 2026).
 

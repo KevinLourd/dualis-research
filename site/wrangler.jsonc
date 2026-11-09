@@ -6,6 +6,8 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "workers_dev": true,
+  // dualisresearch.com + www: custom domains added in the Cloudflare dashboard (Workers > dualis-site > Domains), not here:
+  // the deploy token cannot see the zone (code 10082, 2026-11-09). No "routes" key, so a deploy leaves them in place.
   "observability": { "enabled": true }
   // Runtime secret (set by .github/workflows/deploy-site.yml): DATABASE_URL (read-only use: gold tables).
 }
