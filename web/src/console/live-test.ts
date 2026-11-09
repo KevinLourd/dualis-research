@@ -85,10 +85,13 @@ export type PnlPosition = Pick<Position, "symbol" | "side" | "strength" | "entry
 
 export type Pnl = { lines: Line[]; totalReturn: number; benchmarkReturn: number | null };
 
-/** The book's curve since `start` (first signal day) for one weak weight, and the S&P 500 rebased at `start`. */
+/**
+ * The book's curve since `start` (the first signal, ISO time) for one weak weight, and the S&P 500 rebased at the close
+ * known at that moment, the same rule as an entry (else both lines would not start on the same day).
+ */
 export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[]>, benchmark: Bar[], start: string | null, weakWeight: number): Pnl {
   const priced = positions.filter((p) => p.entryDate !== null);
-  const first = [start, ...priced.map((p) => p.entryDate!)].filter((d): d is string => d !== null).sort()[0];
+  const first = [start?.slice(0, 10) ?? null, ...priced.map((p) => p.entryDate!)].filter((d): d is string => d !== null).sort()[0];
   const days = first
     ? [...new Set([...priced.flatMap((p) => (bars[p.symbol] ?? []).map((x) => x.date)), ...benchmark.map((x) => x.date)])].filter((d) => d >= first).sort()
     : [];
@@ -126,7 +129,7 @@ export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[
   });
   const lines: Line[] = [];
   if (points.length) lines.push({ name: "Signal book", kind: "portfolio", points });
-  const base = start ? (benchmark.find((x) => x.date >= start) ?? null) : null;
+  const base = start ? (closeKnownAt(benchmark, new Date(start), "US") ?? benchmark.find((x) => x.date >= start.slice(0, 10)) ?? null) : null;
   if (base) lines.push({ name: "S&P 500", kind: "benchmark", points: benchmark.filter((x) => x.date >= base.date).map((x) => ({ date: x.date, value: x.close / base.close - 1 })) });
   const bench = lines.find((l) => l.kind === "benchmark");
   return { lines, totalReturn: equity - 1, benchmarkReturn: bench ? bench.points.at(-1)!.value : null };

@@ -16,9 +16,11 @@ export async function liveTestView() {
     db.select().from(signalEvents).orderBy(desc(signalEvents.at)),
     db.select().from(livePositions).orderBy(desc(livePositions.openedAt)),
   ]);
-  const start = events.length ? events.map((e) => e.at.toISOString().slice(0, 10)).sort()[0] : null;
+  const startAt = events.length ? events.map((e) => e.at.toISOString()).sort()[0] : null;
+  const start = startAt?.slice(0, 10) ?? null;
   const symbols = [...new Set([...events.map((e) => e.symbol), ...positions.map((p) => p.symbol)])];
-  const firstEntry = [start, ...positions.map((p) => p.entryDate)].filter((d): d is string => d !== null).sort()[0];
+  // A week earlier (weekends, holidays): the S&P is rebased at the close known when the first signal fired.
+  const firstEntry = [start ? new Date(Date.parse(`${start}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10) : null, ...positions.map((p) => p.entryDate)].filter((d): d is string => d !== null).sort()[0];
   const traded = [...new Set(positions.map((p) => p.symbol))];
   const [profiles, rows] = await Promise.all([
     symbols.length ? db.select({ symbol: companyProfiles.symbol, name: companyProfiles.name, logoUrl: companyProfiles.logoUrl }).from(companyProfiles).where(inArray(companyProfiles.symbol, symbols)) : [],
@@ -35,6 +37,6 @@ export async function liveTestView() {
   const benchmark = bars[BENCHMARK] ?? [];
   delete bars[BENCHMARK];
   const companies = Object.fromEntries(profiles.map((p) => [p.symbol, { name: p.name, logoUrl: p.logoUrl }]));
-  return { start, events, positions, bars, benchmark, companies };
+  return { start, startAt, events, positions, bars, benchmark, companies };
 }
 export type LiveTestView = Awaited<ReturnType<typeof liveTestView>>;
