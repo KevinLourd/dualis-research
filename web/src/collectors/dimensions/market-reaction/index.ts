@@ -9,7 +9,9 @@ import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } fr
 import { itemsOf, EVIDENCE_WINDOW_DAYS } from "../evidence/items";
 import { majorUnit } from "../financials/derive";
 import { analysedSymbols } from "../watchlist";
-import { reactionOf, type Bar, type FvPoint } from "./compute";
+import { reactionOf, type Bar, type FvPoint, type Minute } from "./compute";
+import { latestPrice, priceKnownAt } from "@/console/live-test";
+import { latestTicks, mergeTicks, ticksKnownAt } from "../intraday-price/read";
 
 export * from "./compute";
 
@@ -68,7 +70,21 @@ export const marketReactionSource: Source = {
     const [bars, benchBars, points, items] = await Promise.all([closes(db, symbol, currency), bench, fairValuePoints(db, symbol), itemsOf(db, symbol)]);
     const now: FvPoint | null = fv ? { day: (fv.asOf ?? new Date()).toISOString().slice(0, 10), value: fv.value, low: fv.low, high: fv.high } : null;
     const major = currency ? majorUnit(1, currency).currency : null;
-    const reactions = items.map((it) => reactionOf({ id: `${symbol}|${it.kind}:${it.id}`, symbol, day: it.at.toISOString().slice(0, 10) }, bars, benchBars, points, now, fv?.currency ?? major));
+    // The minute view: the 5-minute bar already closed when each item came out (one query), and the latest bar.
+    const [[ticker], known, latest] = await Promise.all([
+      db.select({ market: gold.tickers.market }).from(gold.tickers).where(eq(gold.tickers.symbol, symbol)),
+      ticksKnownAt(db, items.flatMap((it) => [{ symbol, at: it.at }, { symbol: BENCHMARK, at: it.at }])),
+      latestTicks(db, [symbol, BENCHMARK]),
+    ]);
+    const ticks = mergeTicks(known, latest);
+    const own = (ticks.get(symbol) ?? []).map((t) => ({ ...t, close: majorUnit(t.close, currency).price }));
+    const spx = ticks.get(BENCHMARK) ?? [];
+    const market = ticker?.market ?? null;
+    const minuteOf = (at: Date): Minute | null =>
+      market
+        ? { eventAt: at, atEvent: priceKnownAt(bars, own, at, market), now: latestPrice(bars, own, market), benchAtEvent: priceKnownAt(benchBars, spx, at, "US"), benchNow: latestPrice(benchBars, spx, "US") }
+        : null;
+    const reactions = items.map((it) => reactionOf({ id: `${symbol}|${it.kind}:${it.id}`, symbol, day: it.at.toISOString().slice(0, 10) }, bars, benchBars, points, now, fv?.currency ?? major, minuteOf(it.at)));
     const history = points.map((p) => ({ id: `${symbol}|${p.day}`, symbol, day: p.day, value: p.value, low: p.low, high: p.high, currency: p.currency }));
     const payload: Payload = { history, reactions };
     return { request: { symbol, items: items.length, bars: bars.length }, httpStatus: null, payload };
@@ -90,7 +106,9 @@ export async function promoteMarketReactions(db: Db, fetches: BronzeFetch[]): Pr
   const symbols = [...latest.keys()];
   if (symbols.length === 0) return 0;
   const history = [...latest.values()].flatMap((p) => p.history);
-  const reactions = [...latest.values()].flatMap((p) => p.reactions);
+  // Bronze holds JSON: the minute view's times come back as strings.
+  const when = (v: Date | string | null) => (v === null ? null : new Date(v));
+  const reactions = [...latest.values()].flatMap((p) => p.reactions).map((r) => ({ ...r, eventAt: when(r.eventAt), priceAtEventAt: when(r.priceAtEventAt), priceNowAt: when(r.priceNowAt) }));
   await db.transaction(async (tx) => {
     await tx.delete(fairValueHistory).where(inArray(fairValueHistory.symbol, symbols));
     await tx.delete(marketReactions).where(inArray(marketReactions.symbol, symbols));

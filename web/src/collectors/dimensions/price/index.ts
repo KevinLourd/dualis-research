@@ -146,6 +146,8 @@ export async function rebuildGoldPrices(db: Db, symbol: string, written: Row[]):
     change: previous ? last.close - previous.close : null,
     changePct: previous ? (last.close - previous.close) / previous.close : null,
     currency: withCurrency?.currency ?? null,
+    at: null,
+    source: "close" as const,
     sources: last.sources,
     rebuiltAt: new Date(),
   };

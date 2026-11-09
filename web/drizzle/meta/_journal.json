@@ -288,6 +288,13 @@
       "when": 1794227577357,
       "tag": "0040_intraday-prices",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794228598902,
+      "tag": "0041_intraday-quotes-reactions",
+      "breakpoints": true
     }
   ]
 }

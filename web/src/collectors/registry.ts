@@ -45,11 +45,11 @@ import type { Dimension } from "./types";
  * Peers (comparables + analyst targets) after consensus; Valuation (the fair value pyramid) after peers; Analysis after valuation (it reads the Fair Value; one thesis below or above the fair value range, both inside it); Market Reaction beside it (the fair value history and what the price did around each news, code only); Narrative Since after analysis (the month the current story took hold); Evidence after it (every item since that month against each driver, older ones Too old); Narrative State after it (each driver's tag, then the ticker's); Signals last (fair value x the ticker's tag).
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
- * Intraday price (5-minute bars, Yahoo) beside valuation (no Yahoo there), before analysis: market reaction, the judges and the live test read the price at the minute a news item or a signal lands.
+ * Intraday price (5-minute bars, Yahoo) alone in its stage right after price (Yahoo rate limit): it moves gold.quotes to the latest 5-minute price, so EV, valuation, every judge and the live test read the real price, and market reaction the price at the minute a news item lands.
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, intradayPrice, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -66,10 +66,11 @@ export const STAGES: readonly (readonly string[])[] = [
   ["watchlist"],
   ["portfolio", "company-profile"],
   ["news", "onedrive", "price", "filings", "earnings"],
+  ["intraday-price"],
   ["thesis", "onedrive-filings", "consensus"],
   ["financials"],
   ["peers"],
-  ["valuation", "intraday-price"],
+  ["valuation"],
   ["analysis", "market-reaction"],
   ["narrative-since"],
   ["evidence"],

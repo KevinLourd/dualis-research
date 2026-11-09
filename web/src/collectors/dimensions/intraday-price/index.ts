@@ -1,4 +1,4 @@
-import { and, eq, inArray, max, min, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, max, min, ne, sql } from "drizzle-orm";
 import { signalStates } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as gold from "@/db/schema/gold";
@@ -188,6 +188,45 @@ export async function promoteIntraday(db: Db, fetches: BronzeFetch[]): Promise<P
         .values(chunk.map((r) => ({ symbol, at: r.at, date: r.date, close: r.close, sources: r.sources })))
         .onConflictDoUpdate({ target: [gold.intradayBars.symbol, gold.intradayBars.at], set: { date: sql`excluded.date`, close: sql`excluded.close`, sources: sql`excluded.sources` } });
     }
+    const latest = rows.reduce((a, b) => (b.at > a.at ? b : a));
+    await liveQuote(db, symbol, { at: latest.at, date: latest.date, close: latest.close, sources: latest.sources });
   }
   return { silverRowsBySource };
+}
+
+/**
+ * gold.quotes -> the latest 5-minute price when it is newer than the stored quote (Kevin 2026-11-09: every judge reads
+ * the real price, never yesterday's close). Day change vs the last daily close before that trading day.
+ */
+export async function liveQuote(db: Db, symbol: string, bar: { at: Date; date: string; close: number; sources: string[] }): Promise<void> {
+  const [q] = await db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol));
+  if (!q) return; // No daily price yet: `price` writes the quote first (currency, history).
+  const known = new Date(bar.at.getTime() + INTRADAY_MINUTES * 60_000);
+  if (bar.date < q.date || (q.at && q.at >= known)) return;
+  const [prev] = await db
+    .select({ close: gold.priceBars.close })
+    .from(gold.priceBars)
+    .where(and(eq(gold.priceBars.symbol, symbol), lt(gold.priceBars.date, bar.date)))
+    .orderBy(desc(gold.priceBars.date))
+    .limit(1);
+  const previousClose = prev?.close ?? null;
+  await db
+    .update(gold.quotes)
+    .set({
+      date: bar.date,
+      close: bar.close,
+      at: known,
+      source: "intraday",
+      previousClose,
+      change: previousClose === null ? null : bar.close - previousClose,
+      changePct: previousClose === null ? null : (bar.close - previousClose) / previousClose,
+      sources: bar.sources,
+      rebuiltAt: new Date(),
+    })
+    .where(eq(gold.quotes.symbol, symbol));
+}
+
+/** How a judge reads when a quote was taken: « 2026-11-09 15:05 UTC, 5-minute price » or « 2026-11-06 close ». */
+export function quoteStamp(q: { date: string; at: Date | null; source: string }): string {
+  return q.source === "intraday" && q.at ? `${q.at.toISOString().slice(0, 16).replace("T", " ")} UTC, 5-minute price` : `${q.date} close`;
 }

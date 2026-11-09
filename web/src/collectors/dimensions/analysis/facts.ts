@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { quoteStamp } from "../intraday-price";
 import { consensus } from "@/db/schema/consensus";
 import { fairValues } from "@/db/schema/analysis";
 import { valuations } from "@/db/schema/financials";
@@ -97,12 +98,12 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   // per news): they stay out of the hash; each one is judged against the narrative by `evidence` instead.
   const news = ["News and filings of the last 12 months (newest first):", items.length ? items.map((i) => `- ${i.at.toISOString().slice(0, 10)} ${i.kind}${i.publisher ? ` (${i.publisher})` : ""}: ${i.title}`).join("\n") : "none"].join("\n");
 
-  const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency } : null;
+  const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency, stamp: quoteStamp(quote) } : null;
   const fvLine = fairValue
     ? `Fair value (${fairValue.author === "thierry" ? "the analyst's own number" : "weighted from several valuation methods"}): ${fmt(fairValue.value, "per-share")} ${fairValue.currency ?? ""}${fairValue.low !== null && fairValue.high !== null ? `, range ${fmt(fairValue.low, "per-share")} to ${fmt(fairValue.high, "per-share")}` : ""}; ${fairValue.method ?? ""}.${vreport ? ` ${vreport.summary}` : ""}`
     : "Fair value: none yet (no valuation ran).";
   const fvBucket = fairValue && fairValue.value > 0 ? Math.round(Math.log(fairValue.value) / Math.log(1.15)) : "none";
-  const priceLine = q ? `Quote: ${fmt(q.close, "per-share")} ${q.currency ?? ""} on ${q.date}; market cap at that price ${valuation?.marketCap ? fmt(valuation.marketCap) : "n/a"}, EV/EBITDA now ${fmt(valuation?.evEbitda, "multiple")}.` : "Quote: none.";
+  const priceLine = q ? `Quote: ${fmt(q.close, "per-share")} ${q.currency ?? ""} (${q.stamp}); market cap at that price ${valuation?.marketCap ? fmt(valuation.marketCap) : "n/a"}, EV/EBITDA now ${fmt(valuation?.evEbitda, "multiple")}.` : "Quote: none.";
   const bucket = q && q.close > 0 ? Math.round(Math.log(q.close) / Math.log(1.15)) : "none";
   return {
     symbol,

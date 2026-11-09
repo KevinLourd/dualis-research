@@ -334,6 +334,23 @@ describe("Market Reaction (Kevin 2026-11-09)", () => {
     expect(reactionLine(r)).toContain("fair value then 22.43 (range 17.05 to 31.23) (first computed 2026-11-06)");
     expect(fairValueAt(history, "2026-11-07")?.value).toBe(22.43);
   });
+  it("the minute view: the price when the news came out and now, 5-minute bars during a session, the close when shut", () => {
+    const at = new Date("2026-11-05T15:12:00Z");
+    const minute = {
+      eventAt: at,
+      atEvent: { price: 21, date: "2026-11-05", at: new Date("2026-11-05T15:10:00Z"), source: "intraday" as const },
+      now: { price: 23.1, date: "2026-11-09", at: new Date("2026-11-09T15:05:00Z"), source: "intraday" as const },
+      benchAtEvent: { price: 100, date: "2026-11-04", at: new Date("2026-11-04T21:00:00Z"), source: "close" as const },
+      benchNow: { price: 101, date: "2026-11-09", at: new Date("2026-11-09T15:05:00Z"), source: "intraday" as const },
+    };
+    const r = reactionOf({ id: "NVRI|news:x", symbol: "NVRI", day: "2026-11-05" }, bars, bench, history, null, "USD", minute);
+    expect(r.returnSinceEvent).toBeCloseTo(0.1);
+    expect(r.benchSinceEvent).toBeCloseTo(0.01);
+    expect(reactionLine(r)).toMatch(/^When it came out \(2026-11-05 15:12 UTC\) the price was 21\.00 \(2026-11-05 15:10 UTC\), now 23\.10 \(2026-11-09 15:05 UTC\): \+10\.0% since, S&P 500 \+1\.0%\. Daily closes: Price: 20\.51 the close before/);
+    const shut = reactionOf({ id: "NVRI|news:x", symbol: "NVRI", day: "2026-11-05" }, bars, bench, history, null, "USD", { ...minute, atEvent: { price: 20.51, date: "2026-11-04", at: new Date("2026-11-04T21:00:00Z"), source: "close" } });
+    expect(reactionLine(shut)).toContain("the price was 20.51 (2026-11-04 close, market shut)");
+    expect(reactionLine(reactionOf({ id: "NVRI|news:x", symbol: "NVRI", day: "2026-11-05" }, bars, bench, history, null, "USD"))).toMatch(/^Price: /);
+  });
   it("the dimension writes the fair value history (last synthesis of each day) and one reaction per news item and filing", async () => {
     const synth = (at: string, base: number) => ({ symbol: SYMBOL, inputHash: at, result: { currency: "KRW", low: base * 0.9, base, high: base * 1.1, weights: [], label: "l", summary: "s", report: "r" }, model: "m", bronzeId: crypto.randomUUID(), createdAt: new Date(at) });
     await db.insert(valuationSyntheses).values([synth("2026-11-06T10:00:00Z", 38000), synth("2026-11-06T20:00:00Z", 39000), synth("2026-11-08T10:00:00Z", 40000)]);
@@ -352,8 +369,8 @@ describe("speed (Kevin 2026-11-06)", () => {
   it("every dimension sits in exactly one stage, after the ones it reads", () => {
     expect(STAGES.flat().sort()).toEqual(DIMENSIONS.map((d) => d.name).sort());
     const at = (n: string) => STAGES.findIndex((s) => s.includes(n));
-    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["valuation", "market-reaction"], ["market-reaction", "evidence"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"], ["intraday-price", "market-reaction"], ["intraday-price", "signals"]]) expect(at(before)).toBeLessThan(at(after));
-    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation", "intraday-price"], ["analysis", "market-reaction"], ["narrative-since"], ["evidence"], ["narrative-state"], ["signals"]]);
+    for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["valuation", "market-reaction"], ["market-reaction", "evidence"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"], ["price", "intraday-price"], ["intraday-price", "financials"], ["intraday-price", "market-reaction"], ["intraday-price", "signals"]]) expect(at(before)).toBeLessThan(at(after));
+    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["analysis", "market-reaction"], ["narrative-since"], ["evidence"], ["narrative-state"], ["signals"]]);
   });
   it("a merge collects only what its files can move", () => {
     expect(collectPlan(["web/src/console/analysis.tsx", "site/src/app/page.tsx", "CLAUDE.md"])).toBeNull();
