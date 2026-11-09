@@ -65,6 +65,21 @@ export const priceBars = gold.table(
   (t) => [primaryKey({ columns: [t.symbol, t.date] })],
 );
 
+/** 5-minute bars (silver.intraday_bars' chosen close): the price at the minute a signal or a news item lands. */
+export const intradayBars = gold.table(
+  "intraday_bars",
+  {
+    symbol: text("symbol").notNull(),
+    /** The bar's start; its close is known INTRADAY_MINUTES later. */
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    /** Trading day in the exchange's time zone (same key as price_bars.date). */
+    date: text("date").notNull(),
+    close: doublePrecision("close").notNull(),
+    sources: text("sources").array().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.symbol, t.at] })],
+);
+
 /** Last close and day change per ticker (Tickers list, ticker header). */
 export const quotes = gold.table("quotes", {
   symbol: text("symbol").primaryKey(),

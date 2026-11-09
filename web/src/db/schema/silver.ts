@@ -113,6 +113,32 @@ export const judgments = silver.table(
 );
 
 /**
+ * One 5-minute bar per (symbol, start time), Yahoo chart `interval=5m` (Kevin 2026-11-09: the live test and the judges
+ * need the price at the minute a signal or a news item lands, not the day's close). `at` = the bar's START; its close
+ * is known 5 minutes later (INTRADAY_MINUTES). `date` = the trading day in the exchange's own time zone, the same key as
+ * the daily bars. A bar several sources give carries every tag; `observations` keeps each source's own bar.
+ */
+export const intradayBars = silver.table(
+  "intraday_bars",
+  {
+    symbol: text("symbol").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    date: text("date").notNull(),
+    open: doublePrecision("open"),
+    high: doublePrecision("high"),
+    low: doublePrecision("low"),
+    close: doublePrecision("close").notNull(),
+    volume: doublePrecision("volume"),
+    currency: text("currency"),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    observations: jsonb("observations").$type<Record<string, PriceObservation>>().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.symbol, t.at] })],
+);
+
+/**
  * One daily bar per (symbol, date). `observations` keeps every source's own bar; the chosen values are those of
  * the largest group of sources whose closes agree (within 0.5%), and `sources` lists every source in that group.
  */

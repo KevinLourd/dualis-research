@@ -401,14 +401,21 @@ export const livePositions = gold.table(
     openedAt: timestamp("opened_at", { withTimezone: true }).notNull(),
     /** Null while open. */
     closedAt: timestamp("closed_at", { withTimezone: true }),
-    /** Null when no close was stored before the signal. */
+    /** Null when no price was stored before the signal. `*_date` = the trading day, `*_at` = when that price was known. */
     entryDate: text("entry_date"),
     entryPrice: doublePrecision("entry_price"),
+    entryAt: timestamp("entry_at", { withTimezone: true }),
+    /** `intraday` = a 5-minute bar, `close` = the day's close (the market was shut). */
+    entrySource: text("entry_source").$type<PriceBasis>(),
     exitDate: text("exit_date"),
     exitPrice: doublePrecision("exit_price"),
-    /** The close the return reads on: the exit, else the latest close. */
+    exitAt: timestamp("exit_at", { withTimezone: true }),
+    exitSource: text("exit_source").$type<PriceBasis>(),
+    /** The price the return reads on: the exit, else the latest price (5-minute bar or close). */
     markDate: text("mark_date"),
     markPrice: doublePrecision("mark_price"),
+    markAt: timestamp("mark_at", { withTimezone: true }),
+    markSource: text("mark_source").$type<PriceBasis>(),
     return: doublePrecision("return"),
     currency: text("currency"),
     rebuiltAt,
@@ -416,6 +423,28 @@ export const livePositions = gold.table(
   (t) => [index("gold_live_positions_symbol").on(t.symbol, t.openedAt)],
 );
 export type GoldLivePosition = typeof livePositions.$inferSelect;
+
+/** Where a live-test price comes from: a 5-minute bar, or the day's close when the market was shut. */
+export type PriceBasis = "intraday" | "close";
+
+/**
+ * Live test, the S&P 500 the book is compared with: bought at the price known when the first signal fired, marked to
+ * the latest price, same rule as a position. One row (`symbol` = ^GSPC). Rebuilt by `signals`.
+ */
+export const liveBenchmark = gold.table("live_benchmark", {
+  symbol: text("symbol").primaryKey(),
+  startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+  baseDate: text("base_date").notNull(),
+  basePrice: doublePrecision("base_price").notNull(),
+  baseAt: timestamp("base_at", { withTimezone: true }).notNull(),
+  baseSource: text("base_source").$type<PriceBasis>().notNull(),
+  markDate: text("mark_date").notNull(),
+  markPrice: doublePrecision("mark_price").notNull(),
+  markAt: timestamp("mark_at", { withTimezone: true }).notNull(),
+  markSource: text("mark_source").$type<PriceBasis>().notNull(),
+  rebuiltAt,
+});
+export type GoldLiveBenchmark = typeof liveBenchmark.$inferSelect;
 
 /** Research Report: equity-research style, markdown, `[EXHIBIT n]` markers = gold.exhibits.number of the ticker. */
 export const researchReports = gold.table("research_reports", {
