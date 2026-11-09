@@ -53,7 +53,7 @@ const px = (x: number) => (x >= 100 ? x.toFixed(0) : x.toFixed(2));
 export function marketLine(m: Drivers["market"]): string {
   if (!m) return "Today: no comparable quote and fair value.";
   const range = m.fv.low !== null && m.fv.high !== null ? ` (range ${px(m.fv.low)} to ${px(m.fv.high)})` : "";
-  return `Today (${m.date}): price ${px(m.price)} ${m.currency ?? ""}, fair value ${px(m.fv.value)}${range}, the price ${((m.price / m.fv.value - 1) * 100).toFixed(1)}% vs the fair value.`;
+  return `Today (${m.stamp}): price ${px(m.price)} ${m.currency ?? ""}, fair value ${px(m.fv.value)}${range}, the price ${((m.price / m.fv.value - 1) * 100).toFixed(1)}% vs the fair value.`;
 }
 
 /** quote / fair value - 1 from gold (same currency only), or null. */

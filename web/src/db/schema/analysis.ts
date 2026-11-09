@@ -518,6 +518,20 @@ export const marketReactions = gold.table(
     fvNow: doublePrecision("fv_now"),
     fvLowNow: doublePrecision("fv_low_now"),
     fvHighNow: doublePrecision("fv_high_now"),
+    /**
+     * The minute view (Kevin 2026-11-09: « donne les vrais chiffres intraday »): when the item came out, the price known
+     * then (the 5-minute bar already closed, else the last close printed, `price_at_event_source`), the latest price
+     * the same way, the move between them and the S&P 500's over the same span. Null when no price was stored then.
+     */
+    eventAt: timestamp("event_at", { withTimezone: true }),
+    priceAtEvent: doublePrecision("price_at_event"),
+    priceAtEventAt: timestamp("price_at_event_at", { withTimezone: true }),
+    priceAtEventSource: text("price_at_event_source").$type<PriceBasis>(),
+    priceNow: doublePrecision("price_now"),
+    priceNowAt: timestamp("price_now_at", { withTimezone: true }),
+    priceNowSource: text("price_now_source").$type<PriceBasis>(),
+    returnSinceEvent: doublePrecision("return_since_event"),
+    benchSinceEvent: doublePrecision("bench_since_event"),
     rebuiltAt,
   },
   (t) => [index("gold_market_reactions_symbol").on(t.symbol, t.eventDay)],

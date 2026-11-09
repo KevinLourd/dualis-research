@@ -4,7 +4,7 @@ import type { BronzeFetch } from "@/db/schema/bronze";
 import * as gold from "@/db/schema/gold";
 import { intradayBars } from "@/db/schema/silver";
 import { testDb } from "@/test/db";
-import { fetchWindow, promoteIntraday } from "./index";
+import { fetchWindow, promoteIntraday, quoteStamp } from "./index";
 import { latestTicks, mergeTicks, ticksKnownAt } from "./read";
 
 /** Yahoo chart answer, New York (gmtoffset -5 h): bars at 14:30, 14:35 UTC on Monday 2026-11-09 (09:30, 09:35 local). */
@@ -63,6 +63,29 @@ describe("intraday-price", () => {
       expect((await fetchWindow(db, "ZZZ", new Date("2026-01-01T00:00:00Z"), now)).from.toISOString()).toBe("2026-09-11T12:00:00.000Z");
       await promoteIntraday(db, [fetchOf(ID1, "ZZZ", chart([10]), "2026-11-09T14:41:00Z")]);
       expect((await fetchWindow(db, "ZZZ", new Date("2026-11-05T10:00:00Z"), now)).from.toISOString()).toBe("2026-11-08T14:30:00.000Z");
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("intraday-price: the live quote every judge reads", () => {
+  it("moves gold.quotes to the latest 5-minute price (day change vs the last close before that day); an older bar never rolls it back", async () => {
+    const { db, close } = await testDb();
+    try {
+      await db.insert(gold.priceBars).values([["2026-11-05", 9], ["2026-11-06", 10]].map(([date, c]) => ({ symbol: "ZZZ", date: date as string, close: c as number, sources: ["yahoo"], alternatives: [] })));
+      await db.insert(gold.quotes).values({ symbol: "ZZZ", date: "2026-11-06", close: 10, previousClose: 9, currency: "USD", sources: ["yahoo"] });
+      await promoteIntraday(db, [fetchOf(ID1, "ZZZ", chart([10.5, 11]), "2026-11-09T14:41:00Z")]);
+      let [q] = await db.select().from(gold.quotes);
+      expect(q).toMatchObject({ date: "2026-11-09", close: 11, previousClose: 10, source: "intraday" });
+      expect(q.at?.toISOString()).toBe("2026-11-09T14:40:00.000Z");
+      expect(q.changePct).toBeCloseTo(0.1);
+      expect(quoteStamp(q)).toBe("2026-11-09 14:40 UTC, 5-minute price");
+      // A refetch whose newest bar is older leaves it.
+      await promoteIntraday(db, [fetchOf(ID2, "ZZZ", chart([10.2]), "2026-11-09T14:50:00Z")]);
+      [q] = await db.select().from(gold.quotes);
+      expect(q.close).toBe(11);
+      expect(quoteStamp({ date: "2026-11-06", at: null, source: "close" })).toBe("2026-11-06 close");
     } finally {
       await close();
     }

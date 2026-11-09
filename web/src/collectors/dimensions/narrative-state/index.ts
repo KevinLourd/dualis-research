@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { quoteStamp } from "../intraday-price";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import { evidence, fairValueHistory, NARRATIVE_TAGS, narratives, narrativeStates, parseTag, PRICED_IN, type GoldEvidence, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
@@ -84,11 +85,11 @@ export function driverNewsLines(rows: GoldEvidence[], driverId: string, reaction
   };
 }
 
-/** The price path a thesis judge reads: 12 month-end closes, the last 10 closes, and every fair value change, oldest first. */
+/** The price path a thesis judge reads: 12 month-end closes, the last 10 closes, the latest price (5-minute when the market is open), and every fair value change, oldest first. */
 export async function pathLines(db: Db, symbol: string, now = new Date()): Promise<string> {
   const from = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), 1)).toISOString().slice(0, 10);
   const [[q], bars, fvs] = await Promise.all([
-    db.select({ currency: gold.quotes.currency }).from(gold.quotes).where(eq(gold.quotes.symbol, symbol)),
+    db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol)),
     db.select({ date: gold.priceBars.date, close: gold.priceBars.close }).from(gold.priceBars).where(and(eq(gold.priceBars.symbol, symbol), gte(gold.priceBars.date, from))).orderBy(asc(gold.priceBars.date)),
     db.select().from(fairValueHistory).where(eq(fairValueHistory.symbol, symbol)).orderBy(asc(fairValueHistory.day)),
   ]);
@@ -101,6 +102,7 @@ export async function pathLines(db: Db, symbol: string, now = new Date()): Promi
   return [
     `Month-end closes: ${[...months].map(([m, c]) => `${m} ${px(c)}`).join("; ") || "none"}`,
     `Last closes: ${bars.slice(-10).map((b) => `${b.date} ${px(b.close)}`).join("; ") || "none"}`,
+    q ? `Latest price: ${px(q.close)} (${quoteStamp(q)})` : "Latest price: none",
     `Fair value over time (base, range): ${fvs.map((f) => `${f.day} ${f.value >= 100 ? f.value.toFixed(0) : f.value.toFixed(2)}${f.low !== null && f.high !== null ? ` (${f.low.toFixed(2)} to ${f.high.toFixed(2)})` : ""}`).join("; ") || "only today's"}`,
   ].join("\n");
 }

@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { quoteStamp } from "../intraday-price";
 import { fairValues, THESIS_SIDES, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
@@ -27,12 +28,12 @@ export function parseThesisId(id: string): { symbol: string; side: ThesisSide } 
 export const driverIdOf = (symbol: string, side: ThesisSide, rank: number) => `${symbol}:${side}:${rank}`;
 
 /** The fair value (base, low, high) and the quote in the same unit, or null when either is missing or currencies differ. */
-export async function priceAndFairValue(db: Db, symbol: string): Promise<{ price: number; date: string; currency: string | null; fv: { value: number; low: number | null; high: number | null; currency: string | null } } | null> {
+export async function priceAndFairValue(db: Db, symbol: string): Promise<{ price: number; date: string; stamp: string; currency: string | null; fv: { value: number; low: number | null; high: number | null; currency: string | null } } | null> {
   const [[fv], [q]] = await Promise.all([db.select().from(fairValues).where(eq(fairValues.symbol, symbol)), db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol))]);
   if (!fv || !q || !(fv.value > 0)) return null;
   const m = majorUnit(q.close, q.currency);
   if (fv.currency && m.currency && fv.currency !== m.currency) return null;
-  return { price: m.price, date: q.date, currency: m.currency ?? fv.currency, fv: { value: fv.value, low: fv.low, high: fv.high, currency: fv.currency } };
+  return { price: m.price, date: q.date, stamp: quoteStamp(q), currency: m.currency ?? fv.currency, fv: { value: fv.value, low: fv.low, high: fv.high, currency: fv.currency } };
 }
 
 /** The ticker's current theses (none without a fair value and a comparable quote). */

@@ -80,11 +80,18 @@ export const intradayBars = gold.table(
   (t) => [primaryKey({ columns: [t.symbol, t.at] })],
 );
 
-/** Last close and day change per ticker (Tickers list, ticker header). */
+/**
+ * Latest price and day change per ticker (Tickers list, ticker header, every judge's « price today »). `price` writes
+ * the last daily close (`source` close); `intraday-price` then moves it to the latest 5-minute price (`source`
+ * intraday, `at` = when that price was known; Kevin 2026-11-09: the LLMs read the real price, not yesterday's close).
+ */
 export const quotes = gold.table("quotes", {
   symbol: text("symbol").primaryKey(),
   date: text("date").notNull(),
   close: doublePrecision("close").notNull(),
+  /** When that price was known (5-minute prices only; a daily close carries its date). */
+  at: timestamp("at", { withTimezone: true }),
+  source: text("source").$type<"intraday" | "close">().notNull().default("close"),
   previousClose: doublePrecision("previous_close"),
   change: doublePrecision("change"),
   changePct: doublePrecision("change_pct"),
