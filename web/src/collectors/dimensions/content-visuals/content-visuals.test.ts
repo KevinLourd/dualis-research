@@ -10,7 +10,7 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentVisuals, pickVisualSubjects, renderSource, VISUALS_VERSION } from ".";
-import { chartSvg, exhibitSvg, gapWords, opportunity, signalCardSvg, timeAgo, toneOf, videoFrames } from "./render";
+import { chartSvg, exhibitSvg, gapWords, monthTicks, opportunity, signalCardSvg, timeAgo, toneOf, videoFrames } from "./render";
 import { COLOR } from "@/design/tokens";
 import { fetches as bronzeFetches } from "@/db/schema/bronze";
 import { CALLOUT_SYSTEM, calloutPoints, chartJudgeInput, parseCallout } from "./choose";
@@ -237,9 +237,15 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(price).toContain("Sold off");
     expect(price.toLowerCase()).toContain(COLOR.short.dark.toLowerCase());
     // The price chart has the driver charts' layout: the Signal and the way to the range top right, the BREAKING card.
-    for (const t of ["BUY signal", "% opportunity", "32% under fair value"]) expect(price).toContain(t);
+    expect(price).toContain("32% under fair value");
+    // The same pasted price card as the driver charts (a PNG: the card's words are inside it).
+    expect(price).toContain('<image href="data:image/png;base64,');
     const priceNews = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "long", banner });
-    for (const t of ["BREAKING", "REUTERS", "CareCloud signs a new", "CareCloud: Hospitals that pay us", "BUY signal"]) expect(priceNews).toContain(t);
+    for (const t of ["BREAKING", "REUTERS", "CareCloud signs a new", "CareCloud: Hospitals that pay us", '<image href="data:image/png;base64,']) expect(priceNews).toContain(t);
+    // Month axis: « Sep-25 », every tick a different month.
+    const ticks = monthTicks(Date.UTC(2025, 10, 7), Date.UTC(2026, 10, 6));
+    expect(ticks.map((t) => new Date(t).toISOString().slice(0, 7))).toEqual(["2026-01", "2026-03", "2026-05", "2026-07", "2026-09", "2026-11"]);
+    expect(monthTicks(Date.UTC(2026, 8, 7), Date.UTC(2026, 10, 6))).toHaveLength(2);
     expect(priceNews).not.toContain("32% under fair value");
     if (process.env.RENDER_SAMPLE) (await import("node:fs")).writeFileSync(process.env.RENDER_SAMPLE, priceNews);
     expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", ...say, title: "y", tone: "long", banner: null })).toThrow(/not a period/);

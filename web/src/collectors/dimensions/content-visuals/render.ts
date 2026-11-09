@@ -42,7 +42,25 @@ const MARK = readFileSync(asset("../growth-brief/mark-white.svg")).toString("bas
 
 const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 });
 const ts = (d: string) => Date.parse(`${d}T00:00:00Z`);
-const monthLabel = (v: number) => new Date(v).toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** « Sep-25 », like the driver charts' periods (Kevin 2026-11-09: the time axis printed « Sept 26 » three times). */
+const monthLabel = (v: number) => {
+  const d = new Date(v);
+  return `${MONTHS[d.getUTCMonth()]}-${String(d.getUTCFullYear() % 100).padStart(2, "0")}`;
+};
+
+/** One tick per month start inside the chart, every 1, 2 or 3 months so up to 6 or 7 labels show, each a different month. */
+export function monthTicks(from: number, to: number): number[] {
+  const start = new Date(from);
+  const months = (new Date(to).getUTCFullYear() - start.getUTCFullYear()) * 12 + new Date(to).getUTCMonth() - start.getUTCMonth();
+  const step = months <= 6 ? 1 : months <= 13 ? 2 : 3;
+  const out: number[] = [];
+  for (let m = 1; m <= months; m++) {
+    const t = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + m, 1);
+    if (t <= to && (months - m) % step === 0) out.push(t);
+  }
+  return out;
+}
 
 export type Frame = {
   /** Share of the closes drawn (0..1]. */
@@ -111,6 +129,7 @@ function yRange(input: VisualInput) {
 
 function axes(input: VisualInput, onCard: boolean) {
   const { min, max } = yRange(input);
+  const ticks = monthTicks(ts(input.bars[0].date), ts(input.bars[input.bars.length - 1].date));
   const label = { color: onCard ? LAVENDER : NOTE.muted, fontSize: 18, fontFamily: FONT };
   return {
     xAxis: {
@@ -120,8 +139,7 @@ function axes(input: VisualInput, onCard: boolean) {
       axisLine: { lineStyle: { color: onCard ? "#3a3470" : NOTE.base } },
       axisTick: { show: false },
       splitLine: { show: false },
-      axisLabel: { ...label, formatter: (v: number) => monthLabel(v) },
-      splitNumber: 6,
+      axisLabel: { ...label, color: onCard ? LAVENDER : NOTE.text, formatter: (v: number) => monthLabel(v), customValues: ticks },
     },
     yAxis: {
       type: "value" as const,
@@ -279,7 +297,7 @@ function withMark(svg: string, x: number, y: number, size: number): string {
   return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${MARK}" x="${x}" y="${y}" width="${size}" height="${size}"/></svg>`);
 }
 
-/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow, news card and signal stamp. */
+/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow, news card and the pasted price card. */
 export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation | null = null): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const last = input.bars[input.bars.length - 1];
@@ -288,23 +306,24 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
   // Same layout as the driver charts (Kevin 2026-11-09): the big BREAKING card top left, the Signal and the way to the fair
   // value range top right, the chart label small above the chart, the mark bottom right.
   const news = !!a?.banner;
-  const stamp = !!a && !!input.fair;
-  const top = 28;
-  const newsBox = { x: 40, y: top, w: stamp ? W - 40 - STAMP_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
+  // The same pasted price card as the driver charts (Kevin 2026-11-09: « tu ne respectes pas du tout », his reference).
+  const card = !!a && !!input.fair && input.bars.length >= 20;
+  const cardY = news ? 34 : 22;
+  const newsBox = { x: 40, y: 28, w: card ? W - 40 - CARD_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
   const labelTop = newsBox.y + newsBox.h + 26;
   const head = a ? heading(a, company) : null;
-  const titleW = stamp ? W - 56 - STAMP_W - 40 - 40 : W - 112 - 96;
-  const grid = { left: 96, right: 200, top: news ? labelTop + 28 + 44 : stamp ? top + STAMP_H + 40 : 160, bottom: 92 };
+  const titleW = card ? W - 56 - CARD_W - 40 - 40 : W - 112 - 96;
+  const grid = { left: 110, right: 200, top: news ? labelTop + 28 + 44 : card ? cardY + CARD_H + 70 : 160, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: news ? "" : head ? head.title : `${company} share price vs fair value`, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: stamp ? "break" : "truncate" } },
+      { text: news ? "" : head ? head.title : `${company} share price vs fair value`, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
       {
         text: news && head ? `${head.title} · ${subtitle}` : head ? [head.sub, subtitle].filter(Boolean).join(" · ") : subtitle,
         left: 56,
-        top: news ? labelTop : stamp ? grid.top - 44 : 94,
+        top: news ? labelTop : card ? grid.top - 48 : 94,
         textStyle: { color: NOTE.muted, fontSize: news ? 21 : 22, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : titleW, overflow: "truncate" },
       },
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
@@ -320,37 +339,14 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     chart.setOption({
       graphic: [
         ...(a.banner ? bannerGraphics(a.banner, newsBox) : []),
-        ...(stamp ? signalStampGraphics(input, W - 40 - STAMP_W, top) : []),
         ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }),
       ],
     });
   }
   const svg = chart.renderToSVGString();
   chart.dispose();
-  return stamp ? withMark(svg, W - 56 - 40, H - 62, 40) : withMark(svg, W - 56 - 72, 40, 72);
-}
-
-const STAMP_W = 300;
-const STAMP_H = 200;
-
-/**
- * The Signal and the way to the fair value range on the price chart (Kevin 2026-11-09, his pick: the words only, the
- * pasted price card would draw this same chart a second time): « SELL signal » on its colour, « 15-40% downside » under it.
- */
-function signalStampGraphics(input: VisualInput, x: number, y: number) {
-  const fair = input.fair;
-  if (!fair) throw new Error("a signal stamp needs a fair value");
-  const last = input.bars[input.bars.length - 1];
-  const up = last.close < fair.value;
-  const colour = up ? COLOR.long.dark : COLOR.short.dark;
-  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value);
-  const pillH = 96;
-  return [
-    { type: "rect", shape: { x: x + 5, y: y + 6, width: STAMP_W, height: pillH, r: 10 }, style: { fill: "rgba(0,0,0,0.45)" }, z: 10 },
-    { type: "rect", shape: { x, y, width: STAMP_W, height: pillH, r: 10 }, style: { fill: colour }, z: 11 },
-    { type: "text", style: { text: label, x: x + STAMP_W / 2, y: y + pillH / 2, fill: "#fff", fontSize: input.signal ? 40 : 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 12 },
-    { type: "text", style: { text: opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up), x: x + STAMP_W / 2, y: y + pillH + 46, fill: colour, fontSize: 32, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 12 },
-  ];
+  const marked = card ? withMark(svg, W - 56 - 40, H - 62, 40) : withMark(svg, W - 56 - 72, 40, 72);
+  return card ? withCard(marked, signalCardSvg(input), W - 40 - CARD_W, cardY) : marked;
 }
 
 /**
