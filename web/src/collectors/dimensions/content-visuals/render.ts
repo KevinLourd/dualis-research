@@ -143,6 +143,8 @@ export type Annotation = {
   priceSays: string;
   driver: string | null;
   title: string;
+  /** Under the title: what the chart measures, in plain words. */
+  chartLabel: string;
   tone: "long" | "short" | "neutral";
   /** The breaking-news inset: `ago` is when the news came out, said as « 2h ago ». */
   banner: { headline: string; publisher: string; logo: string | null; ago: string } | null;
@@ -204,7 +206,7 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
     { text: `VS price narrative: "${a.priceSays}"`, size: 18 },
     ...(a.driver ? [{ text: `Driver broken: ${a.driver}`, size: 18 }] : []),
   ];
-  const boxW = Math.min(560, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
+  const boxW = Math.min(760, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
   const boxH = 22 + lines.reduce((t, l) => t + l.size + 10, 0);
   const gap = 70;
   // A bar is hit from the side: the note sits high in the free space over the shorter bars.
@@ -277,7 +279,7 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     title: [
       { text: a ? a.title : `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44 + off, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
       {
-        text: a ? `${input.companyName ?? input.symbol} share price · ${subtitle}` : subtitle,
+        text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel} · ${subtitle}` : subtitle,
         left: 56,
         top: 94 + off,
         textStyle: { color: NOTE.muted, fontSize: 22, fontWeight: 400, fontFamily: FONT },
@@ -323,7 +325,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     textStyle: { fontFamily: FONT },
     title: [
       { text: a ? a.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: a ? 36 : 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
-      { text: a ? `${input.companyName ?? input.symbol}: ${e.title}` : e.takeaway, left: 56, top: 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
+      { text: a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : e.takeaway, left: 56, top: 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend

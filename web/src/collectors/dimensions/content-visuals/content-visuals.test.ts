@@ -60,9 +60,9 @@ function fakeJudge(verdict: string) {
       callouts.push(prompt);
       const point = [...prompt.split("Points (id: value):\n")[1].matchAll(/^- (\S+): .*$/gm)].map((m) => m[1]);
       const news = prompt.includes("Reuters") ? { index: 0, domain: "reuters.com" } : null;
-      const driver = prompt.match(/Drivers of that narrative:\n- ([^:\n]+)/)?.[1] ?? null;
+      const hasDriver = prompt.includes("Drivers of that narrative");
       const ids = point.filter((id) => /^\d{4}-\d{2}-\d{2}$/.test(id));
-      return { text: JSON.stringify({ point: ids.at(-1), note: "Clients back to 45", priceSays: "The biggest client is gone", driver, title: "Look: clients just hit a record", news }), model: "fake" };
+      return { text: JSON.stringify({ point: ids.at(-1), note: "Clients back to 45", priceSays: "The biggest client is gone", driverIndex: hasDriver ? 0 : null, driver: hasDriver ? "Lost clients came back" : null, newsLine: news ? "CareCloud wins a big hospital back" : null, title: "Look: clients just hit a record", chartLabel: "Hospitals that pay us", news }), model: "fake" };
     }
     prompts.push(prompt);
     return { text: JSON.stringify({ verdict, probability: 0.8, cited_sentence: null, reason: "The client count is the striking turn." }), model: "fake" };
@@ -194,13 +194,15 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const [chart] = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, ideaId)).then((r) => r.filter((v) => v.kind === "chart"));
     expect(chart.status).toBe("ok");
     const rows = await db.select().from(bronzeFetches).where(eq(bronzeFetches.subject, `idea:${ideaId}#chart`));
-    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", priceSays: "The biggest client is gone", driver: "Client loss", title: "Look: clients just hit a record", news: { index: 0, domain: "reuters.com" } });
+    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", priceSays: "The biggest client is gone", driver: "Lost clients came back", newsLine: "CareCloud wins a big hospital back", title: "Look: clients just hit a record", chartLabel: "Hospitals that pay us", news: { index: 0, domain: "reuters.com" } });
     // The callout saw the points and the news with its publisher.
     expect(judge.callouts[0]).toContain("- 2025-12-31: 2025-12 Hospital clients 45");
     expect(judge.callouts[0]).toContain("- 0: Reuters: CCLD signs a new hospital client");
     // It knows what the price says and the drivers it could break.
     expect(judge.callouts[0]).toContain("What the price says (pessimistic narrative): The market thinks CCLD lost its biggest client.");
-    expect(judge.callouts[0]).toContain("- Client loss: Revenue fell 20%.");
+    expect(judge.callouts[0]).toContain("- 0: Client loss: Revenue fell 20%.");
+    // Told to write, never to copy.
+    expect(judge.callouts[0]).not.toContain("copied exactly");
   });
 
   it("colours the one point by the story's side and draws arrow, note and news strip", async () => {
@@ -210,9 +212,9 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(toneOf(input, input.exhibits[0])).toBe("long"); // a long driver's turn is an inflection
     expect(toneOf(input)).toBe("long");
     const banner = { headline: "CareCloud signs a new hospital client", publisher: "Reuters", logo: PNG_1PX.toString("base64"), ago: "2h ago" };
-    const say = { priceSays: "The biggest client is gone", driver: "Client loss" };
+    const say = { priceSays: "The biggest client is gone", driver: "Client loss", chartLabel: "Hospitals that pay us" };
     const svg = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Look: clients just hit a record", tone: "long", banner });
-    for (const t of ["Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "Driver broken: Client loss", "Look: clients just hit a record", "BREAKING", "REUTERS  ·  2h ago", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
+    for (const t of ["CareCloud: Hospitals that pay us", "Clients back to 45", "VS price narrative: &quot;The biggest client is gone&quot;", "Driver broken: Client loss", "Look: clients just hit a record", "BREAKING", "REUTERS  ·  2h ago", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
     expect(svg).toContain(COLOR.breaking.dark);
     expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
     const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Look: 32% under fair value", tone: "short", banner: null });
@@ -223,11 +225,11 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
 
   it("refuses a callout pointing off the chart, missing its news source, or naming a driver the Idea does not cite", () => {
     const points = [{ id: "2025-12-31", label: "x" }];
-    const base = { note: "n", priceSays: "p", title: "t" };
+    const base = { note: "n", priceSays: "p", title: "t", chartLabel: "c" };
     expect(() => parseCallout(JSON.stringify({ ...base, point: "2020-01-01", driver: null, news: null }), points, 0, [])).toThrow(/not on the chart/);
     expect(() => parseCallout(JSON.stringify({ ...base, point: "2025-12-31", driver: null, news: null }), points, 1, [])).toThrow(/news index/);
-    expect(() => parseCallout(JSON.stringify({ ...base, point: "2025-12-31", driver: "Made up", news: null }), points, 0, ["Client loss"])).toThrow(/not one of the Idea's drivers/);
-    expect(parseCallout(JSON.stringify({ ...base, note: "n — m", point: "2025-12-31", driver: "Client loss", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1, ["Client loss"])).toEqual({ point: "2025-12-31", note: "n, m", priceSays: "p", driver: "Client loss", title: "t", news: { index: 0, domain: "www.ft.com" } });
+    expect(() => parseCallout(JSON.stringify({ ...base, point: "2025-12-31", driverIndex: 3, driver: "x", news: null }), points, 0, ["Client loss"])).toThrow(/driverIndex/);
+    expect(parseCallout(JSON.stringify({ ...base, note: "n — m", point: "2025-12-31", driverIndex: 0, driver: "Lost clients came back", newsLine: "A hospital comes back", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1, ["Client loss"])).toEqual({ point: "2025-12-31", note: "n, m", priceSays: "p", driver: "Lost clients came back", newsLine: "A hospital comes back", title: "t", chartLabel: "c", news: { index: 0, domain: "www.ft.com" } });
     expect(timeAgo(new Date("2026-11-09T10:00:00Z"), new Date("2026-11-09T12:10:00Z"))).toBe("2h ago");
     expect(timeAgo(new Date("2026-11-06T10:00:00Z"), new Date("2026-11-09T12:00:00Z"))).toBe("3d ago");
     expect(calloutPoints).toBeTypeOf("function");

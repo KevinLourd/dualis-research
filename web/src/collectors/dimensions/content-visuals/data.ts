@@ -17,7 +17,7 @@ export type VisualInput = {
   /** The first news the Idea cites that has a link: what a capture shows. */
   newsUrl: string | null;
   /** The news items the Idea cites (headline + publisher): the chart's headline strip shows the most prestigious one. */
-  news: { headline: string; publisher: string; url: string | null; at: Date }[];
+  news: { headline: string; publisher: string; url: string | null; at: Date; why: string | null; citedSentence: string | null }[];
   /** The drivers the Idea rests on, each with its thesis side, and the narrative of each side: what the price says. */
   drivers: { title: string; summary: string | null; side: ThesisSide }[];
   narratives: { side: ThesisSide; text: string }[];
@@ -60,7 +60,7 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
     db.select({ name: companyProfiles.name }).from(companyProfiles).where(eq(companyProfiles.symbol, symbol)),
     db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(and(eq(priceBars.symbol, symbol), gte(priceBars.date, since))).orderBy(asc(priceBars.date)),
     db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
-    evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url, driverId: evidence.driverId, kind: evidence.kind, headline: evidence.headline, publisher: evidence.publisher, at: evidence.eventAt }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
+    evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url, driverId: evidence.driverId, kind: evidence.kind, headline: evidence.headline, publisher: evidence.publisher, at: evidence.eventAt, why: evidence.why, citedSentence: evidence.citedSentence }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
   ]);
   // The drivers the Idea rests on: the ones it names, then the ones its Evidence moves.
   const driverIds = [...new Set([...citedDrivers, ...evidenceIds.map((id) => items.find((e) => e.id === id)?.driverId).filter((d): d is string => !!d)])];
@@ -83,7 +83,7 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
     news: evidenceIds
       .map((id) => items.find((e) => e.id === id))
       .filter((e): e is (typeof items)[number] & { publisher: string } => !!e && e.kind === "news" && !!e.publisher)
-      .map((e) => ({ headline: e.headline, publisher: e.publisher, url: e.url, at: e.at })),
+      .map((e) => ({ headline: e.headline, publisher: e.publisher, url: e.url, at: e.at, why: e.why, citedSentence: e.citedSentence })),
     drivers: drivers.map((d) => ({ title: d.title, summary: d.summary, side: d.side })),
     narratives: storyRows.map((n) => ({ side: n.side, text: n.text })),
     angle: idea.angle,
