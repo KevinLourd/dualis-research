@@ -78,4 +78,10 @@ describe("live test replay", () => {
     expect(r.stats.worst?.symbol).toBe("B");
     expect(r.stats.worst?.return).toBeCloseTo(-0.2);
   });
+
+  it("no best or worst ticker while every ticker ties", () => {
+    const r = replayStrategy([st("A", "2026-11-10", "BUY", "weak"), st("B", "2026-11-10", "BUY", "weak")], bars, spx, "all");
+    expect(r.stats.best).toBeNull();
+    expect(r.stats.worst).toBeNull();
+  });
 });
