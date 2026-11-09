@@ -13,7 +13,7 @@ export default async function AnalysisPage({ params, searchParams }: { params: P
   const base = `/tickers/${encodeURIComponent(symbol)}`;
   return (
     <div className="flex max-w-4xl flex-col pt-6">
-      <AnalysisBody analysis={analysis} variant="page" thesisHref={(side) => `${base}?thesis=${side}`} />
+      <AnalysisBody analysis={analysis} variant="page" />
       {view && (
         <SlideOver title={view.title} subtitle={view.subtitle} closeHref={thesis ? `${base}?thesis=${thesis}` : base} size="lg" back>
           {view.body}

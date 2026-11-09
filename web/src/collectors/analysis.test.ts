@@ -16,7 +16,7 @@ import { narrativeSinceDim, sinceChoices } from "./dimensions/narrative-since";
 import { batchSubject, evidenceDim, parseBatch, parseBatchSubject, parseEvidenceSubject, verdictRank } from "./dimensions/evidence";
 import { collectPlan, dimensionsFor, stagesFor, STAGES, DIMENSIONS } from "./registry";
 import { narrativeStateDim } from "./dimensions/narrative-state";
-import { combineTheses, signalsDim } from "./dimensions/signals";
+import { combineTheses, onFairValueSide, signalsDim } from "./dimensions/signals";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
 import type { SourceContext } from "./types";
@@ -297,6 +297,11 @@ describe("theses and the surfacing rule (Kevin 2026-11-09)", () => {
     expect(combineTheses([st("long", "noise"), st("short", "strong")])).toMatchObject({ signal: "SELL", side: "short" });
     expect(combineTheses([st("long", "weak"), st("short", "strong")])).toMatchObject({ signal: "none", strength: "noise", side: null });
     expect(combineTheses([st("long", "noise"), st("short", "noise")])).toMatchObject({ signal: "none", side: null });
+    // BUY only below the fair value, SELL only above (MNRO 2026-11-09: a SELL 21% under it).
+    expect(onFairValueSide(combineTheses([st("short", "weak")]), -0.21)).toMatchObject({ signal: "none", strength: "noise", side: null });
+    expect(onFairValueSide(combineTheses([st("short", "weak")]), 0.1)).toMatchObject({ signal: "SELL" });
+    expect(onFairValueSide(combineTheses([st("long", "strong")]), 0.05)).toMatchObject({ signal: "none" });
+    expect(onFairValueSide(combineTheses([st("long", "strong")]), -0.3)).toMatchObject({ signal: "BUY" });
   });
   it("NVRI 2026-11-09: good news on the long thesis never turn into a SELL because the price sits 0.2% above fair value", () => {
     // The price is inside the range; the long thesis turned but the judge saw it priced in (no signal); the short one is noise.

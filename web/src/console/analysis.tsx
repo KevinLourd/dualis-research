@@ -262,36 +262,11 @@ function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: D
   );
 }
 
-/** The two theses when the price sits inside the fair value range: each with its tag; the shown one is selected. */
-function ThesisTabs({ objects, href }: { objects: Analysis["objects"]; href: (side: ThesisSide) => string }) {
-  if (objects.theses.length < 2) return null;
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="max-w-prose text-base text-kumo-default">
-        The price sits inside the fair value range, so two stories compete. A signal shows only when one of them signals alone.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {objects.theses.map((t) => {
-          const active = t.side === objects.side;
-          return (
-            <Link
-              key={t.side}
-              href={href(t.side)}
-              scroll={false}
-              aria-current={active ? "true" : undefined}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 ring-1 transition-colors ${active ? "bg-kumo-tint ring-kumo-brand" : "ring-kumo-line hover:bg-kumo-tint"}`}
-            >
-              <span className="text-base font-medium text-kumo-strong">{t.side === "long" ? "Long thesis" : "Short thesis"}</span>
-              {t.state ? <TagBadge effect={t.state.effect} strength={t.state.strength} side={t.side} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Analysis; variant: "panel" | "page"; thesisHref: (side: ThesisSide) => string }) {
+/**
+ * One story on screen (Kevin 2026-11-09, « WTF IS THAT » on the two-thesis tabs): the thesis that signals, else the only
+ * one, else the long. The competition between two theses stays in the backend.
+ */
+export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
   const { row, ownFair: thesis, consensus, objects, chart, valuation } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const symbol = row.symbol;
@@ -314,8 +289,7 @@ export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Anal
         <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} />
       )}
 
-      <Section title={side ? (side === "long" ? "Narrative · long thesis" : "Narrative · short thesis") : "Narrative"}>
-        <ThesisTabs objects={objects} href={thesisHref} />
+      <Section title="Narrative">
         {narrative ? (
           <>
             <p className={`max-w-prose leading-snug text-kumo-strong ${variant === "page" ? "text-2xl" : "text-xl"}`}>{narrative}</p>
