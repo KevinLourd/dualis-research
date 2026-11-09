@@ -1,4 +1,5 @@
 import { desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { PROPOSED_FORMATS } from "@/collectors/dimensions/content-drafts/format";
 import * as content from "@/db/schema/content";
 import type { IdeaRequest, IdeaScore } from "@/db/schema/content";
 import { companyProfiles } from "@/db/schema/gold";
@@ -36,7 +37,9 @@ export async function rebuildGoldIdeas(db: Db, now = new Date()): Promise<number
   const ids = ideas.map((i) => i.id);
   const scores = ids.length ? await db.select().from(content.contentIdeaScores).where(inArray(content.contentIdeaScores.ideaId, ids)) : [];
   const byIdea = new Map<string, IdeaScore[]>();
-  for (const s of scores) byIdea.set(s.ideaId, [...(byIdea.get(s.ideaId) ?? []), { format: s.format, score: s.score, why: s.why }]);
+  // Only the formats still offered: an article score from before articles left the proposals would otherwise win "Best for".
+  const offered = new Set<string>(PROPOSED_FORMATS);
+  for (const s of scores.filter((x) => offered.has(x.format))) byIdea.set(s.ideaId, [...(byIdea.get(s.ideaId) ?? []), { format: s.format, score: s.score, why: s.why }]);
   const { requests, counts } = await requestsAndCounts(db, ids);
   const symbols = [...new Set(ideas.map((i) => i.symbol).filter((s): s is string => !!s))];
   const names = new Map(
