@@ -11,8 +11,10 @@ import type { Bar, Line } from "./portfolio-series";
  * strong one, and back). Entry and exit at the price known when the signal fired = the last close the ticker's market had
  * printed by then (a signal on Sunday trades at Friday's close). An open position is marked to the latest close.
  *
- * P&L: each day the open positions share the book, a strong entry weighs 1 and a weak one `weakWeight` (0-1, the page's
- * cursor, default 0.5); the book compounds their day returns.
+ * P&L: each day the book is split in equal slots, one per open position; a strong position invests its whole slot, a
+ * weak one `weakWeight` of it (0-1, the page's cursor, default 0.5), the rest of its slot stays in cash; the book
+ * compounds. The weight is absolute, never relative to the other positions (Kevin 2026-11-09: a lone weak position took
+ * the whole book at 0.05 and nothing at 0).
  */
 
 export type SignalReading = { id: string; signal: "BUY" | "SELL" | "none"; strength: "strong" | "weak" | "noise"; at: Date };
@@ -108,7 +110,7 @@ export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[
     if (i > 0) {
       const prev = days[i - 1];
       let sum = 0;
-      let units = 0;
+      let slots = 0;
       for (const p of priced) {
         // Held over (prev, d]: entered at or before prev, not exited at or before prev. A closed position with no exit
         // close stored yet is held to the latest close.
@@ -116,14 +118,13 @@ export function portfolioPnl(positions: PnlPosition[], bars: Record<string, Bar[
         const exit = p.closedAt !== null ? p.exitDate : null;
         if (exit !== null && exit <= prev) continue;
         const u = p.strength === "strong" ? 1 : weakWeight;
-        if (u <= 0) continue;
         const a = closeAt(p.symbol, prev);
         const z = closeAt(p.symbol, exit !== null && exit < d ? exit : d);
         if (a === null || z === null) continue;
         sum += u * positionReturn(a, z, p.side)!;
-        units += u;
+        slots += 1;
       }
-      if (units > 0) equity *= 1 + sum / units;
+      if (slots > 0) equity *= 1 + sum / slots;
     }
     return { date: d, value: equity - 1 };
   });
