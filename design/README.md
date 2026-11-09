@@ -1,6 +1,6 @@
 # Dualis Research
 
-Independent equity research. Every idea is weighed from both sides before we take one.
+Independent research for buy-side opportunities: long and short ideas in small and mid caps. Play winnable games.
 
 Version 4, November 2026 (v4: Notes and X charts on deep indigo, a 10-colour series palette; v3: one indigo colour; v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
 
@@ -10,7 +10,7 @@ Version 4, November 2026 (v4: Notes and X charts on deep indigo, a 10-colour ser
 - The claim first, the evidence after. Titles state a view ("Monro is a cheap call on Icahn's next move"), never a topic ("Monro update").
 - Short sentences, one idea each. Numbers carry a date and a source.
 - Calm and confident. No hype words, no rocket emojis, no em dashes.
-- Both sides, always: every note says what would make us wrong.
+- Every note says what would make us wrong.
 - English only. Every published piece ends with the disclaimer.
 
 ## Colour
@@ -47,7 +47,7 @@ Two themes (Thierry 2026-11-09, he picked them from rendered options). **Substac
 The paywall sits after item 4 or 5.
 
 ## Website (Aurelion's pages, our own rendering)
-Pages (Kevin 2026-11-05): Home (one full-bleed hero), Company, Research (with the research portal), Portfolio (year-to-date only), About (Thierry, photo), Contact, Plans, Disclaimer. Rendering of our own (Thierry 2026-11-06, "we copy them too closely"): every inner page opens on a deep indigo band (section name, one serif statement, white) and closes on a deep indigo band (statement left, one action right); between them white sections, with deep indigo for the track record. Blocks come from the competitors' best (Altas's latest-research rows, Pernas's proof block, trust cards and FAQ), never Aurelion's sequence. Section headings in IBM Plex Sans, statements in Newsreader, sentence case. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers: a Wikimedia Commons photo of the company or its industry under an indigo veil, with shelf, title, date and mark, never AI images. The reports also run as a black horizontal strip: black and white covers, the one under the pointer grows and turns to colour. Home background: a muted trading-floor clip (Mixkit, free licence) under a deep indigo veil.
+Pages (Kevin 2026-11-05): Home (one full-bleed hero), Company, Research (with the research portal), Portfolio (year-to-date only), About (Thierry, photo), Contact, Subscribe (the plans), Disclaimer. Rendering of our own (Thierry 2026-11-06, "we copy them too closely"): every inner page opens on a deep indigo band (section name, one serif statement, white) and closes on a deep indigo band (statement left, one action right); between them white sections, with deep indigo for the track record. Blocks come from the competitors' best (Altas's latest-research rows, Pernas's proof block, trust cards and FAQ), never Aurelion's sequence. Section headings in IBM Plex Sans, statements in Newsreader, sentence case. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers: a Wikimedia Commons photo of the company or its industry under an indigo veil, with shelf, title, date and mark, never AI images. The reports also run as a black horizontal strip: black and white covers, the one under the pointer grows and turns to colour. Home background: a 34 s loop of the industries and real assets expected to hold up in the AI era, hottest first, under a light veil on the left only (public-domain US government footage + Mixkit).
 
 ## Disclaimer (verbatim)
 Not investment advice. For information only. The author may hold positions in the securities discussed.

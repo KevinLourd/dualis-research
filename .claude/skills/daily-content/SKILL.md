@@ -15,7 +15,7 @@ description: The daily distribution loop for Dualis Research - 2 posts/day on Su
 3. A market-wide take tied to a thesis.
 
 **Post shape = Multibagger Ideas** (@multibaggerideas: 42K readers, 515 paid, ~$1M/yr; Thierry 2026-11-09 « copy aspects of his posting »; Note TYPES below; the paragraph + chart shape is Thierry's)
-- Substack Note = **one small paragraph (2-4 sentences) + one chart** (Thierry 2026-11-06: « this is more of like a report... A note should be like a small paragraph with a chart »; the drafter's `substack-note` rule). Opens on a number or a one-line claim.
+- Substack Note = **one small paragraph (2-4 sentences) + one chart** (the most striking Exhibit of the driver it cites, white data on deep indigo; `content-visuals` draws it, the price only when the post is about price) (Thierry 2026-11-06: « this is more of like a report... A note should be like a small paragraph with a chart »; the drafter's `substack-note` rule). Opens on a number or a one-line claim.
 - Four Note types he rotates: **maths fact** made visual (emoji bars « Lose 50% → need +100% », a table by decade) + one famous case (Buffett, Amazon -90%); **teaser** of a new post = a restack of it, company unnamed + 3 figures (« record revenue / stock down 56% »); **closed call** with its % (« Thesis Closed at +81% in 15 Months »); **milestone** as plain facts (views, readers, paid).
 - X: « much smaller »: one or two sentences, at most 160 characters, the number first, the chart attached.
 - An Idea can be a plain company update, not only an inflection (Thierry). The weekly article is HIS (« one a week, high quality »): drafts are Notes and posts, articles leave the proposals.

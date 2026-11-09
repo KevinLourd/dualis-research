@@ -1,6 +1,6 @@
 # Dualis Research website (`site/`)
 
-The public website: Aurelion Research's page list (Kevin 2026-11-05), none of its blocks (Kevin 2026-11-06): Home (video hero), Company, Research (with the research portal), Portfolio, About, Contact, Plans, Disclaimer, Terms of Use, Privacy Policy. Private preview for Thierry until launch (not indexed, no link to it anywhere).
+The public website: Aurelion Research's page list (Kevin 2026-11-05), none of its blocks (Kevin 2026-11-06): Home (video hero), Company, Research (with the research portal), Portfolio, About, Contact, Subscribe (the plans, `/subscribe`), Disclaimer, Terms of Use, Privacy Policy. Private preview for Thierry until launch (not indexed, no link to it anywhere).
 
 - Live: https://dualis-site.dualis-research.workers.dev (every merge to `main` touching `site/` deploys, `.github/workflows/deploy-site.yml`).
 - Data: reads the console's **gold** tables in Neon, read-only (`src/lib/queries.ts`): only Thierry's PUBLISHED Substack articles (`gold.content_library`, own publications) and his Substack URL (`gold.content_channels`). Never the watchlist, theses or calls.
