@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { evidence, fairValues, narrativeStates, signalChanges, signalStates, signals, type GoldNarrativeState, type SignalKind, type Strength } from "@/db/schema/analysis";
+import { evidence, fairValues, narrativeStates, signalChanges, signalStates, signals, type GoldNarrativeState, type SignalKind, type Strength, type ThesisReading, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
@@ -8,29 +8,55 @@ import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } fr
 import { majorUnit } from "../financials/derive";
 import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
+import { SIDE } from "../analysis/sides";
 
 export const SIGNALS_DIMENSION = "signals";
 /** Evidence ids kept on a signal (its strongest reversals). */
 const MAX_EVIDENCE = 10;
 
-export type SignalReading = { signal: SignalKind; strength: Strength; evidenceIds: string[]; fairValue: number | null; fairValueMethod: string | null; fairValueLabel?: string | null; currency: string | null; quote: number | null; quoteDate: string | null; gapPct: number | null };
+export type SignalReading = {
+  signal: SignalKind;
+  strength: Strength;
+  side: ThesisSide | null;
+  why: string | null;
+  theses: ThesisReading[];
+  evidenceIds: string[];
+  fairValue: number | null;
+  fairValueMethod: string | null;
+  fairValueLabel?: string | null;
+  currency: string | null;
+  quote: number | null;
+  quoteDate: string | null;
+  gapPct: number | null;
+};
+
+type ThesisState = Pick<GoldNarrativeState, "side" | "effect" | "strength" | "signal" | "why" | "since" | "evidenceIds">;
 
 /**
- * The rule (Thierry's method, Kevin 2026-11-06): the whole narrative in REVERSAL (its ticker-level Narrative State) with
- * the price BELOW fair value = BUY (a bad story inflects); in reversal with the price ABOVE = SELL (a loved story
- * cracks); continuation or noise = none. Strength = the state's strength.
+ * The surfacing rule (Kevin 2026-11-09): each thesis' judge already decided whether it signals now (narrative-state,
+ * level `thesis`). One thesis (price outside the fair value range): its signal. Two (inside the range, in competition):
+ * the one that signals ALONE surfaces; both signalling, or neither, = no signal. A long signals a BUY, a short a SELL.
  */
-export function computeSignal(
+export function combineTheses(states: ThesisState[]): { signal: SignalKind; strength: Strength; side: ThesisSide | null; why: string | null; evidenceIds: string[] } {
+  const signalling = states.filter((s) => s.signal === "strong" || s.signal === "weak");
+  if (signalling.length !== 1) {
+    const why = signalling.length > 1 ? "Both the long and the short thesis signal: the two stories cancel out." : (states.length === 1 ? states[0].why : null);
+    return { signal: "none", strength: "noise", side: null, why, evidenceIds: [] };
+  }
+  const s = signalling[0];
+  return { signal: SIDE[s.side].signal, strength: s.signal as Strength, side: s.side, why: s.why, evidenceIds: s.evidenceIds.slice(0, MAX_EVIDENCE) };
+}
+
+export function readingOf(
   fv: { value: number; currency: string | null; method: string | null; label?: string | null } | null,
   quote: { close: number; currency: string | null; date: string } | null,
-  state: Pick<GoldNarrativeState, "effect" | "strength" | "evidenceIds"> | null,
+  states: ThesisState[],
 ): SignalReading {
   const q = quote ? majorUnit(quote.close, quote.currency) : null;
   const comparable = !!fv && !!q && (!fv.currency || !q.currency || fv.currency === q.currency);
   const gapPct = comparable && fv!.value > 0 ? q!.price / fv!.value - 1 : null;
-  const base = { fairValue: fv?.value ?? null, fairValueMethod: fv?.method ?? null, fairValueLabel: fv?.label ?? null, currency: fv?.currency ?? null, quote: q?.price ?? null, quoteDate: quote?.date ?? null, gapPct };
-  if (gapPct === null || gapPct === 0 || !state || state.effect !== "reversal") return { ...base, signal: "none", strength: "noise", evidenceIds: [] };
-  return { ...base, signal: gapPct < 0 ? "BUY" : "SELL", strength: state.strength, evidenceIds: state.evidenceIds.slice(0, MAX_EVIDENCE) };
+  const theses: ThesisReading[] = states.map((s) => ({ side: s.side, signal: s.signal ?? "noise", effect: s.effect, strength: s.strength, why: s.why, since: s.since }));
+  return { ...combineTheses(states), theses, fairValue: fv?.value ?? null, fairValueMethod: fv?.method ?? null, fairValueLabel: fv?.label ?? null, currency: fv?.currency ?? null, quote: q?.price ?? null, quoteDate: quote?.date ?? null, gapPct };
 }
 
 export const rulesSource: Source = {
@@ -41,15 +67,15 @@ export const rulesSource: Source = {
     if (!ctx.db) throw new Error("signals: needs the database");
     const [fv] = await ctx.db.select().from(fairValues).where(eq(fairValues.symbol, symbol));
     const [quote] = await ctx.db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol));
-    const [state] = await ctx.db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "ticker")));
-    const reading = computeSignal(fv ?? null, quote ? { close: quote.close, currency: quote.currency, date: quote.date } : null, state ?? null);
-    return { request: { symbol, rule: "BUY/SELL = the narrative in reversal, below / above fair value", state: state ? `${state.effect}:${state.strength}` : null }, httpStatus: null, payload: reading };
+    const states = await ctx.db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "thesis")));
+    const reading = readingOf(fv ?? null, quote ? { close: quote.close, currency: quote.currency, date: quote.date } : null, states);
+    return { request: { symbol, rule: "the thesis that signals alone surfaces; both or neither = none", theses: states.map((s) => `${s.side} ${s.signal ?? "noise"}`) }, httpStatus: null, payload: reading };
   },
 };
 
 export const signalsDim: Dimension = {
   name: SIGNALS_DIMENSION,
-  description: "Signal per ticker: BUY (the narrative in reversal, price below fair value) / SELL (in reversal, price above) / none, its strength = the narrative's. Each change after the first reading = a Signal Change with an Update Note.",
+  description: "Signal per ticker from its theses' judged signals: one thesis = its signal; two in competition = the one that signals alone, else none. Each change after the first reading = a Signal Change with an Update Note.",
   sources: [rulesSource],
   subjects: analysedSymbols,
   promote: (db, fetches, ctx) => promoteSignals(db, fetches, ctx.complete),
@@ -68,10 +94,11 @@ export const NOTE_SYSTEM = "You write one-line signal notes for a small-cap long
 
 async function updateNote(db: Db, complete: Complete, symbol: string, from: { signal: string; strength: string }, to: { signal: string; strength: string; evidenceIds: string[] }): Promise<{ text: string; model: string }> {
   const items = to.evidenceIds.length ? (await db.select().from(evidence).where(eq(evidence.symbol, symbol))).filter((e) => to.evidenceIds.includes(e.id)) : [];
-  const [[profile], [state]] = await Promise.all([
+  const [[profile], states] = await Promise.all([
     db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)),
-    db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "ticker"))),
+    db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "thesis"))),
   ]);
+  const state = states.find((s) => s.side === (to.signal === "SELL" ? "short" : "long")) ?? states[0];
   const prompt = [
     `${profile?.name ?? symbol} (${symbol}): the signal moved from ${signalWords(from.signal, from.strength)} to ${signalWords(to.signal, to.strength)}.`,
     state?.why ? `Where the narrative stands: ${state.why}` : null,
@@ -130,7 +157,7 @@ async function rebuildSignalsGold(db: Db, latest: Map<string, BronzeFetch>): Pro
     const last = list.at(-1)!;
     if (f) {
       const r = f.payload as SignalReading;
-      current.push({ symbol, signal: r.signal, strength: r.strength, fairValue: r.fairValue, fairValueMethod: r.fairValueMethod, fairValueLabel: r.fairValueLabel ?? null, currency: r.currency, quote: r.quote, quoteDate: r.quoteDate, gapPct: r.gapPct, evidenceIds: r.evidenceIds, since: last.at });
+      current.push({ symbol, signal: r.signal, strength: r.strength, side: r.side, why: r.why, theses: r.theses, fairValue: r.fairValue, fairValueMethod: r.fairValueMethod, fairValueLabel: r.fairValueLabel ?? null, currency: r.currency, quote: r.quote, quoteDate: r.quoteDate, gapPct: r.gapPct, evidenceIds: r.evidenceIds, since: last.at });
     }
     for (let i = 1; i < list.length; i++) {
       const [a, b] = [list[i - 1], list[i]];

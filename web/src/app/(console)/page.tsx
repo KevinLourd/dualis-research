@@ -1,5 +1,5 @@
 import { LightningIcon } from "@phosphor-icons/react/ssr";
-import { AnalysisBody, analysisData, analysisTitle } from "@/console/analysis";
+import { AnalysisBody, analysisData, analysisTitle, parseThesis } from "@/console/analysis";
 import { InactiveTable, SignalTable } from "@/console/board";
 import { inactiveBoard, signalBoard } from "@/console/board-queries";
 import { BoardTabs } from "@/console/board-tabs";
@@ -13,10 +13,11 @@ export const metadata = { title: "Signals" };
  * Level A: which ticker has a signal, in one glance. Strong signals on top; Weak and Noise in tabs below.
  * The portfolio is never here: it has its own page. A row opens its analysis in the right panel (`?ticker=`).
  */
-export default async function SignalsPage({ searchParams }: { searchParams: Promise<{ tab?: string; ticker?: string }> }) {
-  const { tab: tabParam, ticker } = await searchParams;
+export default async function SignalsPage({ searchParams }: { searchParams: Promise<{ tab?: string; ticker?: string; thesis?: string }> }) {
+  const { tab: tabParam, ticker, thesis: t } = await searchParams;
+  const thesis = parseThesis(t);
   const tab = tabParam === "noise" || tabParam === "inactive" ? tabParam : "weak";
-  const [rows, inactive, analysis] = await Promise.all([signalBoard(), inactiveBoard(), ticker ? analysisData(ticker) : null]);
+  const [rows, inactive, analysis] = await Promise.all([signalBoard(), inactiveBoard(), ticker ? analysisData(ticker, thesis) : null]);
   const strong = rows.filter((r) => r.strength === "strong");
   const weak = rows.filter((r) => r.strength === "weak");
   const noise = rows.filter((r) => r.strength === "noise");
@@ -49,7 +50,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
       </div>
       {analysis && (
         <SlideOver title={analysisTitle(analysis.row)} subtitle={analysis.row.symbol} closeHref={base} size="lg">
-          <AnalysisBody analysis={analysis} variant="panel" />
+          <AnalysisBody analysis={analysis} variant="panel" thesisHref={(side) => `${panelHref(analysis.row.symbol)}&thesis=${side}`} />
         </SlideOver>
       )}
     </>

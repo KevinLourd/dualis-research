@@ -3,7 +3,8 @@ import { narratives } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
-import { driversOf, sideWords } from "../evidence";
+import { driversOf } from "../evidence";
+import { parseThesisId, SIDE } from "../analysis/sides";
 import { analysedSymbols } from "../watchlist";
 import { narrativeSinceOf, SINCE_SUBJECT_KIND, sinceChoices, sinceKey } from "./since";
 
@@ -43,27 +44,27 @@ export const narrativeSinceSource: Source = {
   name: "claude",
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
   covers: () => true,
-  async fetch(symbol: string, ctx: SourceContext): Promise<FetchOutcome> {
+  async fetch(subject: string, ctx: SourceContext): Promise<FetchOutcome> {
     if (!ctx.db) throw new Error("narrative-since: needs the database");
     if (!ctx.complete) throw new Error("narrative-since: no LLM in the collector context (cli.ts sets ctx.complete)");
     const { judge } = (await nodeImport(new URL("../../../llm/judge.ts", import.meta.url).href)) as typeof import("@/llm/judge");
-    const d = await driversOf(ctx.db, symbol);
-    if (!d) return { request: { symbol }, httpStatus: null, error: "no narrative or no driver for this ticker yet" };
+    const { symbol, side } = parseThesisId(subject);
+    const d = await driversOf(ctx.db, symbol, side);
+    if (!d) return { request: { symbol, side }, httpStatus: null, error: "no narrative or no driver for this thesis yet" };
     const choices = sinceChoices();
     const path = await pricePath(ctx.db, symbol, d.gapPct);
-    const side = sideWords(d.gapPct);
     const j = await judge(
       ctx.db,
       {
         subjectKind: SINCE_SUBJECT_KIND,
-        subjectId: symbol,
+        subjectId: subject,
         questionKey: sinceKey(d.version),
         question: [
-          `${symbol}. The market's narrative today, ${side.story}: ${d.narrative}`,
+          `${symbol}, ${SIDE[side].label.toLowerCase()}: ${SIDE[side].story}. The narrative: ${d.narrative}`,
           "The reasons the market holds it:",
           ...d.drivers.map((x) => `${x.rank}. ${x.title}`),
           "",
-          "Since which month has the market held THIS story, i.e. the price sat on the side of fair value where it is now, for these reasons?",
+          "Since which month has the market held THIS story, for these reasons?",
           `Read the price path below. Answer the month the current story took hold; if it is older than ${choices[0]}, answer ${choices[0]}.`,
           "News from before that month is already in the price: it cannot announce a turn of today's story.",
         ].join("\n"),
@@ -72,22 +73,21 @@ export const narrativeSinceSource: Source = {
       },
       ctx.complete,
     );
-    return { request: { symbol, version: d.version }, httpStatus: null, payload: { since: j.verdict, judgmentId: j.id } };
+    return { request: { symbol, side, version: d.version }, httpStatus: null, payload: { since: j.verdict, judgmentId: j.id } };
   },
 };
 
-/** Analysed tickers whose current narrative has no "since" month yet. */
+/** Current theses (`<symbol>:<side>`) of the analysed tickers whose narrative has no "since" month yet. */
 async function subjects(db: Db): Promise<string[]> {
-  const symbols = await analysedSymbols(db);
-  const versions = await db.select({ symbol: narratives.symbol }).from(narratives);
-  const withNarrative = symbols.filter((s) => versions.some((v) => v.symbol === s));
-  const done = await narrativeSinceOf(db, withNarrative);
-  return withNarrative.filter((s) => !done.has(s));
+  const symbols = new Set(await analysedSymbols(db));
+  const theses = (await db.select({ id: narratives.id, symbol: narratives.symbol }).from(narratives)).filter((n) => symbols.has(n.symbol));
+  const done = await narrativeSinceOf(db, [...new Set(theses.map((t) => t.symbol))]);
+  return theses.map((t) => t.id).filter((id) => !done.has(id));
 }
 
 export const narrativeSinceDim: Dimension = {
   name: NARRATIVE_SINCE_DIMENSION,
-  description: "The month the market adopted its current story on each ticker, read from the price path vs fair value (at most 6 months back). News older than that is Too old: already in the price.",
+  description: "The month the market adopted each thesis' current story, read from the price path vs fair value (at most 6 months back). News older than that is Too old: already in the price.",
   sources: [narrativeSinceSource],
   subjects,
   // The judgment itself is the silver row (silver.judgments); evidence reads it when it rebuilds.

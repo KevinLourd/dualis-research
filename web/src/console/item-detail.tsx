@@ -8,7 +8,8 @@ import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
 import { driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
 import { StrengthBadge } from "./board";
 import { TagBadge } from "./tag-badge";
-import { EvidenceRows, Exhibit, itemHref, metricLabel } from "./analysis";
+import { EvidenceRows, Exhibit, itemHref, metricLabel, PRICED_WORD } from "./analysis";
+import { reactionLine } from "@/collectors/dimensions/market-reaction/compute";
 import { DriverExhibit, ExhibitChart } from "./driver-chart";
 import { formatUnit } from "./exhibit-format";
 import { day, price, utc } from "./format";
@@ -16,6 +17,7 @@ import { Section } from "./signal";
 import { Fact, FactList, SourceTags } from "./ui";
 import { sourceNote } from "./source-labels";
 import type { PeerRow } from "@/db/schema/valuation";
+import type { ThesisSide } from "@/db/schema/analysis";
 
 /**
  * Level C: the detail of one item of the analysis (`?item=` on the Analysis page): what it says, its chart, and where
@@ -42,10 +44,11 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
     subtitle: `${day(c.eventDay)}${c.publisher ? ` · ${c.publisher}` : ""}`,
     body: (
       <>
+        {d.reaction && d.reaction.closeBefore !== null && <p className="text-base leading-relaxed text-kumo-default">{reactionLine(d.reaction)}</p>}
         {d.evidence?.effect === "too-old" ? (
           // Too old (Kevin 2026-11-06): from before the current story, judged against no driver.
           <div className="flex flex-col gap-2">
-            <TagBadge effect="too-old" strength="noise" gapPct={d.gapPct} />
+            <TagBadge effect="too-old" strength="noise" side={null} />
             {d.evidence.why && <p className="text-base leading-relaxed text-kumo-strong">{d.evidence.why}</p>}
           </div>
         ) : d.evidence ? (
@@ -56,10 +59,12 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
               return (
                 <li key={drv.id} className="flex flex-col gap-2 px-4 py-3.5">
                   <span className="flex flex-wrap items-center gap-2">
-                    {v ? <TagBadge effect={v.effect} strength={v.strength} gapPct={d.gapPct} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
+                    {v ? <TagBadge effect={v.effect} strength={v.strength} side={drv.side} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
                     <Link href={itemHref(symbol, `driver:${drv.id}`)} scroll={false} className="text-base font-medium text-kumo-link hover:underline">
                       {drv.title}
                     </Link>
+                    <span className="text-sm text-kumo-subtle">{drv.side === "long" ? "Long thesis" : "Short thesis"}</span>
+                    {v?.pricedIn && v.effect !== "noise" && <span className="text-sm text-kumo-subtle">{PRICED_WORD[v.pricedIn]}</span>}
                   </span>
                   {v?.why && <p className="text-base leading-relaxed text-kumo-strong">{v.why}</p>}
                   {v?.citedSentence && v.effect !== "noise" && (
@@ -206,7 +211,7 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
       <>
         {d.state && (
           <div className="flex flex-col gap-2">
-            <TagBadge effect={d.state.effect} strength={d.state.strength} gapPct={d.gapPct} />
+            <TagBadge effect={d.state.effect} strength={d.state.strength} side={d.side} />
             {d.state.why && <p className="text-base leading-relaxed text-kumo-default">{d.state.why}</p>}
           </div>
         )}
@@ -215,7 +220,7 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
           <Exhibit key={x.id} symbol={symbol} exhibit={x} />
         ))}
         <Section title={`News that bear on it · ${d.evidence.length}`}>
-          {d.evidence.length ? <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} gapPct={d.gapPct} /> : <p className="text-base text-kumo-subtle">No news has touched this driver yet.</p>}
+          {d.evidence.length ? <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} side={d.side} /> : <p className="text-base text-kumo-subtle">No news has touched this driver yet.</p>}
         </Section>
         <SourceNote sources={sources} />
       </>
@@ -475,8 +480,8 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
 }
 
 /** Why the market tells this story: the narrative's detail, then each claim of its Rationale with the drivers and sources it rests on. */
-async function narrativeItem(symbol: string): Promise<ItemView | null> {
-  const a = await getTickerAnalysis(symbol);
+async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise<ItemView | null> {
+  const a = await getTickerAnalysis(symbol, thesis);
   if (!a.narrative) return null;
   const r = a.rationale;
   const driverByRank = new Map(a.drivers.map((d) => [d.rank, d]));
@@ -531,10 +536,10 @@ async function narrativeItem(symbol: string): Promise<ItemView | null> {
   };
 }
 
-export async function itemView(symbol: string, item: string): Promise<ItemView | null> {
+export async function itemView(symbol: string, item: string, thesis: ThesisSide | null = null): Promise<ItemView | null> {
   if (item === "price") return priceItem(symbol);
   if (item === "fair-value") return fairValueItem(symbol);
-  if (item === "narrative") return narrativeItem(symbol);
+  if (item === "narrative") return narrativeItem(symbol, thesis);
   const [kind, ...rest] = item.split(":");
   const key = rest.join(":");
   if (kind === "news") return newsItem(symbol, key);
