@@ -1,6 +1,0 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--dir", "web", "exec", "next", "dev", "-p", "3010"], "port": 3010 }
-  ]
-}
