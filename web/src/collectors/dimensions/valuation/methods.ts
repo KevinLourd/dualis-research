@@ -31,7 +31,7 @@ export type ValuationFacts = {
   bookValue?: { drives: boolean; why: string | null } | null;
 };
 
-export type FactKey = "shares" | "net-debt" | "cash" | "total-debt" | "ebitda" | "eps-trailing" | "eps-forward" | "equity" | "fcf-last" | "fcf-average" | "dividends";
+export type FactKey = "shares" | "net-debt" | "cash" | "total-debt" | "preferred-stock" | "minority-interest" | "short-term-investments" | "equity-investments" | "ebitda" | "eps-trailing" | "eps-forward" | "equity" | "fcf-last" | "fcf-average" | "dividends";
 export type HistoryKey = "ev-ebitda" | "pe" | "pb" | "fcf" | "dividend-yield" | "net-cash";
 
 export type AssumptionSpec = { key: string; label: string; unit: "multiple" | "ratio" };
@@ -74,6 +74,10 @@ export const FACT_LABEL: Record<FactKey, string> = {
   "net-debt": "Net debt",
   cash: "Cash",
   "total-debt": "Total debt",
+  "preferred-stock": "Preferred stock",
+  "minority-interest": "Minority interest",
+  "short-term-investments": "Short-term investments",
+  "equity-investments": "Equity-method investments",
   ebitda: "EBITDA",
   "eps-trailing": "EPS, last fiscal year",
   "eps-forward": "EPS, next fiscal year consensus",
@@ -82,6 +86,39 @@ export const FACT_LABEL: Record<FactKey, string> = {
   "fcf-average": "Free cash flow, 3-year average",
   dividends: "Dividends paid, last fiscal year",
 };
+
+/**
+ * The EV bridge, line by line (financials/derive.ts `BRIDGE_LINES`): equity value = EV - total debt - preferred stock
+ * - minority interest + cash + short-term investments + equity-method investments. A line the filings do not report
+ * on that balance sheet counts zero and its step says so.
+ */
+export const BRIDGE: readonly { key: FactKey; sign: 1 | -1 }[] = [
+  { key: "total-debt", sign: 1 },
+  { key: "preferred-stock", sign: 1 },
+  { key: "minority-interest", sign: 1 },
+  { key: "cash", sign: -1 },
+  { key: "short-term-investments", sign: -1 },
+  { key: "equity-investments", sign: -1 },
+];
+export const BRIDGE_KEYS: FactKey[] = BRIDGE.map((b) => b.key);
+
+/** EV minus equity value: the claims ahead of common shareholders, less the cash and non-operating assets. */
+export function bridgeTotal(f: ValuationFacts): number {
+  // Total debt and cash are required (they come with net debt); the other lines are zero when not reported.
+  if (v(f, "total-debt") === null || v(f, "cash") === null) throw new Error("bridge: total debt and cash not collected");
+  return BRIDGE.reduce((s, b) => s + b.sign * (v(f, b.key) ?? 0), 0);
+}
+
+/** EV -> equity value, one step per bridge line. */
+function toEquity(f: ValuationFacts, ev: number): Computed["steps"] {
+  const steps: Computed["steps"] = [];
+  for (const b of BRIDGE) {
+    const i = f.inputs[b.key];
+    const name = FACT_LABEL[b.key].charAt(0).toLowerCase() + FACT_LABEL[b.key].slice(1);
+    steps.push({ label: `${b.sign > 0 ? "-" : "+"} ${name}${!i || i.reported === false ? " (none reported)" : ""}`, unit: "currency", value: i?.value ?? 0 });
+  }
+  return [...steps, { label: "Equity value", unit: "currency", value: ev - bridgeTotal(f) }];
+}
 
 const perShare = (f: ValuationFacts, equityValue: number, steps: Computed["steps"]): Computed => {
   const shares = v(f, "shares")!;
@@ -95,20 +132,19 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     id: "ev-ebitda",
     name: "EV/EBITDA",
     family: "Multiples",
-    description: "Low case on the company's own 5-year EV/EBITDA range; base and high on the listed peers' median, with a premium or discount for size, growth and margins. Minus net debt, per share.",
+    description: "Low case on the company's own 5-year EV/EBITDA range; base and high on the listed peers' median, with a premium or discount for size, growth and margins. Bridged to equity value (debt, preferred stock, minority interest, cash, investments), per share.",
     assumptions: [{ key: "multiple", label: "EV/EBITDA multiple", unit: "multiple" }],
     peerMultiple: () => ({ key: "evEbitda", id: "ev-ebitda", label: "EV/EBITDA" }),
     history: { key: "ev-ebitda", label: "EV/EBITDA at each fiscal year end", unit: "multiple" },
     notApplicable: (f) => need(f, ["ebitda", "net-debt", "shares"], ["ebitda", "shares"]),
-    uses: () => ["ebitda", "net-debt", "shares"],
+    uses: () => ["ebitda", ...BRIDGE_KEYS, "shares"],
     compute: (f, a) => {
       const ev = a.multiple * v(f, "ebitda")!;
-      return perShare(f, ev - v(f, "net-debt")!, [
+      return perShare(f, ev - bridgeTotal(f), [
         { label: "EBITDA", unit: "currency", value: v(f, "ebitda")! },
         { label: "x multiple", unit: "multiple", value: a.multiple },
         { label: "Enterprise value", unit: "currency", value: ev },
-        { label: "- net debt", unit: "currency", value: v(f, "net-debt")! },
-        { label: "Equity value", unit: "currency", value: ev - v(f, "net-debt")! },
+        ...toEquity(f, ev),
       ]);
     },
   },
@@ -150,7 +186,7 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     id: "dcf",
     name: "DCF on free cash flow",
     family: "Intrinsic",
-    description: `Reported free cash flow grown for ${DCF_YEARS} years, a terminal value, both discounted, minus net debt, per share.`,
+    description: `Reported free cash flow grown for ${DCF_YEARS} years, a terminal value, both discounted, bridged to equity value (debt, preferred stock, minority interest, cash, investments), per share.`,
     assumptions: [
       { key: "growth", label: `FCF growth, years 1-${DCF_YEARS}`, unit: "ratio" },
       { key: "terminalGrowth", label: "Terminal growth", unit: "ratio" },
@@ -166,7 +202,7 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
       if (miss) return miss;
       return v(f, "fcf-average")! > 0 || v(f, "fcf-last")! > 0 ? null : "Free cash flow is negative or not collected.";
     },
-    uses: (_f, basis) => [basis === "last" ? "fcf-last" : "fcf-average", "net-debt", "shares"],
+    uses: (_f, basis) => [basis === "last" ? "fcf-last" : "fcf-average", ...BRIDGE_KEYS, "shares"],
     compute: (f, a, basis) => {
       const fcf0 = v(f, basis === "last" ? "fcf-last" : "fcf-average")!;
       if (!(a.discountRate > a.terminalGrowth + 0.01)) throw new Error(`dcf: discount rate ${a.discountRate} must exceed terminal growth ${a.terminalGrowth} by 1 point`);
@@ -179,15 +215,14 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
       const terminal = (fcf * (1 + a.terminalGrowth)) / (a.discountRate - a.terminalGrowth);
       const pvTerminal = terminal / (1 + a.discountRate) ** DCF_YEARS;
       const ev = pv + pvTerminal;
-      return perShare(f, ev - v(f, "net-debt")!, [
+      return perShare(f, ev - bridgeTotal(f), [
         { label: basis === "last" ? "FCF, last fiscal year" : "FCF, 3-year average", unit: "currency", value: fcf0 },
         { label: `FCF in year ${DCF_YEARS}`, unit: "currency", value: fcf },
         { label: `Present value of years 1-${DCF_YEARS}`, unit: "currency", value: pv },
         { label: "Terminal value", unit: "currency", value: terminal },
         { label: "Present value of terminal", unit: "currency", value: pvTerminal },
         { label: "Enterprise value", unit: "currency", value: ev },
-        { label: "- net debt", unit: "currency", value: v(f, "net-debt")! },
-        { label: "Equity value", unit: "currency", value: ev - v(f, "net-debt")! },
+        ...toEquity(f, ev),
       ]);
     },
   },

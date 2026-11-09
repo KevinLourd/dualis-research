@@ -14,7 +14,8 @@ export type ValuationMethodId = "ev-ebitda" | "pe" | "pb" | "dcf" | "net-assets"
 export type Scenario = "low" | "base" | "high";
 
 /** One input of a method, as read from gold: what, its value, the period, the sources. */
-export type ValuationInput = { key: string; label: string; value: number; unit: "currency" | "per-share" | "count" | "multiple" | "ratio"; period: string; sources: string[] };
+/** `reported: false` = an EV bridge line the filings do not report on that balance sheet (value 0, « none reported »). */
+export type ValuationInput = { key: string; label: string; value: number; unit: "currency" | "per-share" | "count" | "multiple" | "ratio"; period: string; sources: string[]; reported?: false };
 /** One calculation line, its value under each scenario (same value thrice for a fixed input). */
 export type ValuationStep = { label: string; unit: ValuationInput["unit"]; low: number; base: number; high: number };
 /** One assumption Claude picked, per scenario, with why. */

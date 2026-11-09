@@ -30,6 +30,39 @@ export function reportingCurrency(lines: Line[]): string | null {
   return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
+/**
+ * The enterprise value bridge (Wall Street Prep "What is Enterprise Value?", Corporate Finance Institute "Enterprise
+ * Value"): EV = equity value + total debt + preferred stock + minority interest - cash - short-term investments -
+ * equity-method investments. Read from ONE balance sheet date; debt and cash are required, a line the filings do not
+ * report there counts zero and says so. Leases follow the source's own debt line (borrowings and bonds in the filings).
+ * Equity value from an EV = the same bridge in reverse.
+ */
+export const BRIDGE_LINES = [
+  { line: "total-debt", sign: 1, required: true },
+  { line: "preferred-stock", sign: 1, required: false },
+  { line: "minority-interest", sign: 1, required: false },
+  { line: "cash", sign: -1, required: true },
+  { line: "short-term-investments", sign: -1, required: false },
+  { line: "equity-investments", sign: -1, required: false },
+] as const;
+export type BridgeLine = (typeof BRIDGE_LINES)[number]["line"];
+export const BRIDGE_FORMULA = "total debt + preferred stock + minority interest - cash - short-term investments - equity-method investments";
+
+export type BridgePart = { line: BridgeLine; sign: 1 | -1; value: number; reported: boolean; source: Line | null };
+
+/** The bridge at one balance sheet date (same period type first, then the other one at that date); null without debt and cash. */
+export function bridgeAt(lines: Line[], periodType: string, periodEnd: string): { total: number; parts: BridgePart[] } | null {
+  const find = (line: string) =>
+    lines.find((l) => l.line === line && l.periodEnd === periodEnd && l.periodType === periodType) ?? lines.find((l) => l.line === line && l.periodEnd === periodEnd && l.periodType !== "month");
+  const parts: BridgePart[] = [];
+  for (const b of BRIDGE_LINES) {
+    const l = find(b.line);
+    if (!l && b.required) return null;
+    parts.push({ line: b.line, sign: b.sign, value: l?.value ?? 0, reported: !!l, source: l ?? null });
+  }
+  return { total: parts.reduce((s, p) => s + p.sign * p.value, 0), parts };
+}
+
 export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
   const currency = reportingCurrency(lines);
   const at = new Map(lines.map((l) => [`${l.periodType}|${l.periodEnd}|${l.line}`, l]));
@@ -89,11 +122,11 @@ export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
     if (!currency || pc !== currency) continue;
     const marketCap = price * shares.value;
     base("market-cap", marketCap, "currency", `month-end close x ${shares.line}`, [priceLine, shares]);
-    const netDebt = m("net-debt");
-    if (netDebt === undefined) continue;
-    const ev = marketCap + netDebt;
-    const ndInputs = [get(pt, pe, "total-debt")!, get(pt, pe, "cash")!];
-    base("ev", ev, "currency", "market cap + net debt", [priceLine, shares, ...ndInputs]);
+    const bridge = bridgeAt(lines, pt, pe);
+    if (!bridge) continue;
+    const ev = marketCap + bridge.total;
+    const ndInputs = bridge.parts.flatMap((p) => (p.source ? [p.source] : []));
+    base("ev", ev, "currency", `market cap + ${BRIDGE_FORMULA}`, [priceLine, shares, ...ndInputs]);
     if (pt === "year" && ebitda !== undefined && ebitda > 0) base("ev-ebitda", ev / ebitda, "multiple", "EV at fiscal year-end close / fiscal year EBITDA", [priceLine, shares, ...ndInputs, ...ebitdaInputs]);
     const eps = get(pt, pe, "eps-diluted") ?? get(pt, pe, "eps-basic");
     if (pt === "year" && eps && eps.value > 0) base("pe", price / eps.value, "multiple", `fiscal year-end close / ${eps.line}`, [priceLine, eps]);
@@ -118,12 +151,18 @@ export function deriveValuation(symbol: string, lines: Line[], metrics: Metric[]
   // Net debt from ONE balance sheet: the latest period carrying both debt and cash.
   const debtPeriods = lines.filter((l) => l.line === "total-debt" && l.periodType !== "month").sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
   let netDebt: number | null = null;
+  let bridgeTotal: number | null = null;
   for (const d of debtPeriods) {
     const cash = lines.find((l) => l.line === "cash" && l.periodType === d.periodType && l.periodEnd === d.periodEnd);
     if (!cash) continue;
     netDebt = d.value - cash.value;
-    inputs["total-debt"] = { value: d.value, period: `${d.periodType} ${d.periodEnd}`, sources: d.sources };
-    inputs.cash = { value: cash.value, period: `${cash.periodType} ${cash.periodEnd}`, sources: cash.sources };
+    const bridge = bridgeAt(lines, d.periodType, d.periodEnd)!;
+    bridgeTotal = bridge.total;
+    // Every bridge line, read on that same balance sheet: one the filings do not report there is zero, said so.
+    for (const p of bridge.parts) {
+      const at = p.source ?? d;
+      inputs[p.line] = p.reported ? { value: p.value, period: `${at.periodType} ${at.periodEnd}`, sources: at.sources } : { value: 0, period: `${d.periodType} ${d.periodEnd}`, sources: [], reported: false };
+    }
     break;
   }
   // EBITDA: the last 4 reported quarters when they run past the last fiscal year, else the last fiscal year.
@@ -147,7 +186,7 @@ export function deriveValuation(symbol: string, lines: Line[], metrics: Metric[]
   const sameCurrency = !!q2 && !!currency && (q2.currency === null || q2.currency === currency);
   const marketCap = sameCurrency && shares ? q2!.price * shares.value : null;
   if (marketCap !== null) inputs.quote = { value: q2!.price, period: quote!.date, sources: ["price"] };
-  const ev = marketCap !== null && netDebt !== null ? marketCap + netDebt : null;
+  const ev = marketCap !== null && bridgeTotal !== null ? marketCap + bridgeTotal : null;
   return {
     symbol,
     currency,

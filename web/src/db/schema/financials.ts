@@ -123,6 +123,7 @@ export const valuations = gold.table("valuations", {
   quoteDate: text("quote_date"),
   quote: doublePrecision("quote"),
   sharesOutstanding: doublePrecision("shares_outstanding"),
+  /** Total debt - cash; `ev` uses the full bridge (`BRIDGE_LINES` in financials/derive.ts), each line in `inputs`. */
   netDebt: doublePrecision("net_debt"),
   /** EBITDA the current multiple uses, and which periods it sums ("FY 2025-12" or "LTM to 2026-09"). */
   ebitda: doublePrecision("ebitda"),
@@ -130,8 +131,8 @@ export const valuations = gold.table("valuations", {
   marketCap: doublePrecision("market_cap"),
   ev: doublePrecision("ev"),
   evEbitda: doublePrecision("ev_ebitda"),
-  /** Every input with its period and value, for a reader who checks the arithmetic. */
-  inputs: jsonb("inputs").$type<Record<string, { value: number; period: string; sources: string[] }>>().notNull(),
+  /** Every input with its period and sources; an EV bridge line the filings do not report there = value 0, `reported: false`. */
+  inputs: jsonb("inputs").$type<Record<string, { value: number; period: string; sources: string[]; reported?: false }>>().notNull(),
   rebuiltAt,
 });
 export type GoldValuation = typeof valuations.$inferSelect;

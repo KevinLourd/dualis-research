@@ -29,6 +29,8 @@ const facts = (over: Partial<ValuationFacts["inputs"]> = {}): ValuationFacts => 
   inputs: {
     shares: { key: "shares", label: "Shares", value: 100, unit: "count", period: "FY", sources: ["sec"] },
     "net-debt": { key: "net-debt", label: "Net debt", value: 200, unit: "currency", period: "FY", sources: ["sec"] },
+    "total-debt": { key: "total-debt", label: "Total debt", value: 250, unit: "currency", period: "FY", sources: ["sec"] },
+    cash: { key: "cash", label: "Cash", value: 50, unit: "currency", period: "FY", sources: ["sec"] },
     ebitda: { key: "ebitda", label: "EBITDA", value: 300, unit: "currency", period: "FY", sources: ["sec"] },
     "fcf-average": { key: "fcf-average", label: "FCF", value: 100, unit: "currency", period: "FY", sources: ["sec"] },
     equity: { key: "equity", label: "Equity", value: 500, unit: "currency", period: "FY", sources: ["sec"] },
@@ -44,6 +46,33 @@ describe("valuation methods: the arithmetic", () => {
     const r = runScenarios(methodSpec("ev-ebitda"), facts(), { low: { multiple: 6 }, base: { multiple: 4 }, high: { multiple: 5 } }, null);
     expect([r.low, r.base, r.high]).toEqual([(4 * 300 - 200) / 100, (5 * 300 - 200) / 100, (6 * 300 - 200) / 100]);
     expect(r.steps.find((s) => s.label === "Enterprise value")).toMatchObject({ low: 1200, base: 1500, high: 1800 });
+  });
+  it("EV to equity walks the full bridge: debt, preferred stock, minority interest out; cash and investments in; each line a step", () => {
+    const f = facts({
+      "preferred-stock": { key: "preferred-stock", label: "Preferred stock", value: 60, unit: "currency", period: "FY", sources: ["sec-filings"] },
+      "minority-interest": { key: "minority-interest", label: "Minority interest", value: 0, unit: "currency", period: "none reported (FY)", sources: [], reported: false },
+      "short-term-investments": { key: "short-term-investments", label: "Short-term investments", value: 30, unit: "currency", period: "FY", sources: ["yahoo"] },
+      "equity-investments": { key: "equity-investments", label: "Equity-method investments", value: 10, unit: "currency", period: "FY", sources: ["sec"] },
+    });
+    const r = runScenarios(methodSpec("ev-ebitda"), f, { low: { multiple: 5 }, base: { multiple: 5 }, high: { multiple: 5 } }, null);
+    // EV 1,500 - 250 debt - 60 preferred - 0 minority + 50 cash + 30 short-term investments + 10 investments = 1,280; 100 shares.
+    expect(r.base).toBeCloseTo(12.8, 9);
+    expect(r.steps.map((s) => [s.label, s.base])).toEqual([
+      ["EBITDA", 300],
+      ["x multiple", 5],
+      ["Enterprise value", 1500],
+      ["- total debt", 250],
+      ["- preferred stock", 60],
+      ["- minority interest (none reported)", 0],
+      ["+ cash", 50],
+      ["+ short-term investments", 30],
+      ["+ equity-method investments", 10],
+      ["Equity value", 1280],
+      ["Shares outstanding", 100],
+      ["Value per share", 12.8],
+    ]);
+    // The method lists every bridge line among its inputs.
+    expect(methodSpec("dcf").uses(f, "average")).toEqual(expect.arrayContaining(["total-debt", "preferred-stock", "minority-interest", "cash", "short-term-investments", "equity-investments"]));
   });
   it("DCF: five years grown and discounted plus a terminal value", () => {
     const r = runScenarios(methodSpec("dcf"), facts(), { low: { growth: 0, terminalGrowth: 0, discountRate: 0.1 }, base: { growth: 0, terminalGrowth: 0, discountRate: 0.1 }, high: { growth: 0, terminalGrowth: 0, discountRate: 0.1 } }, "average");
@@ -190,6 +219,9 @@ let close: () => Promise<void>;
 const line = (periodEnd: string, l: string, value: number, statement: "income" | "balance" | "cashflow" = "income") => ({ symbol: SYMBOL, periodType: "year" as const, periodEnd, line: l, statement, value, currency: "KRW", label: l, consolidated: true, sources: ["dart"], alternatives: [] });
 const metric = (periodEnd: string, m: string, value: number, unit: "currency" | "multiple" = "currency") => ({ symbol: SYMBOL, periodType: "year" as const, periodEnd, metric: m, value, unit, currency: unit === "currency" ? "KRW" : null, formula: "x", inputs: [], sources: ["dart"] });
 
+const none = { value: 0, period: "year 2025-12", sources: [], reported: false as const };
+const BRIDGE_INPUTS = { "total-debt": { value: 20e9, period: "year 2025-12", sources: ["dart"] }, cash: { value: 120e9, period: "year 2025-12", sources: ["dart"] }, "preferred-stock": none, "minority-interest": none, "short-term-investments": none, "equity-investments": none };
+
 beforeEach(async () => {
   calls = [];
   prompts = [];
@@ -197,7 +229,7 @@ beforeEach(async () => {
   await runDimension(db, watchlist, { trigger: "test", ctx: ctx() });
   await db.insert(goldFinancialLines).values([line("2024-12", "revenue", 300e9), line("2025-12", "revenue", 290e9), line("2025-12", "eps-diluted", 3000), line("2025-12", "equity", 400e9, "balance")]);
   await db.insert(financialMetrics).values([metric("2023-12", "ev-ebitda", 5, "multiple"), metric("2024-12", "ev-ebitda", 7, "multiple"), metric("2025-12", "ev-ebitda", 6, "multiple"), metric("2024-12", "fcf", 40e9), metric("2025-12", "fcf", 50e9), { ...metric("2025-12", "revenue-growth", -0.033), unit: "ratio" as const, currency: null }, { ...metric("2025-12", "ebitda-margin", 0.24), unit: "ratio" as const, currency: null }]);
-  await db.insert(valuations).values({ symbol: SYMBOL, currency: "KRW", quoteCurrency: "KRW", lastFiscalYear: "2025-12", yearsCovered: 2, evEbitdaLow: 5, evEbitdaMedian: 6, evEbitdaHigh: 7, evEbitdaYears: ["2023-12", "2024-12", "2025-12"], quoteDate: "2026-11-05", quote: 30000, sharesOutstanding: 16.5e6, netDebt: -100e9, ebitda: 70e9, ebitdaBasis: "fiscal year 2025-12", marketCap: 495e9, ev: 395e9, evEbitda: 5.6, inputs: {} });
+  await db.insert(valuations).values({ symbol: SYMBOL, currency: "KRW", quoteCurrency: "KRW", lastFiscalYear: "2025-12", yearsCovered: 2, evEbitdaLow: 5, evEbitdaMedian: 6, evEbitdaHigh: 7, evEbitdaYears: ["2023-12", "2024-12", "2025-12"], quoteDate: "2026-11-05", quote: 30000, sharesOutstanding: 16.5e6, netDebt: -100e9, ebitda: 70e9, ebitdaBasis: "fiscal year 2025-12", marketCap: 495e9, ev: 395e9, evEbitda: 5.6, inputs: BRIDGE_INPUTS });
 });
 afterEach(async () => close());
 

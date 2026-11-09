@@ -6,6 +6,7 @@
 const FILINGS: Record<string, string> = {
   sec: "SEC EDGAR",
   "sec-edgar": "SEC EDGAR",
+  "sec-filings": "SEC EDGAR",
   dart: "DART",
   edinet: "EDINET",
   tdnet: "TDnet",

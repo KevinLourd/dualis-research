@@ -62,6 +62,12 @@ export const YAHOO_TYPES: Record<string, string> = {
   TotalLiabilitiesNetMinorityInterest: "total-liabilities",
   StockholdersEquity: "equity",
   TotalEquityGrossMinorityInterest: "total-equity",
+  // EV bridge lines. Yahoo's preferred stock is the carrying value (par for most US issuers: the SEC filing wins).
+  PreferredStock: "preferred-stock",
+  MinorityInterest: "minority-interest",
+  // Two Yahoo names for equity-method holdings: the first one present per period wins.
+  InvestmentsInOtherVenturesUnderEquityMethod: "equity-investments",
+  InvestmentsinAssociatesatCost: "equity-investments",
   OrdinarySharesNumber: "shares-outstanding",
   ShareIssued: "shares-issued",
   OperatingCashFlow: "cfo",
@@ -115,7 +121,15 @@ export const yahoo: FinancialsSource = {
         out.push(reading({ periodType, periodEnd: month(row.asOfDate), line, value, currency: row.currencyCode ?? null, label: base, consolidated: null }));
       }
     }
-    return out;
+    // Several Yahoo types can map to one line: keep the earliest type in YAHOO_TYPES order per (period, line).
+    const order = Object.keys(YAHOO_TYPES);
+    const kept = new Map<string, LineReading>();
+    for (const r of out) {
+      const k = `${r.periodType}|${r.periodEnd}|${r.line}`;
+      const prior = kept.get(k);
+      if (!prior || order.indexOf(r.label) < order.indexOf(prior.label)) kept.set(k, r);
+    }
+    return [...kept.values()];
   },
 };
 
@@ -183,6 +197,8 @@ const DART_IDS: Record<string, string> = {
   "ifrs-full_Liabilities": "total-liabilities",
   "ifrs-full_EquityAttributableToOwnersOfParent": "equity",
   "ifrs-full_Equity": "total-equity",
+  "ifrs-full_NoncontrollingInterests": "minority-interest",
+  "ifrs-full_InvestmentsAccountedForUsingEquityMethod": "equity-investments",
   "ifrs-full_CashFlowsFromUsedInOperatingActivities": "cfo",
   "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": "capex",
   "ifrs-full_CashFlowsFromUsedInInvestingActivities": "cfi",
@@ -333,6 +349,11 @@ const SEC_TAGS: Record<string, string[]> = {
   "short-term-debt": ["DebtCurrent", "LongTermDebtCurrent"],
   "long-term-debt": ["LongTermDebtNoncurrent", "LongTermDebt"],
   "short-borrowings": ["ShortTermBorrowings"],
+  "short-term-investments": ["ShortTermInvestments", "MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"],
+  // Redeemable preferred shown outside equity (mezzanine) at its carrying value; the filing's liquidation value wins.
+  "preferred-stock": ["TemporaryEquityCarryingAmountAttributableToParent"],
+  "minority-interest": ["MinorityInterest"],
+  "equity-investments": ["EquityMethodInvestments"],
   "total-liabilities": ["Liabilities"],
   equity: ["StockholdersEquity"],
   "total-equity": ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
@@ -349,19 +370,24 @@ const SEC_FORMS = new Set(["10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "40-F", "
 type SecFact = { start?: string; end: string; val: number; fp?: string; form?: string; filed?: string; accn?: string };
 type SecConcept = { label?: string; units: Record<string, SecFact[]> };
 
+/** The SEC's 10-digit CIK of a US ticker, from its ticker map (one fetch per run). */
+async function secCik(ctx: SourceContext, symbol: string): Promise<string | null> {
+  const ciks = await memo(ctx, "sec-ciks", async () => {
+    const res = await ctx.fetch("https://www.sec.gov/files/company_tickers.json", { headers: SEC_HEADERS });
+    if (!res.ok) throw new Error(`SEC ticker map: HTTP ${res.status}`);
+    const raw = (await res.json()) as Record<string, { cik_str: number; ticker: string }>;
+    return new Map(Object.values(raw).map((v) => [v.ticker.toUpperCase(), String(v.cik_str).padStart(10, "0")]));
+  });
+  return ciks.get(symbol.toUpperCase().replace(".", "-")) ?? null;
+}
+
 export const secCompanyFacts: FinancialsSource = {
   name: "sec",
   publisher: "SEC EDGAR XBRL company facts: every 10-K and 10-Q as filed",
   requiredEnv: [],
   covers: isUsSymbol,
   async fetch(symbol, ctx) {
-    const ciks = await memo(ctx, "sec-ciks", async () => {
-      const res = await ctx.fetch("https://www.sec.gov/files/company_tickers.json", { headers: SEC_HEADERS });
-      if (!res.ok) throw new Error(`SEC ticker map: HTTP ${res.status}`);
-      const raw = (await res.json()) as Record<string, { cik_str: number; ticker: string }>;
-      return new Map(Object.values(raw).map((v) => [v.ticker.toUpperCase(), String(v.cik_str).padStart(10, "0")]));
-    });
-    const cik = ciks.get(symbol.toUpperCase().replace(".", "-"));
+    const cik = await secCik(ctx, symbol);
     if (!cik) return { request: { symbol }, httpStatus: null, error: "Not an SEC filer (ticker absent from SEC's company_tickers.json)" };
     const url = `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`;
     const out = await getJson(ctx, url, { url, cik, kept: `mapped us-gaap concepts, periods ending in the last ${YEARS + 1} years` }, { headers: SEC_HEADERS });
@@ -425,10 +451,168 @@ export const secCompanyFacts: FinancialsSource = {
   },
 };
 
+// ---------- SEC filings (inline XBRL): preferred stock at its liquidation value, per series ----------
+
+/**
+ * Company facts drop every fact tagged by share class, and most issuers carry preferred stock at par (CareCloud:
+ * $1 thousand for 984,530 Series A shares with a $25 liquidation preference). The bridge needs what a holder is owed:
+ * shares outstanding per series x liquidation preference per share, read from the filings themselves.
+ */
+const SEC_FILING_FACTS = new Set([
+  "us-gaap:PreferredStockSharesOutstanding",
+  "us-gaap:PreferredStockSharesIssued",
+  "us-gaap:PreferredStockLiquidationPreference",
+  "us-gaap:PreferredStockLiquidationPreferenceValue",
+]);
+const SEC_ANNUAL_FORMS = new Set(["10-K", "20-F", "40-F", "10-KT"]);
+/** A tagged fact: its date (instant), the members of its context (share class...), its value in full units. */
+export type SecFilingFact = { name: string; date: string; members: string[]; value: number };
+export type SecFilingDoc = { accession: string; form: string; reportDate: string; url: string; facts: SecFilingFact[] };
+
+/** Reads the preferred-stock facts out of one inline XBRL document. */
+export function inlineXbrlFacts(html: string): SecFilingFact[] {
+  const contexts = new Map<string, { date: string; members: string[] }>();
+  for (const m of html.matchAll(/<(?:xbrli:)?context\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/(?:xbrli:)?context>/g)) {
+    const date = m[2].match(/<(?:xbrli:)?instant>\s*([\d-]+)\s*</)?.[1] ?? m[2].match(/<(?:xbrli:)?endDate>\s*([\d-]+)\s*</)?.[1];
+    if (!date) continue;
+    const members = [...m[2].matchAll(/<xbrldi:explicitMember\b[^>]*>\s*([^<\s]+)\s*</g)].map((x) => x[1]);
+    contexts.set(m[1], { date, members });
+  }
+  const out: SecFilingFact[] = [];
+  // Facts nest (an "issued" fact wrapping the "outstanding" one): each opening tag reads the text up to the next close.
+  for (const m of html.matchAll(/<ix:nonFraction\b([^>]*)>/g)) {
+    const end = html.indexOf("</ix:nonFraction>", m.index + m[0].length);
+    if (end < 0) continue;
+    const attr = (k: string) => m[1].match(new RegExp(`\\b${k}="([^"]*)"`))?.[1];
+    const name = attr("name");
+    if (!name || !SEC_FILING_FACTS.has(name)) continue;
+    const ctx = contexts.get(attr("contextRef") ?? "");
+    if (!ctx) continue;
+    const text = html.slice(m.index + m[0].length, end).replace(/<[^>]+>/g, "").trim();
+    const zero = /zerodash|fixed-zero/.test(attr("format") ?? "") || /^[-–—]$/.test(text);
+    const raw = zero ? 0 : parseNumber(text.replace(/[()]/g, ""));
+    if (raw === null) continue;
+    const value = raw * 10 ** Number(attr("scale") ?? 0) * (attr("sign") === "-" ? -1 : 1);
+    out.push({ name: name.replace(/^us-gaap:/, ""), date: ctx.date, members: ctx.members, value });
+  }
+  return out;
+}
+
+/** "us-gaap:SeriesAPreferredStockMember" -> "Series A preferred"; no class -> "preferred". */
+const seriesName = (member: string) => `${member.replace(/^.*:/, "").replace(/PreferredStockMember$|Member$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").trim()} preferred`.trim();
+
+/**
+ * Preferred stock per balance sheet date = sum over series of shares outstanding x liquidation preference per share
+ * (the aggregate liquidation value when the filing tags it). A series without a known preference leaves the date out:
+ * the carrying value from company facts or Yahoo stands then. Pure.
+ */
+export function preferredFromFilings(docs: SecFilingDoc[]): LineReading[] {
+  // Oldest filing first: a later filing's figure for the same date (a restatement) overwrites an earlier one.
+  const facts = [...docs].sort((a, b) => a.reportDate.localeCompare(b.reportDate)).flatMap((d) => d.facts);
+  const fyeMonth = docs.filter((d) => SEC_ANNUAL_FORMS.has(d.form)).map((d) => d.reportDate.slice(5, 7))[0] ?? null;
+  // One class member per fact (a breakdown by holder or a scenario is another axis: skipped).
+  const series = (f: SecFilingFact) => (f.members.length === 0 ? "" : f.members.length === 1 ? f.members[0] : null);
+  const prefPerShare = (s: string, date: string): number | null => {
+    // Per-share terms tagged on that class (a dated amendment or scenario member beside it is fine).
+    const tagged = facts.filter((f) => f.name === "PreferredStockLiquidationPreference" && f.value > 0 && (s === "" ? f.members.length === 0 : f.members.includes(s)));
+    const pool = tagged.length ? tagged : facts.filter((f) => f.name === "PreferredStockLiquidationPreference" && f.value > 0 && f.members.length === 0);
+    if (!pool.length) return null;
+    const before = pool.filter((f) => f.date <= date).sort((a, b) => b.date.localeCompare(a.date))[0];
+    return (before ?? [...pool].sort((a, b) => a.date.localeCompare(b.date))[0]).value;
+  };
+  const dates = [...new Set(facts.filter((f) => f.name.startsWith("PreferredStockShares") || f.name === "PreferredStockLiquidationPreferenceValue").map((f) => f.date))].sort();
+  const out: LineReading[] = [];
+  for (const date of dates) {
+    const periodEnd = month(date);
+    const periodType: PeriodType = fyeMonth && periodEnd.slice(5, 7) === fyeMonth ? "year" : "quarter";
+    const aggregate = facts.find((f) => f.name === "PreferredStockLiquidationPreferenceValue" && f.date === date && f.members.length === 0);
+    if (aggregate) {
+      out.push({ periodType, periodEnd, line: "preferred-stock", value: aggregate.value, currency: "USD", label: "aggregate liquidation preference", consolidated: true });
+      continue;
+    }
+    // Shares per series at that date: outstanding when tagged, else issued.
+    const shares = new Map<string, number>();
+    for (const name of ["PreferredStockSharesIssued", "PreferredStockSharesOutstanding"]) {
+      for (const f of facts.filter((x) => x.name === name && x.date === date)) {
+        const s = series(f);
+        if (s !== null) shares.set(s, f.value);
+      }
+    }
+    // A total without series beside per-series rows double counts: keep the series.
+    if (shares.size > 1) shares.delete("");
+    if (shares.size === 0) continue;
+    const parts: string[] = [];
+    let value = 0;
+    let complete = true;
+    for (const [s, n] of [...shares].sort((a, b) => a[0].localeCompare(b[0]))) {
+      if (n === 0) {
+        parts.push(`${seriesName(s)}: none outstanding`);
+        continue;
+      }
+      const pref = prefPerShare(s, date);
+      if (pref === null) {
+        complete = false;
+        break;
+      }
+      value += n * pref;
+      parts.push(`${n.toLocaleString("en-US")} ${seriesName(s)} shares x $${pref.toFixed(2)} liquidation preference`);
+    }
+    if (!complete) continue;
+    out.push({ periodType, periodEnd, line: "preferred-stock", value, currency: "USD", label: parts.join("; "), consolidated: true });
+  }
+  return out;
+}
+
+/** The filings read: every 10-K / 10-Q / 20-F of the last YEARS + 1 years, so each balance sheet date has its own. */
+const SEC_FILING_MAX = 28;
+
+export const secFilings: FinancialsSource = {
+  name: "sec-filings",
+  publisher: "SEC EDGAR 10-K and 10-Q filings (inline XBRL), 5 years: preferred stock per series at its liquidation value",
+  requiredEnv: [],
+  covers: isUsSymbol,
+  async fetch(symbol, ctx) {
+    const cik = await secCik(ctx, symbol);
+    if (!cik) return { request: { symbol }, httpStatus: null, error: "Not an SEC filer (ticker absent from SEC's company_tickers.json)" };
+    const subUrl = `https://data.sec.gov/submissions/CIK${cik}.json`;
+    const sub = await getJson(ctx, subUrl, { url: subUrl }, { headers: SEC_HEADERS });
+    if (sub.error) return sub;
+    const r = (sub.payload as { filings: { recent: { form: string[]; reportDate: string[]; accessionNumber: string[]; primaryDocument: string[] } } }).filings.recent;
+    const all = r.form.map((form, i) => ({ form, reportDate: r.reportDate[i], accession: r.accessionNumber[i], doc: r.primaryDocument[i] })).filter((f) => f.reportDate && /\.htm$/.test(f.doc));
+    const since = `${new Date().getUTCFullYear() - YEARS - 1}-01-01`;
+    const wanted = all.filter((f) => (SEC_ANNUAL_FORMS.has(f.form) || f.form === "10-Q") && f.reportDate >= since).slice(0, SEC_FILING_MAX);
+    // A filing never changes once filed: reuse what the last successful run read.
+    const previous = ctx.db
+      ? ((await ctx.db.select({ payload: fetches.payload }).from(fetches).where(and(eq(fetches.dimension, "financials"), eq(fetches.source, "sec-filings"), eq(fetches.subject, symbol), isNull(fetches.error))).orderBy(desc(fetches.fetchedAt)).limit(1))[0]?.payload as { documents?: SecFilingDoc[] } | undefined)
+      : undefined;
+    const documents: SecFilingDoc[] = [];
+    for (const f of wanted) {
+      const known = previous?.documents?.find((d) => d.accession === f.accession);
+      if (known) {
+        documents.push(known);
+        continue;
+      }
+      const url = `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${f.accession.replace(/-/g, "")}/${f.doc}`;
+      const res = await ctx.fetch(url, { headers: SEC_HEADERS });
+      if (!res.ok) return { request: { url }, httpStatus: res.status, payloadText: (await res.text()).slice(0, 500), error: `SEC filing ${f.accession}: HTTP ${res.status}` };
+      documents.push({ accession: f.accession, form: f.form, reportDate: f.reportDate, url, facts: inlineXbrlFacts(await res.text()) });
+    }
+    return {
+      request: { url: subUrl, cik, filings: wanted.map((f) => `${f.form} ${f.reportDate}`), kept: "preferred stock facts (shares per series, liquidation preference)" },
+      httpStatus: 200,
+      payload: { cik, documents },
+      ...(documents.length === 0 ? { error: "no 10-K, 20-F or 10-Q filed as HTML" } : {}),
+    };
+  },
+  extract(payload) {
+    return preferredFromFilings((payload as { documents: SecFilingDoc[] }).documents);
+  },
+};
+
 // ---------- EDINET (Japan FSA): annual securities reports (有価証券報告書), 5-year summary + full statements ----------
 
 type EdinetRow = { element: string; context: string; unit: string; value: string };
-type EdinetDoc = { docID: string; periodEnd: string; description: string; rows: EdinetRow[] };
+type EdinetDoc = { docID: string; periodEnd: string; description: string; rows: EdinetRow[]; rowsVersion?: number };
 
 /** 5-year summary (経営指標等) elements -> canonical line. */
 const EDINET_SUMMARY: Record<string, string> = {
@@ -472,7 +656,11 @@ const EDINET_STATEMENTS: Record<string, string> = {
   CurrentLiabilities: "current-liabilities",
   Liabilities: "total-liabilities",
   Inventories: "inventory",
+  NonControllingInterests: "minority-interest",
+  ShortTermInvestmentSecurities: "short-term-investments",
 };
+/** Bump when the kept rows change (new mapped elements): a stored report read with fewer rows is downloaded again. */
+const EDINET_ROWS_VERSION = 2;
 const EDINET_SHORT_DEBT = new Set(["ShortTermLoansPayable", "CurrentPortionOfLongTermLoansPayable", "CurrentPortionOfBonds", "CommercialPapersLiabilities"]);
 const EDINET_LONG_DEBT = new Set(["LongTermLoansPayable", "BondsPayable", "ConvertibleBondTypeBondsWithSubscriptionRights"]);
 const EDINET_CONTEXT = /^(Current|Prior(\d))Year(Duration|Instant)(_NonConsolidatedMember)?$/;
@@ -551,7 +739,7 @@ export const edinetFinancials: FinancialsSource = {
     const documents: EdinetDoc[] = [];
     for (const fyEnd of due) {
       const periodEnd = isoDate(fyEnd);
-      const known = previous?.documents?.find((d) => d.periodEnd === periodEnd);
+      const known = previous?.documents?.find((d) => d.periodEnd === periodEnd && d.rowsVersion === EDINET_ROWS_VERSION);
       if (known) {
         documents.push(known);
         continue;
@@ -560,7 +748,7 @@ export const edinetFinancials: FinancialsSource = {
       if (!doc) continue;
       const res = await ctx.fetch(`https://api.edinet-fsa.go.jp/api/v2/documents/${doc.docID}?type=5&Subscription-Key=${ctx.env.EDINET_API_KEY}`);
       if (!res.ok) return { request: { docID: doc.docID }, httpStatus: res.status, payloadText: await res.text(), error: `EDINET document ${doc.docID}: HTTP ${res.status}` };
-      documents.push({ docID: doc.docID, periodEnd, description: doc.docDescription, rows: await edinetRows(new Uint8Array(await res.arrayBuffer())) });
+      documents.push({ docID: doc.docID, periodEnd, description: doc.docDescription, rows: await edinetRows(new Uint8Array(await res.arrayBuffer())), rowsVersion: EDINET_ROWS_VERSION });
     }
     return {
       request: { url: "https://api.edinet-fsa.go.jp/api/v2/documents", secCode, fiscalYearEnds: due.map(isoDate), kept: "summary and statement rows we map" },
@@ -746,5 +934,5 @@ export const pdfExtract: FinancialsSource = {
 };
 
 /** Run order = trust order when values disagree and no majority exists: registries first, Yahoo, then extraction. */
-export const FINANCIALS_SOURCES = [secCompanyFacts, dart, edinetFinancials, yahoo, yahooChart, pdfExtract] as const;
+export const FINANCIALS_SOURCES = [secFilings, secCompanyFacts, dart, edinetFinancials, yahoo, yahooChart, pdfExtract] as const;
 export const FINANCIALS_PRIORITY = FINANCIALS_SOURCES.map((s) => s.name);
