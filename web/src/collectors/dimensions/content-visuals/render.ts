@@ -5,12 +5,14 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import * as echarts from "echarts";
-import type { VisualInput } from "./data";
+import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
+import { sourceNote } from "../../../console/source-labels";
+import type { VisualExhibit, VisualInput } from "./data";
 
 /**
  * Node only (loaded by URL from the dimension: the console bundle never sees resvg or ffmpeg). Three pictures of an
- * Idea in the Dualis look: `chart` = the price against the fair value on black (his Note style: white line, grey
- * reference), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
+ * Idea in the Dualis look: `chart` = the most striking Exhibit of the driver the Idea cites (`exhibitSvg`), or the
+ * price against the fair value (`chartSvg`), on black (his Note style: white main series, grey reference), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
  * corner, `video` = the same card with the line drawing itself, then the fair value and the gap (MP4, H.264).
  */
 
@@ -139,6 +141,80 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL): string {
     grid: { left: 96, right: 200, top: 160, bottom: 92 },
     ...axes(input, false),
     series: series(input, frame, false),
+  });
+  const svg = chart.renderToSVGString();
+  chart.dispose();
+  return withMark(svg, W - 56 - 72, 40, 72);
+}
+
+/** Shades of the series after the first (white): his Note style keeps one bright line, the rest grey. */
+const SERIES_GREYS = ["#fff", GREY, "#4d4d55", "#c8c8cf"];
+
+/**
+ * A driver's Exhibit on black, his Note style: white columns or line for the lead series, greys for the others, values
+ * on the columns, the takeaway under the title. Every number is the one stored in gold.exhibits.
+ */
+export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
+  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
+  const lead = e.series[0];
+  const fmtV = (v: number) => formatUnit(v, lead.unit, lead.currency);
+  const period = seriesPeriod(lead.key);
+  const label = { color: GREY, fontSize: 18, fontFamily: FONT };
+  const bars = e.chart === "bar";
+  const legend = e.series.length > 1;
+  const note = sourceNote([...e.sources, "dualis"]) ?? "Source: Dualis Research.";
+  chart.setOption({
+    backgroundColor: "#000",
+    animation: false,
+    textStyle: { fontFamily: FONT },
+    title: [
+      { text: `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40, textStyle: { color: "#fff", fontSize: 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - 96, overflow: "truncate" } },
+      { text: e.takeaway, left: 56, top: 88, textStyle: { color: GREY, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
+      { text: note, left: 56, bottom: 28, textStyle: { color: GREY, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
+    ],
+    legend: legend
+      ? { show: true, right: 56, bottom: 24, icon: "rect", itemWidth: 14, itemHeight: 14, textStyle: { color: GREY, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+      : { show: false },
+    grid: { left: 110, right: bars ? 56 : 170, top: 190, bottom: legend ? 110 : 92 },
+    xAxis: {
+      type: "category",
+      data: e.points.map((p) => periodLabel(p.period, period)),
+      axisLine: { lineStyle: { color: "#333" } },
+      axisTick: { show: false },
+      axisLabel: { ...label, color: "#c8c8cf", hideOverlap: true },
+    },
+    yAxis: {
+      type: "value",
+      scale: !bars,
+      splitNumber: 4,
+      axisLabel: { ...label, formatter: (v: number) => fmtV(v) },
+      splitLine: { lineStyle: { color: "#1c1c1f" } },
+    },
+    series: e.series.map((s, i) => {
+      const colour = SERIES_GREYS[i % SERIES_GREYS.length];
+      const data = e.points.map((p) => p.values[s.key] ?? null);
+      return bars
+        ? {
+            name: s.label,
+            type: "bar",
+            data,
+            barMaxWidth: 64,
+            itemStyle: { color: colour },
+            label: { show: e.series.length === 1 && e.points.length <= 12, position: "top", color: "#fff", fontSize: 18, fontWeight: 600, fontFamily: FONT, formatter: (p: { value: number }) => fmtV(p.value) },
+            labelLayout: { hideOverlap: true },
+          }
+        : {
+            name: s.label,
+            type: "line",
+            data,
+            symbol: "none",
+            connectNulls: true,
+            lineStyle: { color: colour, width: i === 0 ? 4 : 2, ...(i === 0 ? {} : { type: "dashed" as const }) },
+            itemStyle: { color: colour },
+            endLabel: { show: i === 0, color: "#fff", fontSize: 20, fontWeight: 600, fontFamily: FONT, formatter: (p: { value: number }) => fmtV(p.value) },
+            z: 3 - Math.min(i, 2),
+          };
+    }),
   });
   const svg = chart.renderToSVGString();
   chart.dispose();

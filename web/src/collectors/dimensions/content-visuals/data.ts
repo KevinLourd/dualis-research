@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
-import { evidence, fairValues } from "@/db/schema/analysis";
+import { evidence, exhibits, type ExhibitPoint, type ExhibitSeries, fairValues, narrativeDrivers } from "@/db/schema/analysis";
 import * as content from "@/db/schema/content";
 import { companyProfiles, priceBars } from "@/db/schema/gold";
 import type { Db } from "@/db/types";
@@ -16,6 +16,22 @@ export type VisualInput = {
   fair: { value: number; currency: string | null; low: number | null; high: number | null } | null;
   /** The first news the Idea cites that has a link: what a capture shows. */
   newsUrl: string | null;
+  /** How the Idea is told: the chart judge reads it with the title. */
+  angle: string;
+  /** Exhibits of the Narrative Drivers the Idea cites (directly, or through the Evidence it cites), numbers from gold. */
+  exhibits: VisualExhibit[];
+};
+
+/** One gold Exhibit the chart can draw instead of the price. */
+export type VisualExhibit = {
+  id: string;
+  driverTitle: string;
+  title: string;
+  chart: "bar" | "line";
+  series: ExhibitSeries[];
+  points: ExhibitPoint[];
+  takeaway: string;
+  sources: string[];
 };
 
 const PRICE_SOURCE_LABEL: Record<string, string> = { yahoo: "Yahoo Finance", nasdaq: "Nasdaq", cnbc: "CNBC", naver: "Naver Finance" };
@@ -26,12 +42,21 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
   const symbol = idea.symbol ?? idea.sourceRefs.find((r) => r.symbol)?.symbol ?? "";
   const since = new Date(now.getTime() - 365 * 86400_000).toISOString().slice(0, 10);
   const evidenceIds = idea.sourceRefs.filter((r) => r.kind === "evidence").map((r) => r.ref.slice("evidence:".length));
+  const citedDrivers = idea.sourceRefs.filter((r) => r.kind === "driver").map((r) => r.ref.slice("driver:".length));
   const [[profile], bars, [fair], items] = await Promise.all([
     db.select({ name: companyProfiles.name }).from(companyProfiles).where(eq(companyProfiles.symbol, symbol)),
     db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(and(eq(priceBars.symbol, symbol), gte(priceBars.date, since))).orderBy(asc(priceBars.date)),
     db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
-    evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
+    evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url, driverId: evidence.driverId }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
   ]);
+  // The drivers the Idea rests on: the ones it names, then the ones its Evidence moves.
+  const driverIds = [...new Set([...citedDrivers, ...evidenceIds.map((id) => items.find((e) => e.id === id)?.driverId).filter((d): d is string => !!d)])];
+  const [drivers, driverExhibits] = driverIds.length
+    ? await Promise.all([
+        db.select({ id: narrativeDrivers.id, title: narrativeDrivers.title }).from(narrativeDrivers).where(inArray(narrativeDrivers.id, driverIds)),
+        db.select().from(exhibits).where(inArray(exhibits.driverId, driverIds)).orderBy(asc(exhibits.number)),
+      ])
+    : [[], []];
   const newsUrl = evidenceIds.map((id) => items.find((e) => e.id === id)?.url).find((u): u is string => !!u) ?? null;
   return {
     symbol,
@@ -41,5 +66,18 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
     priceSources: [...new Set(bars.flatMap((b) => b.sources))].map((s) => PRICE_SOURCE_LABEL[s] ?? s),
     fair: fair ? { value: fair.value, currency: fair.currency, low: fair.low, high: fair.high } : null,
     newsUrl,
+    angle: idea.angle,
+    exhibits: driverExhibits
+      .filter((e) => e.points.some((p) => Object.values(p.values).some((v) => v !== null)))
+      .map((e) => ({
+        id: e.id,
+        driverTitle: drivers.find((d) => d.id === e.driverId)?.title ?? e.driverId,
+        title: e.title,
+        chart: e.chart,
+        series: e.series,
+        points: e.points,
+        takeaway: e.takeaway,
+        sources: e.sources,
+      })),
   };
 }
