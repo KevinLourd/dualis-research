@@ -1,15 +1,13 @@
 import { Badge, Button, Input } from "@cloudflare/kumo";
 import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, FileTextIcon, QuestionIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
-import { evidenceStrength } from "@/content/signal-words";
 import type { GoldEvidence, GoldExhibit, GoldNarrativeState, ThesisSide } from "@/db/schema/analysis";
-import type { GoldCatalyst } from "@/db/schema/catalysts";
 import type { GoldConsensus } from "@/db/schema/consensus";
 import { type DriverWithExhibits, getTickerAnalysis, getValuation } from "./analysis-queries";
 import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
-import { CallBadge, FairValue, QuoteGap, StrengthBadge, TickerTag } from "./board";
+import { CallBadge, FairValue, QuoteGap, TickerTag } from "./board";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "./kumo";
 import { RowLink } from "./row-link";
 import { signalWordsOf } from "./signal-history";
@@ -19,8 +17,8 @@ import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
 import { day, price, relativeTime, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
-import { Section, StateBadge, StateChange } from "./signal";
-import { getWhy } from "./signal-queries";
+import { Section } from "./signal";
+import { getThesis } from "./thesis-queries";
 import { saveFairValue } from "./thesis-actions";
 import { ComingNext } from "./ui";
 
@@ -36,17 +34,17 @@ export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | nul
 export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
 
 export async function analysisData(symbol: string, thesis: ThesisSide | null = null) {
-  const [row, data, why, consensus, objects, chart, valuation] = await Promise.all([
+  const [row, data, ownFair, consensus, objects, chart, valuation] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
-    getWhy(symbol),
+    getThesis(symbol),
     consensusOf(symbol),
     getTickerAnalysis(symbol, thesis),
     priceVsFairValue(symbol),
     getValuation(symbol),
   ]);
   if (!row || !data) return null;
-  return { row, data, why, consensus, objects, chart, valuation };
+  return { row, data, ownFair, consensus, objects, chart, valuation };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
@@ -160,29 +158,6 @@ function SignalHistory({ changes }: { changes: Analysis["objects"]["signalChange
     </div>
   );
 }
-
-/** News and filings judged against the narrative, each with its strength; a click opens the item with its sources. */
-function Evidence({ symbol, rows }: { symbol: string; rows: GoldCatalyst[] }) {
-  if (rows.length === 0) return <p className="text-lg text-kumo-subtle">No news or filing has been judged against the narrative yet.</p>;
-  return (
-    <ol className="flex flex-col gap-1">
-      {rows.map((c) => (
-        <li key={c.id}>
-          <Link href={itemHref(symbol, `news:${c.id}`)} scroll={false} className="-mx-3 flex flex-col gap-1 rounded-lg px-3 py-3 transition-colors hover:bg-kumo-tint">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-kumo-subtle">
-              <StrengthBadge strength={evidenceStrength(c.direction, c.probability)} />
-              <span>{c.direction === "contradicts" ? "Cracks the narrative" : "Continues the narrative"}</span>
-              <span className="tabular">{day(c.eventDay)}</span>
-              {c.publisher && <span>{c.publisher}</span>}
-            </span>
-            <span className="text-base font-medium text-kumo-strong">{c.headline}</span>
-          </Link>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 
 /** One exhibit, its title opening the exhibit's own panel. */
 export function Exhibit({ symbol, exhibit, linked = true }: { symbol: string; exhibit: GoldExhibit; linked?: boolean }) {
@@ -310,13 +285,11 @@ function ThesisTabs({ objects, href }: { objects: Analysis["objects"]; href: (si
 }
 
 export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Analysis; variant: "panel" | "page"; thesisHref: (side: ThesisSide) => string }) {
-  const { row, data, why, consensus, objects, chart, valuation } = analysis;
+  const { row, ownFair: thesis, consensus, objects, chart, valuation } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
-  const { thesis, latest, state, evidence } = why;
   const symbol = row.symbol;
   // The analysis writes the narrative; nobody edits it by hand (Kevin 2026-11-09).
   const narrative = objects.narrative?.text ?? null;
-  const position = data.ticker.position;
   const side = objects.side;
   // Item links keep the shown thesis only when two compete (one thesis = the default).
   const keep = objects.theses.length > 1 ? side : null;
@@ -356,24 +329,7 @@ export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Anal
             </span>
             {objects.narrativeState.why && <p className="max-w-prose text-base leading-relaxed text-kumo-default">{objects.narrativeState.why}</p>}
           </div>
-        ) : objects.signal ? null : latest ? (
-          <div className="flex flex-col gap-2">
-            <span className="flex flex-wrap items-center gap-3">
-              <StateChange from={latest.fromState} to={latest.toState} position={position} />
-              <time dateTime={latest.at.toISOString()} title={utc(latest.at)} className="text-sm text-kumo-subtle">
-                {relativeTime(latest.at)}
-              </time>
-            </span>
-            {latest.reason && <p className="max-w-prose text-base leading-relaxed text-kumo-default">{latest.reason}</p>}
-          </div>
-        ) : (
-          state && (
-            <div className="flex flex-col gap-2">
-              <StateBadge state={state.state} position={position} />
-              {state.reason && <p className="max-w-prose text-base leading-relaxed text-kumo-subtle">{state.reason}</p>}
-            </div>
-          )
-        )}
+        ) : null}
       </Section>
 
       <Section title="Narrative drivers">
@@ -388,12 +344,6 @@ export function AnalysisBody({ analysis, variant, thesisHref }: { analysis: Anal
           />
         )}
       </Section>
-
-      {objects.drivers.length === 0 && (
-        <Section title={`News against the narrative · ${evidence.length}`}>
-          <Evidence symbol={symbol} rows={evidence} />
-        </Section>
-      )}
 
       {variant === "page" && (
         <>

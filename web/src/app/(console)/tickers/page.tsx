@@ -3,16 +3,15 @@ import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } f
 import { price } from "@/console/format";
 import { CompanyLogo, DayChange } from "@/console/market";
 import { listTickers } from "@/console/queries";
-import { StateBadge } from "@/console/signal";
-import { signalStates } from "@/console/signal-queries";
+import { TickerTag } from "@/console/board";
+import { tickerTags } from "@/console/board-queries";
 import { Missing, PageHeader, PositionTags } from "@/console/ui";
 import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Tickers" };
 
 export default async function TickersPage() {
-  const [rows, states] = await Promise.all([listTickers(), signalStates()]);
-  const stateOf = new Map(states.map((s) => [s.symbol, s.state]));
+  const [rows, tags] = await Promise.all([listTickers(), tickerTags()]);
 
   return (
     <>
@@ -31,7 +30,7 @@ export default async function TickersPage() {
           </KTableHeader>
           <KTableBody>
             {rows.map((t) => {
-              const state = stateOf.get(t.symbol);
+              const tag = tags.get(t.symbol);
               return (
                 <KTableRow key={t.symbol}>
                   <KTableCell className="py-4 pl-6">
@@ -48,7 +47,7 @@ export default async function TickersPage() {
                     {t.lastClose === null ? "–" : <>{price(t.lastClose)} <span className="text-kumo-subtle">{t.quoteCurrency ?? t.currency}</span></>}
                   </KTableCell>
                   <KTableCell className="py-4 text-right"><DayChange ratio={t.changePct} /></KTableCell>
-                  <KTableCell className="py-4 pr-6">{state ? <StateBadge state={state} position={t.position} /> : <span className="text-kumo-subtle">–</span>}</KTableCell>
+                  <KTableCell className="py-4 pr-6">{tag?.tag ? <TickerTag row={tag} /> : <span className="text-kumo-subtle">–</span>}</KTableCell>
                 </KTableRow>
               );
             })}

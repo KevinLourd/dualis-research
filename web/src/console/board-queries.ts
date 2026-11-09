@@ -1,9 +1,8 @@
 import { cache } from "react";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { evidenceStrength, type SignalCall, type SignalStrength } from "@/content/signal-words";
+import type { SignalCall, SignalStrength } from "@/content/signal-words";
 import { getDb } from "@/db/client";
 import { evidence as goldEvidence, exhibits, fairValues, marketReactions, narrativeDrivers, narrativeStates, signals, type ThesisSide } from "@/db/schema/analysis";
-import { goldCatalysts } from "@/db/schema/catalysts";
 import { consensus } from "@/db/schema/consensus";
 import { companyProfiles, filings, priceBars, quotes, tickers } from "@/db/schema/gold";
 import { goldNewsItems } from "@/db/schema/news";
@@ -110,10 +109,8 @@ export const boardRowOf = cache(async (symbol: string): Promise<BoardRow | null>
 export async function evidenceDetail(symbol: string, id: string) {
   const db = getDb();
   const [own] = await db.select().from(goldEvidence).where(and(eq(goldEvidence.symbol, symbol), eq(goldEvidence.id, id)));
-  // Evidence (every news item and filing of the year, judged against a driver) carries its own item; older ids are catalysts.
-  const [legacy] = own ? [] : await db.select().from(goldCatalysts).where(and(eq(goldCatalysts.symbol, symbol), eq(goldCatalysts.id, id)));
-  const catalyst = own
-    ? {
+  if (!own) return null;
+  const catalyst = {
         id: own.id,
         symbol: own.symbol,
         kind: own.kind,
@@ -130,9 +127,7 @@ export async function evidenceDetail(symbol: string, id: string) {
         filingIds: own.filingIds,
         sources: own.sources,
         rebuiltAt: own.rebuiltAt,
-      }
-    : legacy;
-  if (!catalyst) return null;
+      };
   const [articles, docs, [judged]] = await Promise.all([
     catalyst.newsItemIds.length ? db.select().from(goldNewsItems).where(inArray(goldNewsItems.id, catalyst.newsItemIds)).orderBy(desc(goldNewsItems.publishedAt)) : [],
     catalyst.filingIds.length ? db.select().from(filings).where(inArray(filings.id, catalyst.filingIds)).orderBy(desc(filings.filedAt)) : [],
@@ -154,7 +149,7 @@ export async function evidenceDetail(symbol: string, id: string) {
     /** What the price did around the item, and the fair value then and now. */
     reaction: reaction ?? null,
     exhibit: exhibit ?? null,
-    strength: judged?.strength ?? evidenceStrength(catalyst.direction, catalyst.probability),
+    strength: own.strength,
     articles,
     filings: docs,
   };
@@ -230,4 +225,9 @@ export type PriceVsFairValue = Awaited<ReturnType<typeof priceVsFairValue>>;
 export async function fairValueDetail(symbol: string) {
   const [row] = await getDb().select().from(fairValues).where(eq(fairValues.symbol, symbol));
   return row ?? null;
+}
+
+/** Every watchlist ticker's tag as the board shows it (Tickers list). */
+export async function tickerTags(): Promise<Map<string, BoardRow>> {
+  return new Map((await readBoard()).map((r) => [r.symbol, r]));
 }

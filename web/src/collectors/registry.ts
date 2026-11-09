@@ -1,7 +1,5 @@
-import { catalysts } from "./dimensions/catalysts";
 import { companyProfile } from "./dimensions/company-profile";
 import { consensusDim } from "./dimensions/consensus";
-import { thesisConfidenceDim } from "./dimensions/thesis-confidence";
 import { contentAccounts } from "./dimensions/content-accounts";
 import { contentDispatch } from "./dimensions/content-dispatch";
 import { contentDrafts } from "./dimensions/content-drafts";
@@ -39,7 +37,6 @@ import type { Dimension } from "./types";
  * Every dimension, in run order (`collect all` runs them top to bottom).
  * A new dimension = a folder under dimensions/ + one line here. Watchlist first: it defines the subjects. News after company-profile: it queries the resolved names.
  * Outreach before substack-network: the drafted authors join the crawl's candidates.
- * Catalysts after news and filings: it judges each new item against the ticker's narrative.
  * OneDrive (Thierry's research folder) before thesis: the research reads it. Its write-back right after filings.
  * Consensus after earnings: analyst expectations vs actuals, read by the signal that says "above / below what the market expects".
  * Financials after price and filings: EV reads the quote, EDINET the fiscal year end, the PDF extraction the annual report link.
@@ -48,9 +45,9 @@ import type { Dimension } from "./types";
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
- * Thesis confidence right after catalysts: it weighs every judged item so far (narrative holds or cracks).
+ * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, catalysts, thesisConfidenceDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -71,8 +68,8 @@ export const STAGES: readonly (readonly string[])[] = [
   ["financials"],
   ["peers"],
   ["valuation"],
-  ["analysis", "market-reaction", "catalysts"],
-  ["thesis-confidence", "narrative-since"],
+  ["analysis", "market-reaction"],
+  ["narrative-since"],
   ["evidence"],
   ["narrative-state"],
   ["signals"],
