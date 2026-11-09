@@ -187,7 +187,7 @@ describe("visual helpers", () => {
 describe("the chart shouts (Kevin 2026-11-09)", () => {
   it("writes the arrow, note, headline and news strip once, into the chart's bronze request", async () => {
     await addExhibits();
-    const judge = fakeJudge("CCLD:1:1");
+    const judge = fakeJudge("CCLD:long:1:1");
     await runDimension(db, renderOnly, { trigger: "test", ctx: { ...ctx, complete: judge.complete } });
     const [chart] = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, ideaId)).then((r) => r.filter((v) => v.kind === "chart"));
     expect(chart.status).toBe("ok");
