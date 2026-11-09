@@ -41,6 +41,10 @@ async function seed() {
 }
 
 describe("growth brief figures", () => {
+  it("says a lead over the pace, nothing when behind", () => {
+    expect(briefText(growthBrief([{ date: "2026-11-04", subscribers: 153 }, { date: "2026-11-05", subscribers: 300 }], [], "2026-11-05"))).toContain("ahead of pace");
+  });
+
   it("matches the Growth page: count, gain, pace, line, yesterday's contacts", () => {
     const b = growthBrief(audience, [], "2026-11-07");
     expect(b).toMatchObject({ current: 160, gained: 7, remaining: 993, daysLeft: 24, perDayNeeded: 42, countedOn: "2026-11-06" });
@@ -48,7 +52,9 @@ describe("growth brief figures", () => {
     const text = briefText(b);
     expect(text).toContain("*Analysis Paralysis, Nov 7*");
     expect(text).toContain("160 subscribers (counted Nov 6), +7 since Nov 4");
-    expect(text).toContain("Planned for today: 268, 24 days left");
+    expect(text).toContain("Goal 1,153 by Nov 30: 993 to go in 24 days");
+    expect(text).toContain("42 new subscribers a day needed");
+    expect(text).not.toMatch(/planned|ahead/i);
     expect(text).not.toMatch(/\b(test|line|vsPlan|gold)\b/i);
     expect(text).not.toMatch(/[—–]/);
     // No outreach yesterday: the line is left out, never « 0 writers contacted ».
