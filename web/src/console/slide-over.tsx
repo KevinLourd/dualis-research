@@ -32,7 +32,7 @@ export function SlideOver({
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/20 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Dialog.Popup className={`fixed inset-y-0 right-0 z-50 flex ${size === "lg" ? "w-[min(680px,100vw)]" : "w-[min(480px,100vw)]"} flex-col bg-kumo-base shadow-2xl ring-1 ring-kumo-line outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-x-6 data-[ending-style]:opacity-0 data-[starting-style]:translate-x-6 data-[starting-style]:opacity-0`}>
-          <header className="flex items-start justify-between gap-3 border-b border-kumo-hairline px-6 py-4">
+          <header className="flex items-start justify-between gap-3 border-b border-kumo-hairline px-4 py-4 sm:px-6">
             {back && (
               <Button
                 variant="ghost"
@@ -52,7 +52,7 @@ export function SlideOver({
               render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Close" />}
             />
           </header>
-          <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-5 [&>*]:shrink-0">{children}</div>
+          <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-5 sm:px-6 [&>*]:shrink-0">{children}</div>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

@@ -97,7 +97,7 @@ function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
   const fmt = (metric: string, v: number | null) =>
     v === null ? "–" : metric === "eps" ? v.toFixed(2) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
   return (
-    <div className="rounded-lg ring-1 ring-kumo-hairline">
+    <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
       <KTable>
         <KTableHeader>
           <KTableRow>
@@ -136,7 +136,7 @@ function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
 /** Signal history (Analysis page only): every change after the baseline, newest first, with its one-line note. */
 function SignalHistory({ changes }: { changes: Analysis["objects"]["signalChanges"] }) {
   return (
-    <div className="rounded-lg ring-1 ring-kumo-hairline">
+    <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
       <KTable>
         <KTableHeader>
           <KTableRow>

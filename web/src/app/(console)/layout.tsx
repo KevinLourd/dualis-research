@@ -18,7 +18,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           tickers={tickers.map((t) => ({ symbol: t.symbol, name: t.name, market: t.market, inPortfolio: t.inPortfolio, aliases: t.aliases }))}
           lastRun={run}
         />
-        <main className="mx-auto flex w-full max-w-[1200px] shrink-0 flex-col gap-6 px-8 pt-8 pb-16">{children}</main>
+        <main className="mx-auto flex w-full max-w-[1200px] shrink-0 flex-col gap-6 px-4 pt-6 pb-16 md:px-8 md:pt-8">{children}</main>
       </div>
     </SidebarProvider>
   );

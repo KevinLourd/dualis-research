@@ -79,7 +79,7 @@ export default async function DraftsPage({ searchParams }: { searchParams: Promi
       {rows.length === 0 ? (
         <p className="text-base text-kumo-subtle">No draft matches these filters.</p>
       ) : (
-        <div className="rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
+        <div className="overflow-x-auto rounded-lg bg-kumo-base ring-1 ring-kumo-hairline">
           <KTable className="table-fixed">
             <KTableHeader>
               <KTableRow>

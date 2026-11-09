@@ -143,7 +143,7 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
             sources={sources}
           />
         )}
-        <div className="rounded-lg ring-1 ring-kumo-hairline">
+        <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>
             <KTableHeader>
               <KTableRow>

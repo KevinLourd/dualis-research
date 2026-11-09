@@ -77,7 +77,7 @@ export function RangeCards({ low, base, high, currency, baseLabel = "Fair value"
   const cell = "flex flex-col gap-1 rounded-lg px-4 py-3 ring-1 ring-kumo-hairline";
   const n = (x: number | null) => (x === null ? "–" : `${price(x)}${currency ? ` ${currency}` : ""}`);
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className={cell}>
         <span className="text-sm text-kumo-subtle">Low</span>
         <span className="font-mono tabular text-kumo-default">{n(low)}</span>

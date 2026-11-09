@@ -7,6 +7,7 @@
 import { Breadcrumbs, LayerCard, Sidebar, Table } from "@cloudflare/kumo";
 
 export const SidebarProvider = Sidebar.Provider;
+export const KSidebarTrigger = Sidebar.Trigger;
 export const KTable = Table;
 export const KTableHeader = Table.Header;
 export const KTableHead = Table.Head;

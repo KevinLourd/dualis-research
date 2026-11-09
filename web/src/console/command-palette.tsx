@@ -44,9 +44,9 @@ export function TickerSearch({ tickers }: { tickers: PaletteTicker[] }) {
 
   return (
     <>
-      <Button variant="secondary" icon={MagnifyingGlassIcon} onClick={() => setOpen(true)} className="w-72 justify-start">
+      <Button variant="secondary" icon={MagnifyingGlassIcon} onClick={() => setOpen(true)} className="w-full min-w-0 justify-start sm:w-72">
         <span className="flex-1 text-left text-kumo-subtle">Search tickers</span>
-        <kbd className="rounded border border-kumo-hairline bg-kumo-base px-1.5 py-0.5 text-[10px] text-kumo-subtle">⌘K</kbd>
+        <kbd className="hidden rounded border border-kumo-hairline bg-kumo-base px-1.5 py-0.5 text-[10px] text-kumo-subtle sm:inline">⌘K</kbd>
       </Button>
       <CommandPalette.Root
         open={open}
