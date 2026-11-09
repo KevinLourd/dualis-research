@@ -358,6 +358,63 @@ export const signalChanges = gold.table(
 );
 export type GoldSignalChange = typeof signalChanges.$inferSelect;
 
+/**
+ * Live test, signal events (Kevin 2026-11-09): every reading of a ticker's signal at its exact time, the first one
+ * included (signal_changes skips that baseline), so the page shows when we said weak / strong inflection or crack, when
+ * we changed it and when we removed it. = silver.signal_states, rebuilt by `signals`.
+ */
+export const signalEvents = gold.table(
+  "signal_events",
+  {
+    /** = silver.signal_states.id. */
+    id: uuid("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    signal: text("signal").$type<SignalKind>().notNull(),
+    strength: text("strength").$type<Strength>().notNull(),
+    /** The reading before (null on the first one). */
+    fromSignal: text("from_signal").$type<SignalKind>(),
+    fromStrength: text("from_strength").$type<Strength>(),
+    updateNote: text("update_note"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_signal_events_at").on(t.at)],
+);
+export type GoldSignalEvent = typeof signalEvents.$inferSelect;
+
+/**
+ * Live test, positions: one per signal reading that is a BUY (long) or a SELL (short); the next reading of the ticker
+ * closes it, whatever it is (none, the other side, or the same side at another strength: weak -> strong closes the weak
+ * position and opens a strong one, Kevin 2026-11-09). Entry and exit at the last close the ticker's market had printed
+ * at the signal time; an open position is marked to the latest close. No trading costs. Rebuilt by `signals`.
+ */
+export const livePositions = gold.table(
+  "live_positions",
+  {
+    /** = silver.signal_states.id of the reading that opened it. */
+    id: uuid("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    side: text("side").$type<"long" | "short">().notNull(),
+    strength: text("strength").$type<"strong" | "weak">().notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull(),
+    /** Null while open. */
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** Null when no close was stored before the signal. */
+    entryDate: text("entry_date"),
+    entryPrice: doublePrecision("entry_price"),
+    exitDate: text("exit_date"),
+    exitPrice: doublePrecision("exit_price"),
+    /** The close the return reads on: the exit, else the latest close. */
+    markDate: text("mark_date"),
+    markPrice: doublePrecision("mark_price"),
+    return: doublePrecision("return"),
+    currency: text("currency"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_live_positions_symbol").on(t.symbol, t.openedAt)],
+);
+export type GoldLivePosition = typeof livePositions.$inferSelect;
+
 /** Research Report: equity-research style, markdown, `[EXHIBIT n]` markers = gold.exhibits.number of the ticker. */
 export const researchReports = gold.table("research_reports", {
   /** `<symbol>:<side>`: one report per thesis. */
