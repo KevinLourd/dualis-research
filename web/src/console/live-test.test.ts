@@ -58,11 +58,16 @@ describe("live test P&L", () => {
   const weakB = { symbol: "B", side: "long" as const, strength: "weak" as const, entryDate: "2026-11-05", exitDate: null, closedAt: null };
   const bars = { A, B };
 
-  it("a strong entry weighs 1 and a weak one the cursor's weight", () => {
+  it("one equal slot per open position: a strong one invests all of it, a weak one the cursor's share, the rest in cash", () => {
     // Day 1: A +10%, B -20%.
-    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 0.5).lines[0].points[1].value).toBeCloseTo((0.1 - 0.5 * 0.2) / 1.5);
-    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 1).lines[0].points[1].value).toBeCloseTo((0.1 - 0.2) / 2);
-    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 0).lines[0].points[1].value).toBeCloseTo(0.1);
+    const day1 = (w: number, ps = [strongA, weakB]) => portfolioPnl(ps, bars, spx, "2026-11-05", w).lines[0].points[1].value;
+    expect(day1(0.5)).toBeCloseTo((0.1 - 0.5 * 0.2) / 2);
+    expect(day1(1)).toBeCloseTo((0.1 - 0.2) / 2);
+    expect(day1(0)).toBeCloseTo(0.1 / 2);
+    // A lone weak position: its share moves the book smoothly, 0 at 0.
+    expect(day1(0, [weakB])).toBeCloseTo(0);
+    expect(day1(0.05, [weakB])).toBeCloseTo(-0.01);
+    expect(day1(1, [weakB])).toBeCloseTo(-0.2);
   });
 
   it("rebases the S&P at the close known when the first signal fired, like an entry", () => {
