@@ -39,6 +39,9 @@ export const LINES = {
   "total-liabilities": { statement: "balance", name: "Total liabilities" },
   equity: { statement: "balance", name: "Shareholders' equity" },
   "total-equity": { statement: "balance", name: "Total equity incl. minorities" },
+  "preferred-stock": { statement: "balance", name: "Preferred stock (liquidation value when filed)" },
+  "minority-interest": { statement: "balance", name: "Non-controlling (minority) interest" },
+  "equity-investments": { statement: "balance", name: "Equity-method investments" },
   "shares-outstanding": { statement: "balance", name: "Shares outstanding" },
   "shares-issued": { statement: "balance", name: "Shares issued (incl. treasury)" },
   // Cash flow statement (a period's flow)

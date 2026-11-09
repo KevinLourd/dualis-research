@@ -33,6 +33,13 @@ export async function valuationFacts(db: Db, symbol: string, market: MarketReads
     put("net-debt", valuation.netDebt, "currency", vi["total-debt"]?.period ?? "", [...new Set([...(vi["total-debt"]?.sources ?? []), ...(vi.cash?.sources ?? [])])]);
     put("total-debt", vi["total-debt"]?.value, "currency", vi["total-debt"]?.period ?? "", vi["total-debt"]?.sources ?? []);
     put("cash", vi.cash?.value, "currency", vi.cash?.period ?? "", vi.cash?.sources ?? []);
+    // The rest of the EV bridge, read on the same balance sheet; « none reported » when the filings carry no such line.
+    for (const key of ["preferred-stock", "minority-interest", "short-term-investments", "equity-investments"] as const) {
+      const b = vi[key];
+      if (!b) throw new Error(`valuation facts: ${symbol} has net debt but no "${key}" bridge input (financials not rebuilt with the EV bridge)`);
+      put(key, b.value, "currency", b.reported === false ? `none reported (${b.period})` : b.period, b.sources);
+      if (b.reported === false) inputs[key]!.reported = false;
+    }
   }
   if (valuation?.ebitda) put("ebitda", valuation.ebitda, "currency", valuation.ebitdaBasis ?? "", vi.ebitda?.sources ?? []);
   const eps = catalog.get("line:eps-diluted") ?? catalog.get("line:eps-basic");

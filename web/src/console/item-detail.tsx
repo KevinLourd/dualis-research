@@ -451,7 +451,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
                 {m.inputs.map((i) => (
                   <Fact key={i.key} label={i.label}>
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono tabular">{unit(i.unit, i.value)}</span>
+                      <span className="font-mono tabular">{i.reported === false ? "None reported" : unit(i.unit, i.value)}</span>
                       <span className="text-sm text-kumo-subtle">{i.period}</span>
                       <SourceTags sources={i.sources} />
                     </span>

@@ -32,12 +32,30 @@ const SEC_FACTS = {
       PaymentsToAcquirePropertyPlantAndEquipment: { units: { USD: [usd("2025-03-30", "2026-03-28", 25_000_000)] } },
       CashAndCashEquivalentsAtCarryingValue: { units: { USD: [usd(undefined, "2025-03-29", 10_000_000), usd(undefined, "2026-03-28", 20_000_000)] } },
       LongTermDebtNoncurrent: { units: { USD: [usd(undefined, "2025-03-29", 100_000_000), usd(undefined, "2026-03-28", 80_000_000)] } },
+      MinorityInterest: { units: { USD: [usd(undefined, "2026-03-28", 5_000_000)] } },
       // A quarterly report: a 3-month quarter is read, the year-to-date half is not.
       NetIncomeLoss: { units: { USD: [usd("2026-03-29", "2026-06-27", 5_000_000, { fp: "Q1", form: "10-Q" }), usd("2026-03-29", "2026-09-27", 3_000_000, { fp: "Q2", form: "10-Q" })] } },
       SomeTagWeDoNotRead: { units: { USD: [usd("2025-03-30", "2026-03-28", 1)] } },
     },
   },
 };
+
+/**
+ * A 10-K as filed (inline XBRL): the balance sheet carries the preferred at par ($1 thousand), the facts tagged by
+ * class give 1,000,000 Series A shares (an "issued" fact wrapping the "outstanding" one) and a $25 liquidation
+ * preference; Series B has none left.
+ */
+const TEN_K = `<html><body>
+<xbrli:context id="c-0328"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2026-03-28</xbrli:instant></xbrli:period></xbrli:context>
+<xbrli:context id="c-A"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:SeriesAPreferredStockMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2026-03-28</xbrli:instant></xbrli:period></xbrli:context>
+<xbrli:context id="c-B"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:SeriesBPreferredStockMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2026-03-28</xbrli:instant></xbrli:period></xbrli:context>
+<xbrli:context id="c-A-terms"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:SeriesAPreferredStockMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2020-11-04</xbrli:instant></xbrli:period></xbrli:context>
+<p>Preferred stock <ix:nonFraction name="us-gaap:PreferredStockValue" contextRef="c-0328" unitRef="USD" scale="3">1</ix:nonFraction></p>
+<p>Series A, issued and outstanding <ix:nonFraction name="us-gaap:PreferredStockSharesIssued" contextRef="c-A" unitRef="Shares"><ix:nonFraction name="us-gaap:PreferredStockSharesOutstanding" contextRef="c-A" unitRef="Shares">1,000,000</ix:nonFraction></ix:nonFraction> shares.
+Series B <ix:nonFraction name="us-gaap:PreferredStockSharesIssued" contextRef="c-B" unitRef="Shares" format="ixt:fixed-zero">-</ix:nonFraction> shares.</p>
+<p>Liquidation preference of $<ix:nonFraction name="us-gaap:PreferredStockLiquidationPreference" contextRef="c-A-terms" unitRef="USDPShares">25.00</ix:nonFraction> per share.</p>
+</body></html>`;
+const SEC_SUBMISSIONS = { filings: { recent: { form: ["8-K", "10-K"], reportDate: ["2026-06-01", "2026-03-28"], accessionNumber: ["0001-26-2", "0001-26-1"], primaryDocument: ["x8k.htm", "mnro-10k.htm"] } } };
 
 const ts = (date: string) => Math.floor(Date.parse(`${date}T14:30:00Z`) / 1000);
 const timeseries = (rows: [string, string, number][]) =>
@@ -49,7 +67,9 @@ const fake = (async (input: string | URL | Request) => {
   const url = new URL(String(input));
   const path = url.pathname;
   if (url.host === "www.sec.gov" && path === "/files/company_tickers.json") return json({ 0: { cik_str: 1, ticker: "MNRO" } });
+  if (url.host === "data.sec.gov" && path === "/submissions/CIK0000000001.json") return json(SEC_SUBMISSIONS);
   if (url.host === "data.sec.gov") return path.endsWith("CIK0000000001.json") ? json(SEC_FACTS) : new Response("no", { status: 404 });
+  if (url.host === "www.sec.gov" && path === "/Archives/edgar/data/1/0001261/mnro-10k.htm") return new Response(TEN_K, { status: 200 });
   if (path.startsWith("/ws/fundamentals-timeseries/")) {
     if (yahooDown) return new Response("Too Many Requests", { status: 429 });
     if (!path.endsWith("/MNRO")) return json({ timeseries: { result: [] } });
@@ -60,6 +80,7 @@ const fake = (async (input: string | URL | Request) => {
       ["annualOrdinarySharesNumber", "2026-03-31", 30_000_000],
       ["annualOrdinarySharesNumber", "2025-03-31", 31_000_000],
       ["annualCapitalExpenditure", "2026-03-31", -25_000_000], // Yahoo signs outflows negative
+      ["annualPreferredStock", "2026-03-31", 1_000], // carrying value at par: the filing's liquidation value wins
     ]);
   }
   if (path.startsWith("/v8/finance/chart/")) {
@@ -126,9 +147,10 @@ describe("financials dimension", () => {
     expect(await metric("MNRO", "2026-03", "ebitda")).toMatchObject({ value: 105_000_000, unit: "currency", formula: "operating income + depreciation and amortization" });
     expect(await metric("MNRO", "2026-03", "fcf")).toMatchObject({ value: 65_000_000 });
     expect(await metric("MNRO", "2026-03", "net-debt")).toMatchObject({ value: 60_000_000 });
-    // EV = 20 x 30M + 60M = 660M; / 105M.
-    expect((await metric("MNRO", "2026-03", "ev-ebitda")).value).toBeCloseTo(660 / 105, 6);
-    // FY2025: EV = 30 x 31M + 90M = 1,020M; EBITDA 130M.
+    // EV = 20 x 30M market cap + 80M debt + 25M preferred + 5M minority interest - 20M cash = 690M; / 105M.
+    expect((await metric("MNRO", "2026-03", "ev-ebitda")).value).toBeCloseTo(690 / 105, 6);
+    expect(await metric("MNRO", "2026-03", "ev")).toMatchObject({ value: 690_000_000, formula: "market cap + total debt + preferred stock + minority interest - cash - short-term investments - equity-method investments" });
+    // FY2025: no preferred or minority interest on that balance sheet: EV = 30 x 31M + 90M = 1,020M; EBITDA 130M.
     expect((await metric("MNRO", "2025-03", "ev-ebitda")).value).toBeCloseTo(1020 / 130, 6);
     expect((await metric("MNRO", "2026-03", "revenue-growth")).value).toBeCloseTo(1150 / 1200 - 1, 6);
     // No D&A, no EBITDA: never filled in.
@@ -136,8 +158,34 @@ describe("financials dimension", () => {
 
     const [v] = await db.select().from(valuations).where(eq(valuations.symbol, "MNRO"));
     expect(v).toMatchObject({ currency: "USD", lastFiscalYear: "2026-03", yearsCovered: 2, evEbitdaYears: ["2025-03", "2026-03"], quote: 25, sharesOutstanding: 30_000_000, netDebt: 60_000_000, ebitda: 105_000_000, ebitdaBasis: "fiscal year 2026-03" });
-    expect(v.evEbitdaMedian).toBeCloseTo((660 / 105 + 1020 / 130) / 2, 6);
-    expect(v.evEbitda).toBeCloseTo((25 * 30_000_000 + 60_000_000) / 105_000_000, 6);
+    expect(v.evEbitdaMedian).toBeCloseTo((690 / 105 + 1020 / 130) / 2, 6);
+    expect(v.ev).toBe(25 * 30_000_000 + 60_000_000 + 25_000_000 + 5_000_000);
+    expect(v.evEbitda).toBeCloseTo(v.ev! / 105_000_000, 6);
+  });
+
+  it("bridges EV with every line, each sourced; the preferred at its liquidation value from the filing, a line not reported said so", async () => {
+    await runDimension(db, financials, { trigger: "test", ctx: ctx() });
+    expect(await line("MNRO", "year", "2026-03", "preferred-stock")).toMatchObject({
+      value: 25_000_000,
+      sources: ["sec-filings"],
+      alternatives: [{ source: "yahoo", value: 1_000 }],
+      label: "1,000,000 Series A preferred shares x $25.00 liquidation preference; Series B preferred: none outstanding",
+    });
+    const [v] = await db.select().from(valuations).where(eq(valuations.symbol, "MNRO"));
+    expect(v.inputs).toMatchObject({
+      "total-debt": { value: 80_000_000, sources: ["sec"] },
+      "preferred-stock": { value: 25_000_000, period: "year 2026-03", sources: ["sec-filings"] },
+      "minority-interest": { value: 5_000_000, sources: ["sec"] },
+      cash: { value: 20_000_000, sources: ["sec"] },
+      "short-term-investments": { value: 0, sources: [], reported: false },
+      "equity-investments": { value: 0, sources: [], reported: false },
+    });
+    // The filing is read once: the next run reuses it, no download.
+    const seen: string[] = [];
+    const counting = (async (input: string | URL | Request, init?: RequestInit) => (seen.push(String(input)), fake(input, init))) as typeof fetch;
+    await runDimension(db, financials, { trigger: "test", ctx: { ...ctx(), fetch: counting } });
+    expect(seen.filter((u) => u.includes("/Archives/"))).toEqual([]);
+    expect((await line("MNRO", "year", "2026-03", "preferred-stock")).value).toBe(25_000_000);
   });
 
   it("reads Korean statements from DART: borrowings summed into debt, the key never stored", async () => {

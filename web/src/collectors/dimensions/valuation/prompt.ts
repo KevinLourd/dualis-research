@@ -1,10 +1,10 @@
 import type { MethodResult, MethodWeight, PeerPricing, ValuationAssumption, ValuationMethodId } from "@/db/schema/valuation";
 import { firstJsonObject } from "@/llm/judge";
 import { stripDashes } from "../thesis/structure";
-import { FACT_LABEL, peerMedian, peerPriced, type MethodSpec, type ValuationFacts } from "./methods";
+import { FACT_LABEL, peerMedian, peerPriced, bridgeTotal, type MethodSpec, type ValuationFacts } from "./methods";
 
 /** Bump when a prompt or the arithmetic changes meaning: every method and synthesis is asked again. */
-export const VALUATION_VERSION = "valuation@v4";
+export const VALUATION_VERSION = "valuation@v5";
 
 const f2 = (v: number) => (Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
 const median = (xs: number[]) => {
@@ -25,7 +25,7 @@ function today(spec: MethodSpec, f: ValuationFacts): string | null {
   const i = (k: keyof typeof FACT_LABEL) => f.inputs[k]?.value ?? null;
   if (!q) return null;
   const shares = i("shares");
-  if (spec.id === "ev-ebitda" && shares && i("ebitda")! > 0 && i("net-debt") !== null) return `EV/EBITDA today: ${((q * shares + i("net-debt")!) / i("ebitda")!).toFixed(1)}x`;
+  if (spec.id === "ev-ebitda" && shares && i("ebitda")! > 0 && i("net-debt") !== null) return `EV/EBITDA today: ${((q * shares + bridgeTotal(f)) / i("ebitda")!).toFixed(1)}x`;
   if (spec.id === "pe" && i("eps-trailing")! > 0) return `P/E today on last year's EPS: ${(q / i("eps-trailing")!).toFixed(1)}x`;
   if (spec.id === "pb" && shares && i("equity")! > 0) return `P/B today: ${(q / (i("equity")! / shares)).toFixed(2)}x`;
   if (spec.id === "dividend-yield" && shares && i("dividends")! > 0) return `Dividend yield today: ${((i("dividends")! / shares / q) * 100).toFixed(2)}%`;
