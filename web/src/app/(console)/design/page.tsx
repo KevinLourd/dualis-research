@@ -89,7 +89,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                     </KTableCell>
                     <KTableCell className="font-mono">{c.name}</KTableCell>
                     <KTableCell className="max-w-md text-sm text-kumo-default">{c.usage}</KTableCell>
-                    <KTableCell className="text-right">
+                    <KTableCell className="text-right whitespace-nowrap">
                       <Link href={`/design?edit=${c.name}`} scroll={false} className="text-kumo-link hover:underline">
                         Edit ›
                       </Link>
