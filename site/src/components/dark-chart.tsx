@@ -1,6 +1,6 @@
 /**
- * Thierry's Note chart style (docs/screenshots/thierry-note-cpng-2026-11-03.png): near-black ground, faint gridlines,
- * legend on top, a value on every bar, an "E" suffix on estimate periods. Bars are the Dualis purple.
+ * Bar chart in the site's light chart style (design/tokens.json `chart.themes.light`): white ground, light gridlines,
+ * legend on top, a value on every bar, an "E" suffix on estimate periods. Bars are Dualis indigo.
  */
 export type ChartBar = { label: string; value: number; estimate?: boolean; muted?: boolean };
 

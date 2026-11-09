@@ -17,13 +17,14 @@
   --deep: var(--dualis-deep);
   --on-deep: var(--dualis-on-deep);
   --footer: var(--dualis-footer);
-  --chart-bg: var(--dualis-chart-bg);
-  --chart-grid: var(--dualis-chart-grid);
-  --chart-base: var(--dualis-chart-base);
-  --chart-text: var(--dualis-chart-text);
-  --chart-muted: var(--dualis-chart-muted);
-  --chart-bar: var(--dualis-chart-bar);
-  --chart-bar-muted: var(--dualis-chart-bar-muted);
+  /* Site charts = the light chart theme of design/tokens.json (Thierry 2026-11-06: white ground, indigo series). */
+  --chart-bg: var(--dualis-surface);
+  --chart-grid: var(--dualis-rule);
+  --chart-base: var(--dualis-chart-light-base);
+  --chart-text: var(--dualis-ink);
+  --chart-muted: var(--dualis-muted);
+  --chart-bar: var(--dualis-brand);
+  --chart-bar-muted: var(--dualis-chart-light-bench);
   --chart-line: var(--dualis-chart-line);
   --long: var(--dualis-long);
   --short: var(--dualis-short);
@@ -530,9 +531,12 @@ body:has(.hero) .site-footer {
   fill: var(--brand);
 }
 
-/* Dark chart (Thierry's Note style) */
+/* Site chart: white ground, indigo main series, grey benchmark, light axes; a white panel on a deep band. */
 .dark-chart {
   margin: 0;
+  background: var(--chart-bg);
+  border-radius: 6px;
+  padding: 8px 8px 16px;
 }
 .dark-chart svg {
   width: 100%;
@@ -575,8 +579,20 @@ body:has(.hero) .site-footer {
   fill: var(--chart-text);
   font-size: 16px;
 }
-.dc-source {
-  margin-top: 8px;
+.dc-value-main {
+  fill: var(--chart-bar);
+  font-weight: 600;
+}
+.dc-line {
+  stroke: var(--chart-bar);
+}
+.dc-line-muted {
+  stroke: var(--chart-bar-muted);
+}
+.dark-chart .dc-source {
+  margin: 4px 0 0;
+  padding: 0 12px;
+  line-height: 1.5;
   font-size: 13px;
   color: var(--muted);
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -1329,10 +1345,6 @@ body:has(.hero) .site-footer {
   margin-top: 32px;
   color: #fff;
 }
-.proof .dc-title {
-  color: #fff;
-}
-.proof .dc-source,
 .proof .footnote {
   color: var(--on-deep);
 }

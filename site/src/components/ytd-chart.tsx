@@ -1,8 +1,9 @@
 import { YTD_SERIES } from "@/lib/track-record";
 
 /**
- * The portfolio vs the S&P 500 since January 1, in Thierry's Note chart style (near-black ground, faint gridlines):
- * the curve of his own published chart, redrawn. White = portfolio, grey = S&P 500.
+ * The portfolio vs the S&P 500 since January 1, in the light chart style of design/tokens.json (white ground, light
+ * gridlines; Thierry 2026-11-06: « a white background with a purple »): the curve of his own published chart, redrawn.
+ * Indigo = portfolio, grey = S&P 500.
  */
 export function YtdChart({ source }: { source: string }) {
   const W = 640;
@@ -28,7 +29,7 @@ export function YtdChart({ source }: { source: string }) {
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Return since January 1, 2026: portfolio ${pct(last[1])}, S&P 500 ${pct(last[2])}`}>
         <rect width={W} height={H} className="dc-bg" />
         <g transform={`translate(${left} 26)`} className="dc-legend">
-          <rect width="14" height="3" y="-6" fill="#fff" />
+          <rect width="14" height="3" y="-6" className="dc-bar" />
           <text x="22">Portfolio</text>
           <rect x="120" width="14" height="3" y="-6" className="dc-bar-muted" />
           <text x="142">S&amp;P 500</text>
@@ -46,9 +47,9 @@ export function YtdChart({ source }: { source: string }) {
             {new Date(`${m}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}
           </text>
         ))}
-        <path d={line(2)} fill="none" stroke="#8b8b95" strokeWidth="2" />
-        <path d={line(1)} fill="none" stroke="#fff" strokeWidth="2.5" />
-        <text x={x(last[0]) + 8} y={y(last[1]) + 5} className="dc-value">
+        <path d={line(2)} fill="none" className="dc-line-muted" strokeWidth="2" />
+        <path d={line(1)} fill="none" className="dc-line" strokeWidth="2.5" strokeLinejoin="round" />
+        <text x={x(last[0]) + 8} y={y(last[1]) + 5} className="dc-value dc-value-main">
           {pct(last[1])}
         </text>
         <text x={x(last[0]) + 8} y={y(last[2]) + 5} className="dc-axis">
