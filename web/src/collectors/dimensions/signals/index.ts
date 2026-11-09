@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { evidence, fairValues, narrativeStates, signalChanges, signalStates, signals, type GoldNarrativeState, type SignalKind, type Strength, type ThesisReading, type ThesisSide } from "@/db/schema/analysis";
+import { evidence, fairValues, livePositions, narrativeStates, signalChanges, signalEvents, signalStates, signals, type GoldNarrativeState, type SignalKind, type Strength, type ThesisReading, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
@@ -9,6 +9,8 @@ import { majorUnit } from "../financials/derive";
 import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
 import { SIDE } from "../analysis/sides";
+import { positionsFromReadings } from "@/console/live-test";
+import type { Bar } from "@/console/portfolio-series";
 
 export const SIGNALS_DIMENSION = "signals";
 /** Evidence ids kept on a signal (its strongest reversals). */
@@ -163,7 +165,12 @@ async function rebuildSignalsGold(db: Db, latest: Map<string, BronzeFetch>): Pro
       changes.push({ id: b.id, symbol, fromSignal: a.signal, toSignal: b.signal, fromStrength: a.strength, toStrength: b.strength, at: b.at, updateNote: b.updateNote, evidenceIds: b.evidenceIds });
     }
   }
+  const { events, positions } = await liveTestRows(db, bySymbol);
   await db.transaction(async (tx) => {
+    await tx.delete(signalEvents);
+    if (events.length) await tx.insert(signalEvents).values(events);
+    await tx.delete(livePositions);
+    if (positions.length) await tx.insert(livePositions).values(positions);
     if (current.length) {
       await tx.delete(signals);
       await tx.insert(signals).values(current);
@@ -173,3 +180,39 @@ async function rebuildSignalsGold(db: Db, latest: Map<string, BronzeFetch>): Pro
   });
 }
 
+
+/**
+ * Live test (Kevin 2026-11-09): every signal reading as an event (first one included) and the positions following the
+ * signal would have held (`positionsFromReadings`). Reads closes from a week before the first reading (the price a
+ * weekend signal fired at), only for tickers that ever signalled (Neon egress rule).
+ */
+async function liveTestRows(db: Db, bySymbol: Map<string, (typeof signalStates.$inferSelect)[]>) {
+  const events: (typeof signalEvents.$inferInsert)[] = [];
+  for (const [symbol, list] of bySymbol)
+    list.forEach((s, i) => events.push({ id: s.id, symbol, at: s.at, signal: s.signal, strength: s.strength, fromSignal: list[i - 1]?.signal ?? null, fromStrength: list[i - 1]?.strength ?? null, updateNote: s.updateNote }));
+  const traded = [...bySymbol].filter(([, list]) => list.some((s) => s.signal !== "none")).map(([symbol]) => symbol);
+  if (!traded.length) return { events, positions: [] };
+  const first = Math.min(...traded.map((symbol) => bySymbol.get(symbol)![0].at.getTime()));
+  const from = new Date(first - 7 * 86_400_000).toISOString().slice(0, 10);
+  const [tickers, rows, quotes] = await Promise.all([
+    db.select({ symbol: gold.tickers.symbol, market: gold.tickers.market }).from(gold.tickers).where(inArray(gold.tickers.symbol, traded)),
+    db
+      .select({ symbol: gold.priceBars.symbol, date: gold.priceBars.date, close: gold.priceBars.close })
+      .from(gold.priceBars)
+      .where(and(inArray(gold.priceBars.symbol, traded), gte(gold.priceBars.date, from)))
+      .orderBy(asc(gold.priceBars.date)),
+    db.select({ symbol: gold.quotes.symbol, currency: gold.quotes.currency }).from(gold.quotes).where(inArray(gold.quotes.symbol, traded)),
+  ]);
+  const market = new Map(tickers.map((t) => [t.symbol, t.market as string]));
+  const currency = new Map(quotes.map((q) => [q.symbol, q.currency]));
+  const bars = new Map<string, Bar[]>();
+  for (const b of rows) bars.set(b.symbol, [...(bars.get(b.symbol) ?? []), { date: b.date, close: b.close }]);
+  const positions: (typeof livePositions.$inferInsert)[] = [];
+  for (const symbol of traded) {
+    const m = market.get(symbol);
+    // A ticker dropped from the watchlist keeps its events; with no market there is no close time to trade at.
+    if (!m) continue;
+    for (const p of positionsFromReadings(symbol, bySymbol.get(symbol)!, bars.get(symbol) ?? [], m)) positions.push({ ...p, currency: currency.get(symbol) ?? null });
+  }
+  return { events, positions };
+}

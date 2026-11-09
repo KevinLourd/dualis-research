@@ -1,101 +1,77 @@
 import { describe, expect, it } from "vitest";
-import { replayStrategy, type SignalState } from "./live-test";
+import { closeKnownAt, portfolioPnl, positionsFromReadings, signalLabel, type SignalReading } from "./live-test";
 
-const at = (d: string) => new Date(`${d}T22:00:00Z`);
-const st = (symbol: string, d: string, signal: SignalState["signal"], strength: SignalState["strength"]): SignalState => ({ symbol, signal, strength, at: at(d) });
+const r = (id: string, at: string, signal: SignalReading["signal"], strength: SignalReading["strength"]): SignalReading => ({ id, signal, strength, at: new Date(at) });
 const series = (closes: [string, number][]) => closes.map(([date, close]) => ({ date, close }));
-
-const bars = new Map([
-  ["A", series([["2026-11-05", 100], ["2026-11-06", 110], ["2026-11-09", 121], ["2026-11-10", 110]])],
-  ["B", series([["2026-11-05", 50], ["2026-11-06", 40], ["2026-11-09", 45], ["2026-11-10", 50]])],
-]);
-const markets = new Map([["A", "US"], ["B", "US"]]);
+const A = series([["2026-11-05", 100], ["2026-11-06", 110], ["2026-11-09", 121], ["2026-11-10", 110]]);
+const B = series([["2026-11-05", 50], ["2026-11-06", 40], ["2026-11-09", 45], ["2026-11-10", 50]]);
 const spx = series([["2026-11-05", 1000], ["2026-11-06", 1010], ["2026-11-09", 1020], ["2026-11-10", 1030]]);
 
-describe("live test replay", () => {
-  it("baseline BUY enters at that day's close; no signal exits; open position marked to the last close", () => {
-    const r = replayStrategy([st("A", "2026-11-05", "BUY", "weak"), st("A", "2026-11-09", "none", "noise")], bars, spx, markets, "all");
-    expect(r.trades).toHaveLength(1);
-    expect(r.trades[0]).toMatchObject({ side: "long", entryDate: "2026-11-05", entryPrice: 100, exitDate: "2026-11-09", exitPrice: 121, open: false });
-    expect(r.trades[0].return).toBeCloseTo(0.21);
-    expect(r.stats.totalReturn).toBeCloseTo(0.21);
-    expect(r.stats.winners).toBe(1);
-    expect(r.stats.flat).toBe(0);
-
-    const o = replayStrategy([st("A", "2026-11-06", "BUY", "weak")], bars, spx, markets, "all");
-    expect(o.trades[0]).toMatchObject({ open: true, entryPrice: 110, markDate: "2026-11-10", markPrice: 110, weight: 1 });
-    expect(o.trades[0].return).toBeCloseTo(0);
+describe("live test positions", () => {
+  it("trades at the last close printed when the signal fired: Sunday = Friday, US Monday morning = Friday, Tokyo Monday after its close = Monday", () => {
+    expect(closeKnownAt(A, new Date("2026-11-08T12:00:00Z"), "US")?.date).toBe("2026-11-06");
+    expect(closeKnownAt(A, new Date("2026-11-09T08:00:00Z"), "US")?.date).toBe("2026-11-06");
+    expect(closeKnownAt(A, new Date("2026-11-09T08:00:00Z"), "JP")?.date).toBe("2026-11-09");
+    expect(closeKnownAt(A, new Date("2026-11-05T08:00:00Z"), "US")).toBeNull();
   });
 
-  it("a signal trades at the last close printed when it fired: Sunday = Friday's close, Tokyo after its close = that day", () => {
-    const r = replayStrategy([st("A", "2026-11-07", "BUY", "weak")], bars, spx, markets, "all");
-    expect(r.trades[0]).toMatchObject({ signalDate: "2026-11-07", entryDate: "2026-11-06", entryPrice: 110, markPrice: 110, open: true });
-    // US signal on Monday morning UTC: Monday's close is not printed yet, Friday's is the price.
-    const mon = replayStrategy([{ symbol: "A", signal: "BUY", strength: "weak", at: new Date("2026-11-09T08:00:00Z") }], bars, spx, markets, "all");
-    expect(mon.trades[0]).toMatchObject({ entryDate: "2026-11-06", entryPrice: 110 });
-    expect(mon.trades[0].return).toBeCloseTo(0);
-    expect(mon.stats.flat).toBe(1);
-    const jp = replayStrategy([{ symbol: "A", signal: "BUY", strength: "weak", at: new Date("2026-11-09T08:00:00Z") }], bars, spx, new Map([["A", "JP"]]), "all");
-    expect(jp.trades[0]).toMatchObject({ entryDate: "2026-11-09", entryPrice: 121 });
+  it("first BUY opens a long; no signal closes it; an open one is marked to the latest close", () => {
+    const [p, q] = positionsFromReadings(
+      "A",
+      [r("1", "2026-11-05T22:00:00Z", "BUY", "weak"), r("2", "2026-11-09T22:00:00Z", "none", "noise"), r("3", "2026-11-09T23:00:00Z", "SELL", "strong")],
+      A,
+      "US",
+    );
+    expect(p).toMatchObject({ id: "1", side: "long", strength: "weak", entryDate: "2026-11-05", entryPrice: 100, exitDate: "2026-11-09", exitPrice: 121 });
+    expect(p.return).toBeCloseTo(0.21);
+    expect(q).toMatchObject({ id: "3", side: "short", strength: "strong", closedAt: null, entryPrice: 121, markDate: "2026-11-10", markPrice: 110 });
+    expect(q.return).toBeCloseTo(1 - 110 / 121);
   });
 
-  it("an open position is worth the latest close; no close printed before the signal = no entry price", () => {
-    const r = replayStrategy([{ symbol: "A", signal: "BUY", strength: "weak", at: new Date("2026-11-05T08:00:00Z") }], bars, spx, markets, "all");
-    expect(r.trades[0]).toMatchObject({ entryPrice: null, return: null });
+  it("weak -> strong on the same side closes the weak position and opens a strong one, and back", () => {
+    const ps = positionsFromReadings(
+      "A",
+      [r("1", "2026-11-05T22:00:00Z", "BUY", "weak"), r("2", "2026-11-06T22:00:00Z", "BUY", "strong"), r("3", "2026-11-09T22:00:00Z", "BUY", "weak")],
+      A,
+      "US",
+    );
+    expect(ps.map((p) => [p.strength, p.entryPrice, p.exitPrice])).toEqual([["weak", 100, 110], ["strong", 110, 121], ["weak", 121, null]]);
+    expect(ps[2].closedAt).toBeNull();
   });
 
-  it("BUY -> SELL flips: exit the long and enter the short at the same close", () => {
-    const r = replayStrategy([st("B", "2026-11-05", "BUY", "weak"), st("B", "2026-11-06", "SELL", "weak")], bars, spx, markets, "all");
-    const [short, long] = r.trades;
-    expect(long).toMatchObject({ side: "long", entryPrice: 50, exitDate: "2026-11-06", exitPrice: 40 });
-    expect(long.return).toBeCloseTo(-0.2);
-    expect(short).toMatchObject({ side: "short", entryDate: "2026-11-06", entryPrice: 40, open: true, markPrice: 50 });
-    expect(short.return).toBeCloseTo(-0.25);
-    // Equity: -20% then short 40 -> 45 (-12.5%) then 45 -> 50 (-11.1%).
-    expect(r.stats.totalReturn).toBeCloseTo(0.8 * 0.875 * (1 - 5 / 45) - 1);
+  it("BUY -> SELL closes the long and opens a short at the same close; a ticker never signalled has no position", () => {
+    const ps = positionsFromReadings("B", [r("1", "2026-11-05T22:00:00Z", "BUY", "weak"), r("2", "2026-11-06T22:00:00Z", "SELL", "weak")], B, "US");
+    expect(ps[0]).toMatchObject({ side: "long", exitPrice: 40 });
+    expect(ps[1]).toMatchObject({ side: "short", entryPrice: 40, markPrice: 50 });
+    expect(positionsFromReadings("B", [r("1", "2026-11-05T22:00:00Z", "none", "noise")], B, "US")).toEqual([]);
   });
 
-  it("Strong only: skips weak entries, keeps a position when strong turns weak, exits on no signal", () => {
-    const states = [st("A", "2026-11-05", "BUY", "weak"), st("A", "2026-11-06", "BUY", "strong"), st("A", "2026-11-09", "BUY", "weak"), st("A", "2026-11-10", "none", "noise")];
-    const r = replayStrategy(states, bars, spx, markets, "strong");
-    expect(r.trades).toHaveLength(1);
-    expect(r.trades[0]).toMatchObject({ entryDate: "2026-11-06", exitDate: "2026-11-10", strength: "strong" });
-    const all = replayStrategy(states, bars, spx, markets, "all");
-    expect(all.trades).toHaveLength(1);
-    expect(all.trades[0].entryDate).toBe("2026-11-05");
+  it("labels a reading the way Thierry reads it", () => {
+    expect(signalLabel("BUY", "weak")).toBe("Weak inflection");
+    expect(signalLabel("SELL", "strong")).toBe("Strong crack");
+    expect(signalLabel("none", "noise")).toBe("No signal");
   });
+});
 
-  it("Strong x2 weighs a strong entry twice a weak one; equal weight otherwise", () => {
-    const states = [st("A", "2026-11-05", "BUY", "strong"), st("B", "2026-11-05", "BUY", "weak")];
-    const x2 = replayStrategy(states, bars, spx, markets, "strong-x2");
-    const eq = replayStrategy(states, bars, spx, markets, "all");
+describe("live test P&L", () => {
+  const strongA = { symbol: "A", side: "long" as const, strength: "strong" as const, entryDate: "2026-11-05", exitDate: null, closedAt: null };
+  const weakB = { symbol: "B", side: "long" as const, strength: "weak" as const, entryDate: "2026-11-05", exitDate: null, closedAt: null };
+  const bars = { A, B };
+
+  it("a strong entry weighs 1 and a weak one the cursor's weight", () => {
     // Day 1: A +10%, B -20%.
-    expect(eq.lines[0].points[1].value).toBeCloseTo((0.1 - 0.2) / 2);
-    expect(x2.lines[0].points[1].value).toBeCloseTo((2 * 0.1 - 0.2) / 3);
-    expect(x2.trades.find((t) => t.symbol === "A")!.weight).toBeCloseTo(2 / 3);
-    expect(eq.trades.find((t) => t.symbol === "A")!.weight).toBeCloseTo(0.5);
+    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 0.5).lines[0].points[1].value).toBeCloseTo((0.1 - 0.5 * 0.2) / 1.5);
+    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 1).lines[0].points[1].value).toBeCloseTo((0.1 - 0.2) / 2);
+    expect(portfolioPnl([strongA, weakB], bars, spx, "2026-11-05", 0).lines[0].points[1].value).toBeCloseTo(0.1);
   });
 
-  it("a ticker with no signal ever makes no trade; the S&P is rebased at the first signal day", () => {
-    const r = replayStrategy([st("A", "2026-11-06", "none", "noise")], bars, spx, markets, "all");
-    expect(r.trades).toHaveLength(0);
-    expect(r.stats.totalReturn).toBe(0);
-    expect(r.stats.winners).toBeNull();
-    const bench = r.lines.find((l) => l.kind === "benchmark")!;
-    expect(bench.points[0]).toEqual({ date: "2026-11-06", value: 0 });
-    expect(r.stats.benchmarkReturn).toBeCloseTo(1030 / 1010 - 1);
-  });
-
-  it("best and worst ticker compound each ticker's trades", () => {
-    const r = replayStrategy([st("A", "2026-11-05", "BUY", "weak"), st("A", "2026-11-09", "none", "noise"), st("B", "2026-11-05", "BUY", "weak"), st("B", "2026-11-06", "none", "noise")], bars, spx, markets, "all");
-    expect(r.stats.best?.symbol).toBe("A");
-    expect(r.stats.worst?.symbol).toBe("B");
-    expect(r.stats.worst?.return).toBeCloseTo(-0.2);
-  });
-
-  it("no best or worst ticker while every ticker ties", () => {
-    const r = replayStrategy([st("A", "2026-11-10", "BUY", "weak"), st("B", "2026-11-10", "BUY", "weak")], bars, spx, markets, "all");
-    expect(r.stats.best).toBeNull();
-    expect(r.stats.worst).toBeNull();
+  it("compounds day returns, stops a position at its exit, rebases the S&P at the first signal day", () => {
+    const closed = { ...strongA, exitDate: "2026-11-06", closedAt: new Date("2026-11-06T22:00:00Z") };
+    const pnl = portfolioPnl([closed], bars, spx, "2026-11-05", 0.5);
+    expect(pnl.totalReturn).toBeCloseTo(0.1);
+    expect(pnl.benchmarkReturn).toBeCloseTo(0.03);
+    const open = portfolioPnl([strongA], bars, spx, "2026-11-05", 0.5);
+    expect(open.totalReturn).toBeCloseTo(0.1);
+    expect(portfolioPnl([], bars, spx, null, 0.5)).toEqual({ lines: [], totalReturn: 0, benchmarkReturn: null });
   });
 });
