@@ -19,7 +19,9 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v8 (Kevin 2026-11-09): the price card says « +N-M% opportunity » in green, never « Fair value X to Y ».
 // v9 (Kevin 2026-11-09): the headline is the claim alone, no « Look: ».
 // v10 (Kevin 2026-11-09): with news, the BREAKING card fills the top left big, the chart label stays small.
-export const VISUALS_VERSION = "visuals-v10";
+// v11 (Kevin 2026-11-09): the price vs fair value chart gets the same layout: BREAKING card, « SELL signal » + « 15-40% downside »
+// top right, the fair value range shaded, the mark bottom right.
+export const VISUALS_VERSION = "visuals-v11";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
