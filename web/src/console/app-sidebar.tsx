@@ -3,6 +3,7 @@
 import { Sidebar, useSidebar } from "@cloudflare/kumo";
 import {
   DatabaseIcon,
+  FlaskIcon,
   GearSixIcon,
   LightningIcon,
   ListBulletsIcon,
@@ -19,8 +20,17 @@ const RESEARCH = [
   { href: "/", label: "Signals", icon: LightningIcon },
   { href: "/portfolio", label: "Portfolio", icon: BriefcaseIcon },
   { href: "/tickers", label: "Tickers", icon: ListBulletsIcon },
+  { href: "/live-test", label: "Live test", icon: FlaskIcon },
+] as const;
+
+const BUSINESS = [
   { href: "/content", label: "Content", icon: NotePencilIcon },
   { href: "/growth", label: "Growth", icon: TrendUpIcon },
+] as const;
+
+const GROUPS = [
+  { label: "Research", items: RESEARCH },
+  { label: "Business", items: BUSINESS },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -40,16 +50,18 @@ export function AppSidebar() {
         <Logo />
       </Sidebar.Header>
       <Sidebar.Content>
-        <Sidebar.Group>
-          <Sidebar.GroupLabel>Research</Sidebar.GroupLabel>
-          <Sidebar.Menu>
-            {RESEARCH.map(({ href, label, icon }) => (
-              <Sidebar.MenuButton key={href} href={href} icon={icon} tooltip={label} active={isActive(pathname, href)}>
-                {label}
-              </Sidebar.MenuButton>
-            ))}
-          </Sidebar.Menu>
-        </Sidebar.Group>
+        {GROUPS.map((group) => (
+          <Sidebar.Group key={group.label}>
+            <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
+            <Sidebar.Menu>
+              {group.items.map(({ href, label, icon }) => (
+                <Sidebar.MenuButton key={href} href={href} icon={icon} tooltip={label} active={isActive(pathname, href)}>
+                  {label}
+                </Sidebar.MenuButton>
+              ))}
+            </Sidebar.Menu>
+          </Sidebar.Group>
+        ))}
         <Sidebar.Group>
           <Sidebar.GroupLabel>Operations</Sidebar.GroupLabel>
           <Sidebar.Menu>
