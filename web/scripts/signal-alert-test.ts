@@ -16,7 +16,7 @@ async function main() {
   const args = process.argv.slice(2);
   const outAt = args.indexOf("--out");
   const outDir = outAt >= 0 ? args[outAt + 1] : null;
-  const cases = args.filter((a, i) => a.includes(":") && i !== outAt + 1);
+  const cases = args.filter((a, i) => a.includes(":") && !(outAt >= 0 && i === outAt + 1));
   const kevin = outDir ? null : allowlist().find((c) => c.role === "test");
   if (!outDir && !kevin) throw new Error("no test contact in the allowlist");
   const { db, close } = connectNode();
