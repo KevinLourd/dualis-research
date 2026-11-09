@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Career, Portrait } from "@/components/blocks";
 import { Cover } from "@/components/cover";
+import { PageBand } from "@/components/page-band";
 import { LINKEDIN_URL, X_HANDLE, X_URL } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
 
@@ -10,10 +11,7 @@ export default async function About() {
   const posts = (await getPublications()).slice(0, 3);
   return (
     <div className="about-page">
-      <section className="wrap about-head">
-        <h1>About</h1>
-        <p>The analyst behind the research</p>
-      </section>
+      <PageBand label="About" line="The analyst behind the research." scene="about" />
       <section className="wrap">
         <article className="person">
           <div className="person-photo">
@@ -24,6 +22,7 @@ export default async function About() {
             <p className="role">Founder and Lead Analyst</p>
             <p>Thierry is the founder and lead analyst of Dualis Research. He covers smaller listed companies, long and short, across Asia, North America and Europe.</p>
             <p>His work starts where attention is scarce: under-covered markets, small caps, and turnarounds investors have given up on. He reads the narrative the market is paying for against what the business is worth, and acts when the two disagree.</p>
+            <p>He treats markets like a poker room: choose the table where you hold the edge, then size each bet to the odds. Annie Duke&apos;s Thinking in Bets, a favourite on many hedge fund desks, shaped that habit.</p>
             <Career />
             <p className="person-links">
               <a target="_blank" rel="noopener noreferrer" href={LINKEDIN_URL}>LinkedIn</a>

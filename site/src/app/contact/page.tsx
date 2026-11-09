@@ -16,7 +16,7 @@ export default async function Contact() {
   const substackUrl = await getSubstackUrl();
   return (
     <>
-      <PageBand label="Contact" />
+      <PageBand label="Contact" scene="contact" />
       {substackUrl && (
         <div className="strip">
           <div className="wrap strip-inner">

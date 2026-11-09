@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Portfolio" };
 export default async function Portfolio() {
   return (
     <>
-      <PageBand label="Portfolio" line="Live positions, year to date." />
+      <PageBand label="Portfolio" line="Live positions, year to date." scene="portfolio" />
 
       <Proof />
 

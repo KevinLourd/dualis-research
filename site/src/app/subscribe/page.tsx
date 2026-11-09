@@ -9,7 +9,7 @@ export default async function Subscribe() {
   const substackUrl = await getSubstackUrl();
   return (
     <>
-      <PageBand label="Plans" line="Read every report in full." />
+      <PageBand label="Plans" line="Read every report in full." scene="plans" />
       <section className="section">
         <div className="wrap">
           <Plans substackUrl={substackUrl} />
