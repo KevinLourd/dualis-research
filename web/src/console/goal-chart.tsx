@@ -8,10 +8,11 @@ import { CanvasRenderer } from "echarts/renderers";
 
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
+import { COLOR } from "@/design/tokens";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, BrushComponent, ToolboxComponent, CanvasRenderer]);
 
-const NAVY = { light: "#2b2463", dark: "#5b53a8" };
+const NAVY = COLOR["brand-chart"];
 const LINE = "#94a3b8";
 
 /** Thierry's subscribers per day against the straight line to the goal. */

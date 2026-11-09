@@ -4,6 +4,8 @@ Independent equity research. Every idea is weighed from both sides before we tak
 
 Version 3, November 2026 (v3: one indigo colour; v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
 
+**Source of truth: `tokens.json`.** `node design/build.mjs` writes the CSS and TypeScript the site and the console read; the console page Design system shows it live and edits colours; the `dualis-charts` Claude skill draws every chart from it.
+
 ## Voice
 - The claim first, the evidence after. Titles state a view ("Monro is a cheap call on Icahn's next move"), never a topic ("Monro update").
 - Short sentences, one idea each. Numbers carry a date and a source.

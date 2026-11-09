@@ -139,7 +139,7 @@ describe("draft writer dispatch", () => {
     expect(await dispatchDraftWriter({ DRAFT_DISPATCH_TOKEN: "tok" }, f)).toBe(true);
     const [url, init] = f.mock.calls[0];
     expect(url).toBe("https://api.github.com/repos/KevinLourd/dualis-research/actions/workflows/draft.yml/dispatches");
-    expect(JSON.parse(String(init?.body))).toEqual({ ref: "main" });
+    expect(JSON.parse(String(init?.body))).toEqual({ ref: "main", inputs: {} });
     const refused = vi.fn<typeof fetch>(async () => new Response("Bad credentials", { status: 401 }));
     await expect(dispatchDraftWriter({ DRAFT_DISPATCH_TOKEN: "tok" }, refused)).rejects.toThrow(/401 Bad credentials/);
   });

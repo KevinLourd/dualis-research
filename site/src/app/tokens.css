@@ -1,0 +1,32 @@
+/* GENERATED from design/tokens.json by design/build.mjs. Edit tokens.json, never this file. */
+:root {
+  --dualis-paper: #F4F5F7;
+  --dualis-surface: #FFFFFF;
+  --dualis-ink: #17142E;
+  --dualis-muted: #5E5A73;
+  --dualis-rule: #E2E4E9;
+  --dualis-brand: #2B2463;
+  --dualis-on-brand: #FFFFFF;
+  --dualis-long: #1E7A57;
+  --dualis-short: #B0353A;
+  --dualis-long-soft: #E3F1EA;
+  --dualis-short-soft: #F7E4E4;
+  --dualis-accent: #2B2463;
+  --dualis-accent-ink: #1E1947;
+  --dualis-brand-fill: #2B2463;
+  --dualis-brand-fill-hover: #1E1947;
+  --dualis-brand-chart: #2B2463;
+  --dualis-accent-soft: #EEF0F3;
+  --dualis-deep: #1A1640;
+  --dualis-on-deep: rgba(255, 255, 255, 0.8);
+  --dualis-beige: #F2EFEA;
+  --dualis-footer: #0E1016;
+  --dualis-chart-bg: #161616;
+  --dualis-chart-grid: #2A2A2A;
+  --dualis-chart-base: #444444;
+  --dualis-chart-text: #E6E6E6;
+  --dualis-chart-muted: #8F8F8F;
+  --dualis-chart-bar: #FFFFFF;
+  --dualis-chart-bar-muted: #55555E;
+  --dualis-chart-line: #E0592A;
+}

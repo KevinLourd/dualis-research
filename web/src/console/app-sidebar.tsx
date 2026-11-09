@@ -8,6 +8,7 @@ import {
   ListBulletsIcon,
   BriefcaseIcon,
   NotePencilIcon,
+  PaletteIcon,
   TrendUpIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
@@ -54,6 +55,9 @@ export function AppSidebar() {
           <Sidebar.Menu>
             <Sidebar.MenuButton href="/data" icon={DatabaseIcon} tooltip="Data" active={isActive(pathname, "/data")}>
               Data
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton href="/design" icon={PaletteIcon} tooltip="Design system" active={isActive(pathname, "/design")}>
+              Design system
             </Sidebar.MenuButton>
             <Sidebar.MenuButton href="/settings" icon={GearSixIcon} tooltip="Settings" active={isActive(pathname, "/settings")}>
               Settings

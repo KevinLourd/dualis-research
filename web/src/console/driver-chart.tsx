@@ -9,6 +9,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import { type ExhibitPeriod, type ExhibitUnit, formatExhibitValue, formatUnit, monthYear, periodLabel } from "./exhibit-format";
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
+import { COLOR } from "@/design/tokens";
 
 echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, CanvasRenderer]);
 
@@ -18,7 +19,7 @@ echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, MarkLineCompo
  * black baseline, light horizontal gridlines only, value labels on columns, source line underneath.
  */
 
-export const INK = { light: { navy: "#2b2463", text: "#1f2328", muted: "#6b7280", grid: "#e3e5e8", axis: "#1f2328" }, dark: { navy: "#9c93df", text: "#e6e8eb", muted: "#9aa1ab", grid: "#2b3038", axis: "#c9ced6" } };
+export const INK = { light: { navy: COLOR["brand-chart"].light, text: "#1f2328", muted: "#6b7280", grid: "#e3e5e8", axis: "#1f2328" }, dark: { navy: COLOR["brand-chart"].dark, text: "#e6e8eb", muted: "#9aa1ab", grid: "#2b3038", axis: "#c9ced6" } };
 export const FONT = "Arial, Helvetica, sans-serif";
 
 export const SOURCE_LABEL: Record<string, string> = {
@@ -137,7 +138,7 @@ export function DriverExhibit({
   );
 }
 
-const SERIES_INK = { light: ["#2b2463", "#7f93b5", "#2f6fd6", "#b8c2d3"], dark: ["#9c93df", "#9aa1ab", "#8fb8ff", "#5c6470"] };
+const SERIES_INK = { light: [COLOR["brand-chart"].light, "#7f93b5", "#2f6fd6", "#b8c2d3"], dark: [COLOR["brand-chart"].dark, "#9aa1ab", "#8fb8ff", "#5c6470"] };
 
 /**
  * An analysis Exhibit (gold.exhibits): the same research-note look as `DriverExhibit`, with several series

@@ -1,0 +1,36 @@
+name: Design skill
+
+# Packs the Dualis chart skill for Claude Desktop (Thierry): SKILL.md + dualis_charts.py + a copy of
+# design/tokens.json (for sandboxes without internet) + IBM Plex Sans. Published as the release asset
+# https://github.com/KevinLourd/dualis-research/releases/download/design-skill/dualis-charts.zip
+on:
+  push:
+    branches: [main]
+    paths: ["design/tokens.json", ".claude/skills/dualis-charts/**", ".github/workflows/design-skill.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: design-skill
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip
+        run: |
+          d="$RUNNER_TEMP/dualis-charts"
+          mkdir -p "$d/fonts"
+          cp .claude/skills/dualis-charts/SKILL.md .claude/skills/dualis-charts/dualis_charts.py design/tokens.json "$d/"
+          cp web/src/collectors/dimensions/growth-brief/fonts/*.ttf "$d/fonts/"
+          (cd "$RUNNER_TEMP" && zip -r dualis-charts.zip dualis-charts)
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view design-skill >/dev/null 2>&1 || gh release create design-skill --title "Dualis chart skill" --notes "Claude skill that draws Dualis charts from data. Install: console > Design system." --latest=false
+          gh release upload design-skill "$RUNNER_TEMP/dualis-charts.zip" --clobber
