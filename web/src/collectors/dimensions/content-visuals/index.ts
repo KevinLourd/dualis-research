@@ -14,7 +14,8 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v4 (Kevin 2026-11-09): the chart shouts: the claim as headline, one point in colour with an arrow and a note, the news
 // headline with its publisher's logo on top.
 // v5 (Kevin 2026-11-09): the note says what the price narrative said and the driver broken; the news is a BREAKING inset.
-export const VISUALS_VERSION = "visuals-v5";
+// v6 (Kevin 2026-11-09): every word written for the image as one story, never a headline or driver title copied.
+export const VISUALS_VERSION = "visuals-v6";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
@@ -73,7 +74,8 @@ export async function publisherLogo(domain: string, fetchImpl: typeof fetch): Pr
 async function banner(input: VisualInput, callout: Callout, fetchImpl: typeof fetch, ago: (at: Date, now: Date) => string) {
   if (!callout.news) return null;
   const n = input.news[callout.news.index];
-  return { headline: n.headline, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl), ago: ago(n.at, new Date()) };
+  if (!callout.newsLine) throw new Error("callout picked a news source but wrote no news line");
+  return { headline: callout.newsLine, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl), ago: ago(n.at, new Date()) };
 }
 
 /** Chart, card and video, drawn from gold (the chart's news strip fetches its publisher's logo). */
@@ -97,7 +99,7 @@ export const renderSource: Source = {
       ...(callout ? { callout } : {}),
     };
     const r0 = callout ? await renderModule() : null;
-    const annotation = callout && r0 ? { point: callout.point, note: callout.note, priceSays: callout.priceSays, driver: callout.driver, title: callout.title, tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: await banner(input, callout, ctx.fetch, r0.timeAgo) } : null;
+    const annotation = callout && r0 ? { point: callout.point, note: callout.note, priceSays: callout.priceSays, driver: callout.driver, title: callout.title, chartLabel: callout.chartLabel, tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: await banner(input, callout, ctx.fetch, r0.timeAgo) } : null;
     if (choice?.kind === "exhibit") {
       const r = await renderModule();
       const file = r.png(r.exhibitSvg(input, choice.exhibit, annotation));

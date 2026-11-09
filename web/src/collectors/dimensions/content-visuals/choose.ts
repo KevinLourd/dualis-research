@@ -72,19 +72,34 @@ export type Callout = {
   note: string;
   /** The chart's headline: the claim, never a neutral label. */
   title: string;
+  /** What the chart measures in plain words, under the title (never the Exhibit's own title). */
+  chartLabel: string;
   /** What the price's narrative said, the claim this point contradicts (Kevin 2026-11-09: « VS price narrative said XXX »). */
   priceSays: string;
-  /** The driver of that narrative this point breaks: one of the drivers listed; null only when the Idea cites none. */
+  /** The reason behind the price this point breaks, in plain words (never the driver's title); null only when the Idea cites no driver. */
   driver: string | null;
+  /** The news fact that matters, rewritten in plain words (never the headline copied); null without news. */
+  newsLine: string | null;
   /** Index in `input.news` of the most prestigious source, with its web domain (for its logo); null without news. */
   news: { index: number; domain: string } | null;
 };
 
+/**
+ * Every word on the image is WRITTEN for it, as one story read top to bottom (Kevin 2026-11-09: « tu recopies les
+ * titres des drivers et des news alors que ça ne dit pas ce qui est intéressant, et constitue une histoire cohérente »).
+ */
 export const CALLOUT_SYSTEM = [
-  "You annotate ONE chart for a breaking-news style investing post (Dualis Research). The reader must see in one second where to look and why it matters.",
+  "You write every word of ONE chart image for a breaking-news style investing post (Dualis Research). The reader gets the whole story in five seconds, reading top to bottom:",
+  "1. newsLine (in the BREAKING box): what just happened, the one fact in the news that matters, with its number. Faithful to the news, never a fact it does not state.",
+  "2. title (big, over the chart): what it means for the stock, the alarm.",
+  "3. chartLabel (small, under the title): what the bars or line measure, in plain words, e.g. Profit left for shareholders, per quarter.",
+  "4. note (on the arrow, on the point of the chart): the proof in the numbers.",
+  "5. priceSays: what the share price still assumes, the belief this proves wrong.",
+  "6. driver: the reason behind the price that just broke, said as a cause in plain words.",
+  "The lines tell ONE story: each says something the others do not, none repeats another, and a number appears on one line only. NEVER copy a headline, a driver title or a narrative sentence: say what is interesting in it, in your own short words a retail investor gets at once (no accounting jargon like EPS, net income, common shareholders, preferred dividends or income available to common: say profit, profit per share, shareholders, payments to other investors).",
   "Answer with JSON only, no prose, no code fence:",
-  '{"point": "<the id of the ONE point that tells the story: the jump, the crack, the turn>", "note": "<3 to 6 words on the arrow, with its number, e.g. Profit x4 in one quarter>", "priceSays": "<what the price narrative said that this point proves wrong, 3 to 8 words, e.g. Profits keep shrinking>", "driver": "<the title of the driver listed below that this point breaks, copied exactly, or null when no driver is listed>", "title": "<the alarm in 4 to 9 words with its number, e.g. Look: profit just jumped 4x>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
-  "Plain words, no jargon, no em or en dash, no emoji. Use only numbers you can read in the points below. The note must be true of the point it sits on.",
+  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, starts with Look:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "driverIndex": <index of the driver below this breaks, or null when none is listed>, "driver": "<3 to 8 words, or null when none is listed>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
+  "No em or en dash, no emoji. Use only numbers you can read below.",
 ].join("\n");
 
 export function calloutPoints(input: VisualInput, choice: ChartChoice): CalloutPoint[] {
@@ -109,12 +124,12 @@ export function calloutPrompt(input: VisualInput, choice: ChartChoice, points: C
     input.fair && last ? `Share price ${fmt(last.close)}, fair value ${fmt(input.fair.value)}` : "",
     "",
     ...input.narratives.map((n) => `What the price says (${n.side === "long" ? "pessimistic" : "optimistic"} narrative): ${n.text}`),
-    ...(input.drivers.length ? ["Drivers of that narrative:", ...input.drivers.map((d) => `- ${d.title}${d.summary ? `: ${d.summary}` : ""}`)] : []),
+    ...(input.drivers.length ? ["Drivers of that narrative (index: title: summary):", ...input.drivers.map((d, i) => `- ${i}: ${d.title}${d.summary ? `: ${d.summary}` : ""}`)] : []),
     "",
     `Chart: ${chart}`,
     "Points (id: value):",
     ...points.map((p) => `- ${p.id}: ${p.label}`),
-    ...(input.news.length ? ["", "News the Idea cites:", ...input.news.map((n, i) => `- ${i}: ${n.publisher}: ${n.headline}${n.url ? ` (${n.url})` : ""}`)] : ["", "News the Idea cites: none (answer news null)"]),
+    ...(input.news.length ? ["", "News the Idea cites:", ...input.news.map((n, i) => `- ${i}: ${n.publisher}: ${n.headline}${n.citedSentence ? `. Key sentence: ${n.citedSentence}` : ""}${n.why ? `. Why it matters: ${n.why}` : ""}`)] : ["", "News the Idea cites: none (answer news null)"]),
   ]
     .filter((l, i, a) => l !== "" || a[i - 1] !== "")
     .join("\n");
@@ -138,9 +153,13 @@ export function parseCallout(text: string, points: CalloutPoint[], newsCount: nu
     if (!n || typeof n.index !== "number" || n.index < 0 || n.index >= newsCount) throw new Error("callout answer has no valid news index");
     news = { index: n.index, domain: str(n.domain, "news domain").replace(/^https?:\/\//, "").replace(/\/.*$/, "") };
   }
-  const driver = drivers.length === 0 ? null : str(o.driver, "driver");
-  if (driver !== null && !drivers.includes(driver)) throw new Error(`callout driver "${driver}" is not one of the Idea's drivers`);
-  return { point, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), driver, title: str(o.title, "title"), news };
+  let driver: string | null = null;
+  if (drivers.length > 0) {
+    if (typeof o.driverIndex !== "number" || !drivers[o.driverIndex]) throw new Error("callout answer has no valid driverIndex");
+    driver = str(o.driver, "driver");
+  }
+  const newsLine = newsCount > 0 ? str(o.newsLine, "newsLine") : null;
+  return { point, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), driver, newsLine, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), news };
 }
 
 /** One call per chart drawn (the render is made once per visuals version; the answer is kept in its bronze request). */
