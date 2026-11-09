@@ -58,7 +58,6 @@ export const BEST_CALLS = [
   { name: "Miraial", ticker: "4238 JP", side: "Long", result: "+45%", resultNote: "closed", report: "wafer", line: "Wafer carriers at 8.5x earnings, bought as the chip cycle bottomed." },
   { name: "Quantum Corp", ticker: "QMCO", side: "Short", result: "40%+", resultNote: "gain on the short", report: "Quantum", line: "A hyped story with a backlog about to run out." },
 ] as const;
-export const BEST_CALLS_MIN_RETURN = 40;
 
 /** The research portal's three shelves (Thierry 2026-11-04). Filed by a stored judgment in the console's collector. */
 export type ResearchCategory = "coverage" | "primer" | "memo";

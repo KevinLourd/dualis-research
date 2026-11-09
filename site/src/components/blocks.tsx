@@ -217,34 +217,35 @@ export function CallsBoard({ posts }: { posts: Publication[] }) {
   const calls = posts.filter((p) => p.category === "coverage");
   return (
     <>
-      <div className="calls-board">
+      <ol className="calls-board">
         {BEST_CALLS.map((c) => {
           const report = posts.find((p) => p.title.includes(c.report));
           const body = (
             <>
-              <p className={`call-side ${c.side === "Long" ? "long" : "short"}`}>{c.side}</p>
-              <p className="call-result">
-                {c.result}
-                <small>{c.resultNote}</small>
-              </p>
-              <h3>
-                {c.name} <span>{c.ticker}</span>
-              </h3>
-              <p className="call-line">{c.line}</p>
-              {report && <p className="call-read">Read the report ↗</p>}
+              <span className={`call-side ${c.side === "Long" ? "long" : "short"}`}>{c.side}</span>
+              <span className="call-name">
+                {c.name} <small>{c.ticker}</small>
+              </span>
+              <span className="call-line">{c.line}</span>
+              <span className="call-result">
+                {c.result} <small>{c.resultNote}</small>
+              </span>
+              <span className="cl-go" aria-hidden="true">{report ? "↗" : ""}</span>
             </>
           );
-          return report ? (
-            <a key={c.name} className="call-card" target="_blank" rel="noopener noreferrer" href={report.url}>
-              {body}
-            </a>
-          ) : (
-            <div key={c.name} className="call-card">
-              {body}
-            </div>
+          return (
+            <li key={c.name}>
+              {report ? (
+                <a className="call-row" target="_blank" rel="noopener noreferrer" href={report.url}>
+                  {body}
+                </a>
+              ) : (
+                <div className="call-row">{body}</div>
+              )}
+            </li>
           );
         })}
-      </div>
+      </ol>
       {calls.length > 0 && (
         <>
           <h3 className="calls-all">Every published call</h3>
