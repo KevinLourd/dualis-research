@@ -48,6 +48,7 @@ const notApplicable = (spec: MethodSpec, f: ValuationFacts, reason: string): Met
   inputs: [],
   history: historyOf(spec, f),
   peers: [],
+  peerPricing: null,
   summary: null,
   report: null,
 });
@@ -72,6 +73,7 @@ function targetsResult(f: ValuationFacts): MethodResult {
     inputs: [{ key: "targets", label: `Analyst price targets${t.analysts ? `, ${t.analysts} analysts` : ""}`, value: t.mean, unit: "per-share", period: "today", sources: t.sources }],
     history: null,
     peers: [],
+    peerPricing: null,
     summary: `${t.analysts ?? "Some"} analyst${t.analysts === 1 ? "" : "s"} publish a 12-month target between ${t.low} and ${t.high}, mean ${t.mean}.`,
     report: null,
   };
@@ -83,7 +85,7 @@ async function methodResult(spec: MethodSpec, f: ValuationFacts, context: string
   if (spec.id === "analyst-targets") return { result: targetsResult(f), model: null };
   if (!ctx.complete) throw new Error("valuation: no LLM in the collector context (cli.ts sets ctx.complete)");
   const r = await ctx.complete({ system: METHOD_SYSTEM, prompt: methodPrompt(spec, f, context) });
-  const a = parseMethodAnswer(r.text, spec);
+  const a = parseMethodAnswer(r.text, spec, f);
   if (!a.applicable) return { result: notApplicable(spec, f, a.reason!), model: r.model };
   const scen = (s: "low" | "base" | "high") => Object.fromEntries(a.assumptions.map((x) => [x.key, x[s]]));
   const run = runScenarios(spec, f, { low: scen("low"), base: scen("base"), high: scen("high") }, a.basis);
@@ -101,7 +103,8 @@ async function methodResult(spec: MethodSpec, f: ValuationFacts, context: string
       steps: run.steps,
       inputs: Object.values(f.inputs).filter((x) => used.has(x!.key as never)) as MethodResult["inputs"],
       history: historyOf(spec, f),
-      peers: spec.id === "peers" ? f.peers : [],
+      peers: spec.peerMultiple ? f.peers : [],
+      peerPricing: a.peerPricing,
       summary: a.summary,
       report: a.report,
     },
@@ -126,7 +129,7 @@ export const valuationSource: Source = {
     const base = await valuationFacts(db, symbol, { peers: [], targets: null });
     const f: ValuationFacts = {
       ...base,
-      peers: peerRows.map((p) => ({ symbol: p.peerSymbol, name: p.name, currency: p.currency, evEbitda: p.evEbitda, pe: p.pe, sources: p.sources })),
+      peers: peerRows.map((p) => ({ symbol: p.peerSymbol, name: p.name, currency: p.currency, evEbitda: p.evEbitda, pe: p.pe, peForward: p.peForward, pb: p.pb, marketCap: p.marketCap, revenueGrowth: p.revenueGrowth, ebitdaMargin: p.ebitdaMargin, sources: p.sources })),
       targets: target ? targetsIn(base.currency, { low: target.low, mean: target.mean, high: target.high, analysts: target.analysts, currency: target.currency, sources: target.sources }) : null,
     };
     const context = [`Business: ${[profile?.sector, profile?.industry].filter(Boolean).join(" / ") || "unknown"}. ${profile?.description?.slice(0, 500) ?? ""}`, `Analyst position: ${ticker?.position ?? "watch"}.`].join("\n");
@@ -187,9 +190,12 @@ export function valuationFactsHash(f: ValuationFacts, bucket: number | string, c
   const inputs = Object.fromEntries(
     Object.entries(f.inputs).map(([k, i]) => [k, k === "eps-forward" ? { b: marketBucket(i!.value), period: i!.period } : { value: i!.value, period: i!.period }]),
   );
-  const peers = [...f.peers].sort((a, b) => a.symbol.localeCompare(b.symbol)).map((p) => [p.symbol, p.currency, marketBucket(p.evEbitda), marketBucket(p.pe)]);
+  const peers = [...f.peers]
+    .sort((a, b) => a.symbol.localeCompare(b.symbol))
+    .map((p) => [p.symbol, p.currency, ...[p.evEbitda, p.pe, p.peForward, p.pb, p.marketCap].map(marketBucket), ...[p.revenueGrowth, p.ebitdaMargin].map((x) => (x === null || x === undefined ? null : Math.round(x * 20)))]);
   const targets = f.targets ? [marketBucket(f.targets.low), marketBucket(f.targets.mean), marketBucket(f.targets.high), f.targets.currency] : null;
-  return fnv(JSON.stringify({ v: VALUATION_VERSION, inputs, history: f.history, peers, targets, bucket, context }));
+  const own = f.own ? [marketBucket(f.own.marketCap), ...[f.own.revenueGrowth, f.own.ebitdaMargin, f.own.netMargin].map((x) => (x === null ? null : Math.round(x * 100)))] : null;
+  return fnv(JSON.stringify({ v: VALUATION_VERSION, inputs, history: f.history, peers, own, targets, bucket, context }));
 }
 
 export const valuationDim: Dimension = {
@@ -240,14 +246,16 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     for (const [k, h] of pointed) if (h === "none") out.delete(k);
     return out;
   };
-  const mIds = [...pick(mvKeys, (r) => `${r.symbol}|${r.method}`).values()].map((r) => r.id);
+  // Only methods of today's catalogue: "Listed peers" folded into the multiples on 2026-11-09, its old rows stay in silver.
+  const catalogue = new Set<string>(VALUATION_METHODS.map((m) => m.id));
+  const mIds = [...pick(mvKeys.filter((r) => catalogue.has(r.method)), (r) => `${r.symbol}|${r.method}`).values()].map((r) => r.id);
   const sIds = [...pick(syKeys, (r) => `${r.symbol}|synthesis`).values()].map((r) => r.id);
   const mv = mIds.length ? await db.select().from(methodValuations).where(inArray(methodValuations.id, mIds)) : [];
   const sy = sIds.length ? await db.select().from(valuationSyntheses).where(inArray(valuationSyntheses.id, sIds)) : [];
   const methods = new Map(mv.map((r) => [`${r.symbol}|${r.method}`, r]));
   const synth = new Map(sy.map((r) => [`${r.symbol}|synthesis`, r]));
   const thesisRows = new Map((await db.select().from(theses)).map((t) => [t.symbol, t]));
-  const name = (id: ValuationMethodId) => methodSpec(id).name;
+  const name = (id: ValuationMethodId) => (id === "peers" ? "Listed peers" : methodSpec(id).name);
 
   const mRows: (typeof goldMethodValuations.$inferInsert)[] = [...methods.values()].map((r) => ({
     id: `${r.symbol}:${r.method}`,
@@ -265,6 +273,7 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     inputs: r.result.inputs,
     history: r.result.history,
     peers: r.result.peers,
+    peerPricing: r.result.peerPricing ?? null,
     summary: r.result.summary,
     report: r.result.report,
     dataAsOf: dataAsOf(r.result.inputs, r.createdAt),

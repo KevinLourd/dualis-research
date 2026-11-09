@@ -9,6 +9,7 @@ import { silver } from "./silver";
  * Valuation Report that consolidates every method's report.
  */
 
+/** "peers" = the retired Listed peers method (folded into the multiples 2026-11-09): only legacy silver rows carry it. */
 export type ValuationMethodId = "ev-ebitda" | "pe" | "pb" | "dcf" | "net-assets" | "dividend-yield" | "peers" | "analyst-targets";
 export type Scenario = "low" | "base" | "high";
 
@@ -20,8 +21,38 @@ export type ValuationStep = { label: string; unit: ValuationInput["unit"]; low: 
 export type ValuationAssumption = { key: string; label: string; unit: "multiple" | "ratio"; low: number; base: number; high: number; why: string };
 /** The history a method reads against (its multiple per fiscal year, FCF per year...), computed from gold. */
 export type ValuationHistory = { label: string; unit: ValuationInput["unit"]; points: { period: string; value: number }[] } | null;
-/** One comparable company of the peers method: its multiples today. */
-export type PeerRow = { symbol: string; name: string | null; currency: string | null; evEbitda: number | null; pe: number | null; sources: string[] };
+/**
+ * One comparable company: its multiples today, and what sets a premium or a discount against it (size, growth, margins;
+ * Yahoo, in the peer's own currency). Optional fields: rows stored before 2026-11-09 only carry the two multiples.
+ */
+export type PeerRow = {
+  symbol: string;
+  name: string | null;
+  currency: string | null;
+  evEbitda: number | null;
+  pe: number | null;
+  peForward?: number | null;
+  pb?: number | null;
+  marketCap?: number | null;
+  revenueGrowth?: number | null;
+  ebitdaMargin?: number | null;
+  sources: string[];
+};
+/**
+ * How a multiple method priced off its peers (Thierry 2026-11-06: low on the company's own history, base and high on the
+ * peers' median with a premium or discount for size, growth, margins and quality). The code computes every multiple.
+ */
+export type PeerPricing = {
+  /** Which peer multiple: "ev-ebitda", "pe", "pe-forward", "pb". */
+  multiple: string;
+  label: string;
+  median: number;
+  /** Peers carrying the multiple. */
+  count: number;
+  /** Premium (+) or discount (-) to the median, as a decimal. */
+  premium: { base: number; high: number };
+  why: string;
+} | null;
 
 export type MethodResult = {
   applicable: boolean;
@@ -38,6 +69,8 @@ export type MethodResult = {
   inputs: ValuationInput[];
   history: ValuationHistory;
   peers: PeerRow[];
+  /** Multiples only: the peers' median and the premium or discount applied (absent on rows stored before 2026-11-09). */
+  peerPricing?: PeerPricing;
   /** One sentence: the value and what drives it. */
   summary: string | null;
   /** The method's own report, markdown, 120-250 words. */
@@ -110,6 +143,8 @@ export const goldMethodValuations = gold.table(
     inputs: jsonb("inputs").$type<ValuationInput[]>().notNull(),
     history: jsonb("history").$type<ValuationHistory>(),
     peers: jsonb("peers").$type<PeerRow[]>().notNull(),
+    /** Multiples: the peers' median and the premium or discount behind base and high. */
+    peerPricing: jsonb("peer_pricing").$type<PeerPricing>(),
     summary: text("summary"),
     report: text("report"),
     /** Latest date the method's data carries (`dataAsOf`): how fresh it is, not when it was computed. */
@@ -169,7 +204,11 @@ export const peers = gold.table(
     currency: text("currency"),
     evEbitda: doublePrecision("ev_ebitda"),
     pe: doublePrecision("pe"),
+    peForward: doublePrecision("pe_forward"),
+    pb: doublePrecision("pb"),
     marketCap: doublePrecision("market_cap"),
+    revenueGrowth: doublePrecision("revenue_growth"),
+    ebitdaMargin: doublePrecision("ebitda_margin"),
     sources: text("sources").array().notNull(),
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
     rebuiltAt,

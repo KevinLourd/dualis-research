@@ -10,7 +10,7 @@ import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { parsePeers, peersDim, readSummary } from "./dimensions/peers";
 import { valuationDim, valuationFactsHash } from "./dimensions/valuation";
-import { dataAsOf, methodSpec, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
+import { dataAsOf, methodSpec, peerMedian, peerPriced, runScenarios, weighted, type ValuationFacts } from "./dimensions/valuation/methods";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
 import type { SourceContext } from "./types";
@@ -51,7 +51,22 @@ describe("valuation methods: the arithmetic", () => {
   it("not applicable says why", () => {
     expect(methodSpec("ev-ebitda").notApplicable(facts({ ebitda: { key: "ebitda", label: "EBITDA", value: -5, unit: "currency", period: "FY", sources: [] } }))).toMatch(/negative/);
     expect(methodSpec("dividend-yield").notApplicable(facts())).toBe("No dividend paid last fiscal year.");
-    expect(methodSpec("peers").notApplicable(facts())).toMatch(/comparable/);
+  });
+  it("peers' median of the multiple the method prices off (P/E per basis), peers without it left out; a premium moves it", () => {
+    const f = { ...facts(), peers: [
+      { symbol: "A", name: "A", currency: "USD", evEbitda: 6, pe: 10, peForward: 9, pb: null, sources: [] },
+      { symbol: "B", name: "B", currency: "USD", evEbitda: 8, pe: null, peForward: 11, pb: 2, sources: [] },
+      { symbol: "C", name: "C", currency: "USD", evEbitda: 12, pe: 14, sources: [] },
+    ] };
+    expect(peerMedian(methodSpec("ev-ebitda"), f, null)).toEqual({ id: "ev-ebitda", label: "EV/EBITDA", median: 8, count: 3 });
+    expect(peerMedian(methodSpec("pe"), f, "trailing")).toMatchObject({ id: "pe", median: 12, count: 2 });
+    expect(peerMedian(methodSpec("pe"), f, "forward")).toMatchObject({ id: "pe-forward", median: 10, count: 2 });
+    expect(peerMedian(methodSpec("pb"), f, null)).toMatchObject({ median: 2, count: 1 });
+    expect(peerMedian(methodSpec("dcf"), f, "average")).toBeNull();
+    expect(peerMedian(methodSpec("pb"), facts(), null)).toBeNull();
+    // CCLD-like: peers at 8x, much smaller company: a 25% discount for base, 12.5% for high = 6x and 7x.
+    expect(peerPriced(8, { base: -0.25, high: -0.125 })).toEqual({ base: 6, high: 7 });
+    expect(() => peerPriced(8, { base: -1.2, high: 0 })).toThrow(/above -100%/);
   });
   it("weighted fair value normalises the weights over the methods given", () => {
     const w = weighted([{ method: "ev-ebitda", low: 1, base: 2, high: 3 }, { method: "dcf", low: 3, base: 4, high: 5 }], { "ev-ebitda": 30, dcf: 10 });
@@ -99,11 +114,12 @@ describe("peers parsing", () => {
   });
   it("reads multiples and targets, drops a negative multiple", () => {
     const s = readSummary({ quoteSummary: { result: [{ price: { longName: "Peer", currency: "KRW" }, summaryDetail: { trailingPE: { raw: -3 } }, defaultKeyStatistics: { enterpriseToEbitda: { raw: 7.5 } }, financialData: { targetLowPrice: { raw: 9 }, targetMeanPrice: { raw: 11 }, targetHighPrice: { raw: 14 }, numberOfAnalystOpinions: { raw: 3 } } }] } });
-    expect(s).toEqual({ name: "Peer", currency: "KRW", evEbitda: 7.5, pe: null, targets: { low: 9, mean: 11, high: 14, analysts: 3 } });
+    expect(s).toEqual({ name: "Peer", currency: "KRW", evEbitda: 7.5, pe: null, peForward: null, pb: null, marketCap: null, revenueGrowth: null, ebitdaMargin: null, targets: { low: 9, mean: 11, high: 14, analysts: 3 } });
   });
 });
 
 let calls: string[] = [];
+let prompts: string[] = [];
 const fake: Complete = async ({ prompt, system }) => {
   const json = (o: unknown) => ({ text: JSON.stringify(o), model: "fake" });
   if (system.includes("pick trading comparables")) {
@@ -113,24 +129,28 @@ const fake: Complete = async ({ prompt, system }) => {
   if (system.includes("head of research")) {
     if (prompt.includes('"weights"')) {
       calls.push("weights");
-      return json({ weights: { "ev-ebitda": { weight: 60, why: "Cyclical: through the cycle." }, peers: { weight: 40, why: "Listed peers trade near it." }, "analyst-targets": { weight: 0, why: "One analyst." }, dcf: { weight: 0, why: "x" }, pb: { weight: 0, why: "x" }, "net-assets": { weight: 0, why: "x" }, pe: { weight: 0, why: "x" } } });
+      return json({ weights: { "ev-ebitda": { weight: 60, why: "Cyclical: through the cycle." }, pe: { weight: 40, why: "Earnings are steady." }, "analyst-targets": { weight: 0, why: "One analyst." }, dcf: { weight: 0, why: "x" }, pb: { weight: 0, why: "x" }, "net-assets": { weight: 0, why: "x" } } });
     }
     calls.push("report");
     expect(prompt).toContain("Fair value (weighted by the code)");
-    return json({ summary: "Fair value rests on EV/EBITDA and peers.", report: "## Conclusion\nIt holds." });
+    return json({ summary: "Fair value rests on EV/EBITDA and P/E.", report: "## Conclusion\nIt holds." });
   }
   const method = /Method: ([^.]+)\./.exec(prompt)?.[1] ?? "?";
   calls.push(`method:${method}`);
   if (method.startsWith("P/B")) return json({ applicable: false, reason: "Book value says little for this business." });
+  // A multiple with a peers' median: the low on its own history, a discount / premium to the peers for base and high.
+  if (prompt.includes("Peers' median") && /: \d+\.\d+x over/.test(prompt) && (method === "EV/EBITDA" || method === "P/E")) {
+    prompts.push(prompt);
+    return json({ applicable: true, basis: "trailing", assumptions: { multiple: { low: method === "P/E" ? 6 : 4, why: "Its 5-year low." } }, peers: { base: -0.1, high: 0.05, why: "Much smaller than Hanmi, growing slower, thinner margins." }, summary: "It says something.", report: "Short report." });
+  }
   const keys: Record<string, Record<string, [number, number, number]>> = {
-    "EV/EBITDA, own history": { multiple: [4, 6, 8] },
+    "EV/EBITDA": { multiple: [4, 6, 8] },
     "P/E": { multiple: [6, 8, 10] },
     "DCF on free cash flow": { growth: [0, 0.02, 0.04], terminalGrowth: [0.01, 0.02, 0.02], discountRate: [0.12, 0.1, 0.09] },
     "Net cash and assets": { recovery: [0.2, 0.4, 0.6] },
-    "Listed peers": { multiple: [6, 7, 8] },
   };
   const a = Object.fromEntries(Object.entries(keys[method] ?? {}).map(([k, [low, base, high]]) => [k, { low, base, high, why: "From its history." }]));
-  return json({ applicable: true, basis: method === "P/E" ? "trailing" : method === "Listed peers" ? "ev-ebitda" : "average", assumptions: a, summary: "It says something.", report: "Short report." });
+  return json({ applicable: true, basis: method === "P/E" ? "trailing" : "average", assumptions: a, summary: "It says something.", report: "Short report." });
 };
 
 const yahoo = (url: string) => {
@@ -138,7 +158,7 @@ const yahoo = (url: string) => {
   if (url.includes("getcrumb")) return new Response("crumb1", { status: 200 });
   const sym = decodeURIComponent(/quoteSummary\/([^?]+)/.exec(url)?.[1] ?? "");
   const body = sym === "042700.KS"
-    ? { price: { longName: "Hanmi Semiconductor", currency: "KRW" }, summaryDetail: { trailingPE: { raw: 12 } }, defaultKeyStatistics: { enterpriseToEbitda: { raw: 7 } }, financialData: {} }
+    ? { price: { longName: "Hanmi Semiconductor", currency: "KRW", marketCap: { raw: 9e12 } }, summaryDetail: { trailingPE: { raw: 12 } }, defaultKeyStatistics: { enterpriseToEbitda: { raw: 7 }, priceToBook: { raw: 2.5 } }, financialData: { revenueGrowth: { raw: 0.3 }, ebitdaMargins: { raw: 0.35 } } }
     : sym === SYMBOL
       ? { price: { longName: "Worldex", currency: "KRW" }, summaryDetail: {}, defaultKeyStatistics: {}, financialData: { targetLowPrice: { raw: 35000 }, targetMeanPrice: { raw: 42000 }, targetHighPrice: { raw: 50000 }, numberOfAnalystOpinions: { raw: 2 } } }
       : null;
@@ -153,10 +173,11 @@ const metric = (periodEnd: string, m: string, value: number, unit: "currency" | 
 
 beforeEach(async () => {
   calls = [];
+  prompts = [];
   ({ db, close } = await testDb());
   await runDimension(db, watchlist, { trigger: "test", ctx: ctx() });
   await db.insert(goldFinancialLines).values([line("2024-12", "revenue", 300e9), line("2025-12", "revenue", 290e9), line("2025-12", "eps-diluted", 3000), line("2025-12", "equity", 400e9, "balance")]);
-  await db.insert(financialMetrics).values([metric("2023-12", "ev-ebitda", 5, "multiple"), metric("2024-12", "ev-ebitda", 7, "multiple"), metric("2025-12", "ev-ebitda", 6, "multiple"), metric("2024-12", "fcf", 40e9), metric("2025-12", "fcf", 50e9)]);
+  await db.insert(financialMetrics).values([metric("2023-12", "ev-ebitda", 5, "multiple"), metric("2024-12", "ev-ebitda", 7, "multiple"), metric("2025-12", "ev-ebitda", 6, "multiple"), metric("2024-12", "fcf", 40e9), metric("2025-12", "fcf", 50e9), { ...metric("2025-12", "revenue-growth", -0.033), unit: "ratio" as const, currency: null }, { ...metric("2025-12", "ebitda-margin", 0.24), unit: "ratio" as const, currency: null }]);
   await db.insert(valuations).values({ symbol: SYMBOL, currency: "KRW", quoteCurrency: "KRW", lastFiscalYear: "2025-12", yearsCovered: 2, evEbitdaLow: 5, evEbitdaMedian: 6, evEbitdaHigh: 7, evEbitdaYears: ["2023-12", "2024-12", "2025-12"], quoteDate: "2026-11-05", quote: 30000, sharesOutstanding: 16.5e6, netDebt: -100e9, ebitda: 70e9, ebitdaBasis: "fiscal year 2025-12", marketCap: 495e9, ev: 395e9, evEbitda: 5.6, inputs: {} });
 });
 afterEach(async () => close());
@@ -164,26 +185,41 @@ afterEach(async () => close());
 describe("fair value pyramid", () => {
   it("peers, every method, then the weighted Fair Value with its range and report; same inputs never asked again", async () => {
     await runDimension(db, peersDim, { trigger: "test", ctx: ctx() });
-    expect((await db.select().from(peers).where(eq(peers.symbol, SYMBOL))).map((p) => [p.symbol, p.peerSymbol, p.evEbitda, p.pe])).toEqual([[SYMBOL, "042700.KS", 7, 12]]);
+    expect((await db.select().from(peers).where(eq(peers.symbol, SYMBOL))).map((p) => [p.symbol, p.peerSymbol, p.evEbitda, p.pe, p.pb, p.marketCap, p.revenueGrowth, p.ebitdaMargin])).toEqual([[SYMBOL, "042700.KS", 7, 12, 2.5, 9e12, 0.3, 0.35]]);
     expect((await db.select().from(analystTargets).where(eq(analystTargets.symbol, SYMBOL)))[0]).toMatchObject({ symbol: SYMBOL, low: 35000, mean: 42000, high: 50000, analysts: 2 });
 
     calls = [];
     const report = await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
     expect(report.status).toBe("succeeded");
     // No dividend: no call for it; analyst targets are read, not asked.
-    expect(calls.slice(0, 6).sort()).toEqual(["method:DCF on free cash flow", "method:EV/EBITDA, own history", "method:Listed peers", "method:Net cash and assets", "method:P/B, book value", "method:P/E"]);
-    expect(calls.slice(6)).toEqual(["weights", "report"]);
+    // Listed peers is no method of its own any more: the multiples price off the peers.
+    expect(calls.slice(0, 5).sort()).toEqual(["method:DCF on free cash flow", "method:EV/EBITDA", "method:Net cash and assets", "method:P/B, book value", "method:P/E"]);
+    expect(calls.slice(5)).toEqual(["weights", "report"]);
+    // The model sees the company beside its peers: size, growth, margins.
+    expect(prompts[0]).toContain("revenue growth last fiscal year -3.3%, EBITDA margin 24.0%");
+    expect(prompts[0]).toContain("Hanmi Semiconductor (042700.KS): EV/EBITDA 7.0x, P/E 12.0x, forward P/E n/a, P/B 2.5x; market cap 9000.00B KRW, revenue growth 30.0%, EBITDA margin 35.0%");
     const rows = new Map((await db.select().from(goldMethodValuations)).map((r) => [r.method, r]));
-    expect(rows.get("ev-ebitda")).toMatchObject({ applicable: 1, low: (4 * 70e9 + 100e9) / 16.5e6, base: (6 * 70e9 + 100e9) / 16.5e6, high: (8 * 70e9 + 100e9) / 16.5e6 });
+    // Low on its own history (4x); base and high = the peers' median 7x with a 10% discount and a 5% premium.
+    const ev0 = rows.get("ev-ebitda")!;
+    expect(ev0.applicable).toBe(1);
+    expect(ev0.low).toBeCloseTo((4 * 70e9 + 100e9) / 16.5e6, 6);
+    expect(ev0.base).toBeCloseTo((6.3 * 70e9 + 100e9) / 16.5e6, 6);
+    expect(ev0.high).toBeCloseTo((7.35 * 70e9 + 100e9) / 16.5e6, 6);
+    expect(ev0.peerPricing).toEqual({ multiple: "ev-ebitda", label: "EV/EBITDA", median: 7, count: 1, premium: { base: -0.1, high: 0.05 }, why: "Much smaller than Hanmi, growing slower, thinner margins." });
+    expect(ev0.assumptions.map((a) => [a.key, a.low, a.base, a.high])).toEqual([["multiple", 4, expect.closeTo(6.3, 9), expect.closeTo(7.35, 9)], ["peer-premium", expect.closeTo(4 / 7 - 1, 9), -0.1, 0.05]]);
+    expect(ev0.peers.map((p) => p.symbol)).toEqual(["042700.KS"]);
+    const pe0 = rows.get("pe")!;
+    expect(pe0.peerPricing?.median).toBe(12);
+    expect([pe0.low, pe0.base, pe0.high].map((x) => x! / 3000)).toEqual([6, expect.closeTo(10.8, 9), expect.closeTo(12.6, 9)]);
     expect(rows.get("ev-ebitda")!.history?.points.map((p) => p.value)).toEqual([5, 7, 6]);
     expect(rows.get("ev-ebitda")!.dataAsOf?.toISOString().slice(0, 10)).toBe("2025-12-31");
     expect(rows.get("pb")).toMatchObject({ applicable: 0, reason: "Book value says little for this business." });
     expect(rows.get("dividend-yield")).toMatchObject({ applicable: 0, reason: "No dividend paid last fiscal year." });
     expect(rows.get("analyst-targets")).toMatchObject({ applicable: 1, low: 35000, base: 42000, high: 50000 });
-    expect(rows.get("peers")!.peers.map((p) => p.symbol)).toEqual(["042700.KS"]);
+    expect(rows.get("peers")).toBeUndefined();
 
     const ev = rows.get("ev-ebitda")!;
-    const pr = rows.get("peers")!;
+    const pr = rows.get("pe")!;
     const [rep] = await db.select().from(valuationReports);
     expect(rep.base).toBeCloseTo(0.6 * ev.base! + 0.4 * pr.base!, 4);
     expect(rep.low).toBeCloseTo(0.6 * ev.low! + 0.4 * pr.low!, 4);
@@ -191,13 +227,21 @@ describe("fair value pyramid", () => {
     const [fv] = await db.select().from(fairValues).where(eq(fairValues.symbol, SYMBOL));
     expect(fv).toMatchObject({ author: "claude", currency: "KRW", low: rep.low, high: rep.high });
     expect(fv.value).toBeCloseTo(rep.base, 6);
-    expect(fv.method).toBe("EV/EBITDA, own history 60%, Listed peers 40%");
-    expect((await db.select().from(valuationMethods)).length).toBe(8);
+    expect(fv.method).toBe("EV/EBITDA 60%, P/E 40%");
+    expect((await db.select().from(valuationMethods)).length).toBe(7);
 
     calls = [];
     await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual([]);
     expect((await db.select().from(valuationReports))[0].version).toBe(rep.version);
+  });
+
+  it("no peers collected: the multiple runs all three cases on its own history, and says so", async () => {
+    await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
+    expect(prompts).toEqual([]);
+    const [ev] = await db.select().from(goldMethodValuations).where(eq(goldMethodValuations.id, `${SYMBOL}:ev-ebitda`));
+    expect(ev.peerPricing).toBeNull();
+    expect(ev.base).toBeCloseTo((6 * 70e9 + 100e9) / 16.5e6, 6);
   });
 
   it("Thierry's own fair value wins, the weighted one is kept beside it", async () => {
