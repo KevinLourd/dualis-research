@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CallsBoard, CtaBand } from "@/components/blocks";
-import { NarrativeFigure } from "@/components/figures";
-import { BEST_CALLS_MIN_RETURN, MARKETS } from "@/lib/model";
+import { MARKETS } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Company" };
@@ -10,7 +9,9 @@ export const metadata: Metadata = { title: "Company" };
 /**
  * Company (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
  * Altas's photo hero and statement with three columns; the four idea types from
- * Thierry's own fund site, as cards; the calls scoreboard; Thierry's line (his photo lives on About); the price vs value figure.
+ * Thierry's own fund site, as cards; the calls scoreboard; Thierry's line (his photo lives on About).
+ * Thierry 2026-11-06: the price vs value figure « doesn't fit the style of the website » (removed), and the two best
+ * calls should not shout: one quiet block of rows under a small label, no headline.
  */
 const PILLARS = [
   { key: "Under-covered", body: "markets and small caps that few analysts follow and big funds cannot buy." },
@@ -50,6 +51,7 @@ export default async function Company() {
               </p>
             ))}
           </div>
+          <p className="markets-line">Coverage: {MARKETS.join(" · ")}</p>
         </div>
       </section>
 
@@ -73,7 +75,6 @@ export default async function Company() {
       <section className="section deep">
         <div className="wrap">
           <p className="proof-kicker">Track record</p>
-          <h2 className="calls-head">Two calls, both above +{BEST_CALLS_MIN_RETURN}%. One long, one short.</h2>
           <CallsBoard posts={posts} />
         </div>
       </section>
@@ -88,20 +89,6 @@ export default async function Company() {
         </figure>
       </section>
 
-      <section className="section grey split">
-        <div className="wrap split-grid reverse">
-          <div className="figure-wrap">
-            <NarrativeFigure />
-          </div>
-          <div className="prose">
-            <h2 className="h-bold">Price follows the story</h2>
-            <p>Value follows the business. When the two drift apart and the story starts to turn, there is a trade.</p>
-            <p className="markets-line">
-              Coverage: {MARKETS.join(" · ")}
-            </p>
-          </div>
-        </div>
-      </section>
 
       <CtaBand title="Read the research" body="Every report, newest first, with the record behind each call." href="/research" cta="Open the research" />
     </>
