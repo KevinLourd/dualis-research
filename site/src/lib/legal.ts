@@ -93,6 +93,7 @@ export const TERMS: LegalPage = {
         "All research, text, charts, images and logos on this website and in our reports belong to Dualis Research or its licensors.",
         "You may read our research and keep a copy for your own personal, non-commercial use.",
         "You may quote a short extract from a free report if you credit Dualis Research and link to the source.",
+        "Home page video: NASA, U.S. Air Force, Lawrence Livermore National Laboratory (public domain); Starship launch by Anne Toal and robot footage by newscreators, both CC BY 3.0; data center footage from Mixkit.",
       ],
     },
     {

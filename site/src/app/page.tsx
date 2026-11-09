@@ -2,13 +2,15 @@ import Link from "next/link";
 import { WINNABLE } from "@/lib/winnable";
 
 /**
- * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 34 s loop of the industries
- * and real assets experts expect to hold up in the AI era (BlackRock "HALO" sectors, Goldman Sachs and S&P Global on
- * grid and copper, JLL on data-center power, Macquarie on infrastructure), hottest first (Kevin 2026-11-06): a SpaceX
- * Falcon 9 launch (U.S. Space Force video, public domain), the XQ-58 Valkyrie AI-piloted drone (U.S. Air Force,
- * public domain), robotics, semiconductors, data centers, power, the grid, oil and gas, ports, then raw materials
- * (copper and mining, agriculture). Other clips: Mixkit free licence. Never a caption in the footage. Muted;
- * reduced motion = poster.
+ * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 31 s loop of FRONTIER
+ * technology only, the newest generation of each (Kevin 2026-11-09: « l'avion et la fusée font passé, les tous derniers
+ * modèles les plus avancés »; old industries removed): Artemis II SLS launch, 2026 (NASA, public domain, Commons
+ * "Artemis II Launch from OSB II Balcony - Slo Mo"), SpaceX Starship launch (Anne Toal, CC BY 3.0, Commons "SpaceX
+ * Starship integrated flight test -5"), the YFQ-42A AI combat drone (U.S. Air Force, DVIDS 975160, public domain), a
+ * humanoid robot at work (newscreators, CC BY 3.0, Commons "Robot package handling"), the NIF fusion target chamber
+ * (LLNL, public domain), an AI data center (Mixkit), the B-21 Raider (U.S. Air Force, DVIDS 937050, public domain),
+ * Artemis II climbing (NASA, public domain). CC BY credits live in the terms (`lib/legal.ts`). Never a caption in the
+ * footage (cropped out). Muted; reduced motion = poster.
  */
 export default function Home() {
   return (
