@@ -10,7 +10,8 @@ import { MIN_BARS, type VisualInput, visualInput } from "./data";
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
 // v2 (Thierry 2026-11-06): the chart shows the driver's most striking Exhibit, the price only when the Idea is about price.
-export const VISUALS_VERSION = "visuals-v2";
+// v3 (Thierry 2026-11-09): Notes and X charts on the deep indigo ground of the design tokens, a palette for many series.
+export const VISUALS_VERSION = "visuals-v3";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;

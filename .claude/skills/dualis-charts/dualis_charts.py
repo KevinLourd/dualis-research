@@ -103,6 +103,8 @@ class Style:
         self.text = color(spec["text"])
         self.axis = color(spec["axis"])
         self.series = [color(s) for s in spec["series"]]
+        # Charts with many series: the palette of this theme (light values on white, dark values on deep indigo).
+        self.palette = [color(s, theme) for s in spec.get("palette", [])]
 
 
 def figure(theme: str = "dark"):
@@ -129,7 +131,9 @@ def _next(ax, muted: bool = False):
     s = ax._dualis
     if muted:
         return s.series[2]
-    c = s.series[min(ax._dualis_n, 1)]
+    n = ax._dualis_n
+    # Main series, then the second-series colour; a third series and beyond take the palette from its third colour.
+    c = s.series[n] if n < 2 or not s.palette else s.palette[n % len(s.palette)]
     ax._dualis_n += 1
     return c
 
@@ -185,13 +189,14 @@ def finish(fig, ax, title=None, source="Source: Dualis Research.", out="chart.pn
         h, lab = a.get_legend_handles_labels()
         handles += h
         labels += lab
-    top = 0.80 if title else 0.86
+    rows = max(1, -(-len(labels) // 5)) if legend else 1  # the legend wraps 5 a row
+    top = (0.80 if title else 0.86) - 0.05 * (rows - 1)
     fig.subplots_adjust(left=0.08, right=0.92, top=top, bottom=0.14)
     if title:
         fig.text(0.08, 0.93, title, color=s.text, fontsize=13, fontweight="semibold", ha="left", va="center")
     if legend and labels:
-        fig.legend(handles, labels, loc="upper left", bbox_to_anchor=(0.075, top + 0.075), ncol=len(labels), frameon=False,
-                   labelcolor=s.text, fontsize=8, handlelength=1.2)
+        fig.legend(handles, labels, loc="upper left", bbox_to_anchor=(0.075, top + 0.025 + 0.05 * rows), ncol=min(len(labels), 5),
+                   frameon=False, labelcolor=s.text, fontsize=8, handlelength=1.2)
     fig.text(0.08, 0.04, source, color=s.axis, fontsize=7, ha="left")
     fig.savefig(out, facecolor=s.bg)
     plt.close(fig)

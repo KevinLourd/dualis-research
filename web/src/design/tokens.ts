@@ -1,6 +1,6 @@
 /* GENERATED from design/tokens.json by design/build.mjs. Edit tokens.json, never this file. */
 
-export const DESIGN_VERSION = 3;
+export const DESIGN_VERSION = 4;
 
 export const COLOR = {
   "paper": {
@@ -88,32 +88,32 @@ export const COLOR = {
     "dark": "#0E1016"
   },
   "chart-bg": {
-    "light": "#161616",
-    "dark": "#161616"
+    "light": "#1A1640",
+    "dark": "#1A1640"
   },
   "chart-grid": {
-    "light": "#2A2A2A",
-    "dark": "#2A2A2A"
+    "light": "#2A2560",
+    "dark": "#2A2560"
   },
   "chart-base": {
-    "light": "#444444",
-    "dark": "#444444"
+    "light": "#3F3880",
+    "dark": "#3F3880"
   },
   "chart-text": {
     "light": "#E6E6E6",
     "dark": "#E6E6E6"
   },
   "chart-muted": {
-    "light": "#8F8F8F",
-    "dark": "#8F8F8F"
+    "light": "#A9A4D6",
+    "dark": "#A9A4D6"
   },
   "chart-bar": {
     "light": "#FFFFFF",
     "dark": "#FFFFFF"
   },
   "chart-bar-muted": {
-    "light": "#55555E",
-    "dark": "#55555E"
+    "light": "#7E77B8",
+    "dark": "#7E77B8"
   },
   "chart-line": {
     "light": "#E0592A",
@@ -126,6 +126,46 @@ export const COLOR = {
   "chart-light-bench": {
     "light": "#A3A0B2",
     "dark": "#A3A0B2"
+  },
+  "chart-series-1": {
+    "light": "#2B2463",
+    "dark": "#FFFFFF"
+  },
+  "chart-series-2": {
+    "light": "#E0592A",
+    "dark": "#F07A45"
+  },
+  "chart-series-3": {
+    "light": "#2A8C9A",
+    "dark": "#4CC3CF"
+  },
+  "chart-series-4": {
+    "light": "#A97C22",
+    "dark": "#F2C14E"
+  },
+  "chart-series-5": {
+    "light": "#2F86BE",
+    "dark": "#6FA8F5"
+  },
+  "chart-series-6": {
+    "light": "#B23A8A",
+    "dark": "#E26CB5"
+  },
+  "chart-series-7": {
+    "light": "#8E7CD6",
+    "dark": "#B39DFF"
+  },
+  "chart-series-8": {
+    "light": "#8C6239",
+    "dark": "#C9A27E"
+  },
+  "chart-series-9": {
+    "light": "#6B7280",
+    "dark": "#A0A3AD"
+  },
+  "chart-series-10": {
+    "light": "#2C5F8A",
+    "dark": "#E8DFA0"
   }
 } as const;
 

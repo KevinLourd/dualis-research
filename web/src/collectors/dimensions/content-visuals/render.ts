@@ -6,20 +6,34 @@ import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import * as echarts from "echarts";
 import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
+import { COLOR } from "../../../design/tokens";
 import { sourceNote } from "../../../console/source-labels";
 import type { VisualExhibit, VisualInput } from "./data";
 
 /**
  * Node only (loaded by URL from the dimension: the console bundle never sees resvg or ffmpeg). Three pictures of an
  * Idea in the Dualis look: `chart` = the most striking Exhibit of the driver the Idea cites (`exhibitSvg`), or the
- * price against the fair value (`chartSvg`), on black (his Note style: white main series, grey reference), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
+ * price against the fair value (`chartSvg`), as a Notes and X chart (design tokens: white data on deep indigo), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
  * corner, `video` = the same card with the line drawing itself, then the fair value and the gap (MP4, H.264).
  */
 
 export const W = 1280;
 export const H = 720;
 const FONT = "IBM Plex Sans";
-const GREY = "#8a8a93";
+/**
+ * The Notes and X chart, from design/tokens.json (Thierry 2026-11-09, his pick C): white data on the deep indigo
+ * ground, comparisons muted, a chart with more series takes the `chart-series` palette (dark values).
+ */
+const NOTE = {
+  bg: COLOR["chart-bg"].dark,
+  grid: COLOR["chart-grid"].dark,
+  base: COLOR["chart-base"].dark,
+  text: COLOR["chart-text"].dark,
+  muted: COLOR["chart-muted"].dark,
+  main: COLOR["chart-bar"].dark,
+  bench: COLOR["chart-bar-muted"].dark,
+  palette: Array.from({ length: 10 }, (_, i) => COLOR[`chart-series-${i + 1}` as keyof typeof COLOR].dark),
+};
 const INDIGO = "#1A1640";
 const LAVENDER = "#b9b4e0";
 const asset = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
@@ -67,11 +81,11 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
         [ts(input.bars[input.bars.length - 1].date), f.value],
       ],
       symbol: "none",
-      lineStyle: { color: onCard ? LAVENDER : GREY, width: 2, type: "dashed", opacity: frame.reveal },
+      lineStyle: { color: onCard ? LAVENDER : NOTE.muted, width: 2, type: "dashed", opacity: frame.reveal },
       endLabel: {
         show: true,
         formatter: `Fair value ${fmt(f.value)}`,
-        color: onCard ? LAVENDER : GREY,
+        color: onCard ? LAVENDER : NOTE.muted,
         fontSize: 20,
         fontFamily: FONT,
         opacity: frame.reveal,
@@ -92,13 +106,13 @@ function yRange(input: VisualInput) {
 
 function axes(input: VisualInput, onCard: boolean) {
   const { min, max } = yRange(input);
-  const label = { color: onCard ? LAVENDER : GREY, fontSize: 18, fontFamily: FONT };
+  const label = { color: onCard ? LAVENDER : NOTE.muted, fontSize: 18, fontFamily: FONT };
   return {
     xAxis: {
       type: "time" as const,
       min: ts(input.bars[0].date),
       max: ts(input.bars[input.bars.length - 1].date),
-      axisLine: { lineStyle: { color: onCard ? "#3a3470" : "#333" } },
+      axisLine: { lineStyle: { color: onCard ? "#3a3470" : NOTE.base } },
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: { ...label, formatter: (v: number) => monthLabel(v) },
@@ -111,7 +125,7 @@ function axes(input: VisualInput, onCard: boolean) {
       splitNumber: 4,
       // Round ticks only: the padded min and max would print odd values (1.59, 3.46).
       axisLabel: { ...label, showMinLabel: false, showMaxLabel: false, formatter: (v: number) => fmt(v) },
-      splitLine: { lineStyle: { color: onCard ? "#25205a" : "#1c1c1f" } },
+      splitLine: { lineStyle: { color: onCard ? "#25205a" : NOTE.grid } },
     },
   };
 }
@@ -120,12 +134,12 @@ function withMark(svg: string, x: number, y: number, size: number): string {
   return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${MARK}" x="${x}" y="${y}" width="${size}" height="${size}"/></svg>`);
 }
 
-/** Price vs fair value on black: the exhibit. */
+/** Price vs fair value as a Notes and X chart (`NOTE`). */
 export function chartSvg(input: VisualInput, frame: Frame = FULL): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const last = input.bars[input.bars.length - 1];
   chart.setOption({
-    backgroundColor: "#000",
+    backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
@@ -134,9 +148,9 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL): string {
         text: input.fair ? `Last 12 months · ${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}` : "Last 12 months",
         left: 56,
         top: 94,
-        textStyle: { color: GREY, fontSize: 22, fontWeight: 400, fontFamily: FONT },
+        textStyle: { color: NOTE.muted, fontSize: 22, fontWeight: 400, fontFamily: FONT },
       },
-      { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: GREY, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
+      { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     grid: { left: 96, right: 200, top: 160, bottom: 92 },
     ...axes(input, false),
@@ -147,11 +161,8 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL): string {
   return withMark(svg, W - 56 - 72, 40, 72);
 }
 
-/** Shades of the series after the first (white): his Note style keeps one bright line, the rest grey. */
-const SERIES_GREYS = ["#fff", GREY, "#4d4d55", "#c8c8cf"];
-
 /**
- * A driver's Exhibit on black, his Note style: white columns or line for the lead series, greys for the others, values
+ * A driver's Exhibit as a Notes and X chart (`NOTE`): white columns or line for the lead series, the palette for the others, values
  * on the columns, the takeaway under the title. Every number is the one stored in gold.exhibits.
  */
 export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
@@ -159,39 +170,40 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
   const lead = e.series[0];
   const fmtV = (v: number) => formatUnit(v, lead.unit, lead.currency);
   const period = seriesPeriod(lead.key);
-  const label = { color: GREY, fontSize: 18, fontFamily: FONT };
+  const label = { color: NOTE.muted, fontSize: 18, fontFamily: FONT };
   const bars = e.chart === "bar";
   const legend = e.series.length > 1;
   const note = sourceNote([...e.sources, "dualis"]) ?? "Source: Dualis Research.";
   chart.setOption({
-    backgroundColor: "#000",
+    backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
       { text: `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40, textStyle: { color: "#fff", fontSize: 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - 96, overflow: "truncate" } },
-      { text: e.takeaway, left: 56, top: 88, textStyle: { color: GREY, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
-      { text: note, left: 56, bottom: 28, textStyle: { color: GREY, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
+      { text: e.takeaway, left: 56, top: 88, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
+      { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
-      ? { show: true, right: 56, bottom: 24, icon: "rect", itemWidth: 14, itemHeight: 14, textStyle: { color: GREY, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+      ? // Legend on top, left aligned (design tokens chart rule).
+        { show: true, left: 56, top: 140, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
       : { show: false },
-    grid: { left: 110, right: bars ? 56 : 170, top: 190, bottom: legend ? 110 : 92 },
+    grid: { left: 110, right: bars ? 56 : 170, top: legend ? 200 : 190, bottom: 92 },
     xAxis: {
       type: "category",
       data: e.points.map((p) => periodLabel(p.period, period)),
-      axisLine: { lineStyle: { color: "#333" } },
+      axisLine: { lineStyle: { color: NOTE.base } },
       axisTick: { show: false },
-      axisLabel: { ...label, color: "#c8c8cf", hideOverlap: true },
+      axisLabel: { ...label, color: NOTE.text, hideOverlap: true },
     },
     yAxis: {
       type: "value",
       scale: !bars,
       splitNumber: 4,
       axisLabel: { ...label, formatter: (v: number) => fmtV(v) },
-      splitLine: { lineStyle: { color: "#1c1c1f" } },
+      splitLine: { lineStyle: { color: NOTE.grid } },
     },
     series: e.series.map((s, i) => {
-      const colour = SERIES_GREYS[i % SERIES_GREYS.length];
+      const colour = i === 0 ? NOTE.main : NOTE.palette[i % NOTE.palette.length];
       const data = e.points.map((p) => p.values[s.key] ?? null);
       return bars
         ? {
@@ -209,7 +221,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
             data,
             symbol: "none",
             connectNulls: true,
-            lineStyle: { color: colour, width: i === 0 ? 4 : 2, ...(i === 0 ? {} : { type: "dashed" as const }) },
+            lineStyle: { color: colour, width: i === 0 ? 4 : 3 },
             itemStyle: { color: colour },
             endLabel: { show: i === 0, color: "#fff", fontSize: 20, fontWeight: 600, fontFamily: FONT, formatter: (p: { value: number }) => fmtV(p.value) },
             z: 3 - Math.min(i, 2),

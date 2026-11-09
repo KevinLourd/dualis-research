@@ -2,7 +2,7 @@
 
 Independent equity research. Every idea is weighed from both sides before we take one.
 
-Version 3, November 2026 (v3: one indigo colour; v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
+Version 4, November 2026 (v4: Notes and X charts on deep indigo, a 10-colour series palette; v3: one indigo colour; v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
 
 **Source of truth: `tokens.json`.** `node design/build.mjs` writes the CSS and TypeScript the site and the console read; the console page Design system shows it live and edits colours; the `dualis-charts` Claude skill draws every chart from it.
 
@@ -20,7 +20,7 @@ Version 3, November 2026 (v3: one indigo colour; v2: purple accent, dark charts,
 - Separate with `rule` hairlines, never shadows.
 
 ## Charts (Substack Notes, articles, website)
-Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/thierry-note-cpng-2026-11-03.png`): `chart-bg` #161616 ground, faint `chart-grid` lines, legend on top, a value label on every bar or point, "E" after an estimate period (FY26E), source line under the chart. Main series in `chart-bar` white (rounded 4px tops), second series as a `chart-line` orange line with dots, benchmark in `chart-bar-muted`. **The website uses the light theme** (Thierry 2026-11-06: "a white background with a purple", clean like Aurelion): a white panel, `brand` indigo main series, `chart-light-bench` grey benchmark, `rule` gridlines, `chart-light-base` zero line, source line inside the panel. Site components: `site/src/components/ytd-chart.tsx`, `dark-chart.tsx`.
+Two themes (Thierry 2026-11-09, he picked them from rendered options). **Substack Notes and X** (`dark`): white data on the deep indigo `chart-bg` #1A1640 ground (the website's dark bands), faint `chart-grid` lines, legend on top, a value label on every bar or on the last point, "E" after an estimate period (FY26E), source line under the chart, the mark small in the corner. Main series in `chart-bar` white (rounded 4px tops), second series as a `chart-line` orange line, benchmark in `chart-bar-muted`. **The website and reports** (`light`, Thierry 2026-11-06: "a white background with a purple", clean like Aurelion): a white panel, `brand` indigo main series, `chart-light-bench` grey benchmark, `rule` gridlines, `chart-light-base` zero line, source line inside the panel. **Many series** (Thierry: "a few colours in case the chart has like 5-10 different variables"): `chart-series-1` to `-10` in order, light values on white, dark values on deep indigo, every one at least 3:1 against its ground, never green or red (they mean long and short). Site components: `site/src/components/ytd-chart.tsx`, `dark-chart.tsx`.
 
 ## Type
 - **Newsreader** (serif, Google Fonts) for titles and headings: the research-house voice.
@@ -28,7 +28,7 @@ Thierry's black Note chart (screenshot in the private repo, `docs/screenshots/th
 - Labels (`label`) are uppercase with 0.06em tracking: TICKER, TARGET, UPSIDE.
 
 ## Logo
-**The split D** (Kevin 2026-11-05): the D of Dualis, split by a price line that dips, then turns up. Long and short in one letter, and the moment a narrative turns. Files and rules: `assets/Logos/README.md`. The wordmark is "DUALIS" over "RESEARCH" in Newsreader caps beside the mark.
+**Solomon's knot** (Kevin 2026-11-06): two loops that cannot be pulled apart, price and value, long and short. An engraved seal for large uses and a simplified mark for headers, covers and icons; one colour at a time (indigo, white or black), never a watermark over a chart. Files and rules: `assets/Logos/README.md`. The wordmark is "DUALIS" over "RESEARCH" in caps beside the mark.
 
 ## Research note anatomy (Substack and website, same order)
 1. **Header strip**: ticker, exchange, price, market cap, LONG/SHORT tag, target, upside, date.
