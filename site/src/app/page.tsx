@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PokerScene } from "@/components/poker-scene";
+import { WINNABLE } from "@/lib/winnable";
 
 /**
  * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 34 s loop of the industries
@@ -16,6 +18,10 @@ export default function Home() {
         <source src="/video/hero.mp4" type="video/mp4" />
       </video>
       <div className="hero-veil" />
+      {/* The « play winnable games » thread (Kevin 2026-11-09): the poker scene on the right half, over a darker pool. */}
+      <div className="hero-scene">
+        <PokerScene variant="home" label={WINNABLE.home.label} className="hero-canvas" />
+      </div>
       <div className="wrap hero-inner">
         {/* Thierry 2026-11-06: buy-side, on the investor's side, unlike sell-side analysts paid by the companies. */}
         <h1>
@@ -24,6 +30,7 @@ export default function Home() {
           for buy-side opportunities
         </h1>
         <p className="hero-sub">Long and short ideas in small and mid caps.</p>
+        <p className="band-thread">{WINNABLE.home.line}</p>
         <Link href="/research" className="hero-link">
           Read the research
         </Link>

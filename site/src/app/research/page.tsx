@@ -17,7 +17,7 @@ export default async function Research() {
   const subscribe = subscribeHref(substackUrl);
   return (
     <>
-      <PageBand label="Research" line="Long and short calls on the small caps the market misreads." />
+      <PageBand label="Research" line="Long and short calls on the small caps the market misreads." scene="research" />
 
       {posts.length > 0 && (
         <section className="cover-band">
