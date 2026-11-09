@@ -1,28 +1,32 @@
-/* Dualis Research website. Dark professional indigo, no light purple (Kevin 2026-11-06); tokens from design/tokens.json. */
+/* Dualis Research website. Dark professional indigo, no light purple (Kevin 2026-11-06); tokens generated from design/tokens.json. */
+@import "./tokens.css";
+
+/* Site names for the design tokens (design/tokens.json via design/build.mjs): no colour is typed here. */
 :root {
-  --paper: #ffffff;
-  --grey: #f4f5f7;
-  --beige: #f2efea;
-  --ink: #17142e;
-  --muted: #5e5a73;
-  --rule: #e2e4e9;
+  --paper: var(--dualis-surface);
+  --grey: var(--dualis-paper);
+  --beige: var(--dualis-beige);
+  --ink: var(--dualis-ink);
+  --muted: var(--dualis-muted);
+  --rule: var(--dualis-rule);
   /* One colour (Thierry 2026-11-06): Dualis indigo, buttons included. */
-  --brand: #2b2463;
-  --brand-deep: #1e1947;
-  --tint: #eef0f3;
+  --brand: var(--dualis-brand);
+  --brand-deep: var(--dualis-accent-ink);
+  --tint: var(--dualis-accent-soft);
   /* Deep bands: page heads, proof, closing band. Text on them is white. */
-  --deep: #1a1640;
-  --on-deep: rgba(255, 255, 255, 0.8);
-  --footer: #0e1016;
-  --chart-bg: #161616;
-  --chart-grid: #2a2a2a;
-  --chart-text: #e6e6e6;
-  --chart-muted: #8f8f8f;
-  --chart-bar: #ffffff;
-  --chart-bar-muted: #55555e;
-  --chart-line: #e0592a;
-  --long: #1e7a57;
-  --short: #b0353a;
+  --deep: var(--dualis-deep);
+  --on-deep: var(--dualis-on-deep);
+  --footer: var(--dualis-footer);
+  --chart-bg: var(--dualis-chart-bg);
+  --chart-grid: var(--dualis-chart-grid);
+  --chart-base: var(--dualis-chart-base);
+  --chart-text: var(--dualis-chart-text);
+  --chart-muted: var(--dualis-chart-muted);
+  --chart-bar: var(--dualis-chart-bar);
+  --chart-bar-muted: var(--dualis-chart-bar-muted);
+  --chart-line: var(--dualis-chart-line);
+  --long: var(--dualis-long);
+  --short: var(--dualis-short);
   --wrap: 1180px;
   --gutter: clamp(20px, 4vw, 48px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -548,7 +552,7 @@ body:has(.hero) .site-footer {
   stroke: var(--chart-grid);
 }
 .dc-base {
-  stroke: #444;
+  stroke: var(--chart-base);
 }
 .dc-bar {
   fill: var(--chart-bar);

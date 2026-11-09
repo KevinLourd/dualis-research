@@ -1,0 +1,32 @@
+/* GENERATED from design/tokens.json by design/build.mjs. Edit tokens.json, never this file. */
+:root {
+  --dualis-paper: light-dark(#F4F5F7, #0A1120);
+  --dualis-surface: light-dark(#FFFFFF, #111A2C);
+  --dualis-ink: light-dark(#17142E, #E9ECF2);
+  --dualis-muted: light-dark(#5E5A73, #9AA4B4);
+  --dualis-rule: light-dark(#E2E4E9, #24304A);
+  --dualis-brand: light-dark(#2B2463, #B9B2EA);
+  --dualis-on-brand: light-dark(#FFFFFF, #0A1120);
+  --dualis-long: light-dark(#1E7A57, #4CC28F);
+  --dualis-short: light-dark(#B0353A, #E46B6E);
+  --dualis-long-soft: light-dark(#E3F1EA, #13281F);
+  --dualis-short-soft: light-dark(#F7E4E4, #2E1618);
+  --dualis-accent: light-dark(#2B2463, #B9B2EA);
+  --dualis-accent-ink: light-dark(#1E1947, #D2CDF3);
+  --dualis-brand-fill: light-dark(#2B2463, #5B53A8);
+  --dualis-brand-fill-hover: light-dark(#1E1947, #6C64B8);
+  --dualis-brand-chart: light-dark(#2B2463, #9C93DF);
+  --dualis-accent-soft: light-dark(#EEF0F3, #1B1733);
+  --dualis-deep: light-dark(#1A1640, #1A1640);
+  --dualis-on-deep: light-dark(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8));
+  --dualis-beige: light-dark(#F2EFEA, #F2EFEA);
+  --dualis-footer: light-dark(#0E1016, #0E1016);
+  --dualis-chart-bg: light-dark(#161616, #161616);
+  --dualis-chart-grid: light-dark(#2A2A2A, #2A2A2A);
+  --dualis-chart-base: light-dark(#444444, #444444);
+  --dualis-chart-text: light-dark(#E6E6E6, #E6E6E6);
+  --dualis-chart-muted: light-dark(#8F8F8F, #8F8F8F);
+  --dualis-chart-bar: light-dark(#FFFFFF, #FFFFFF);
+  --dualis-chart-bar-muted: light-dark(#55555E, #55555E);
+  --dualis-chart-line: light-dark(#E0592A, #E0592A);
+}

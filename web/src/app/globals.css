@@ -6,18 +6,20 @@
 @source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
+@import "../design/tokens.css";
 
-/* Dualis indigo (design/tokens.json `brand`) replaces Cloudflare's brand blue/orange. Kumo tokens live in @theme, so the override does too. */
+/* Dualis indigo replaces Cloudflare's brand blue/orange. Values come from design/tokens.json (generated
+ * web/src/design/tokens.css, `--dualis-*`); Kumo tokens live in @theme, so the override does too. */
 @theme {
-  --color-kumo-brand: light-dark(#2b2463, #5b53a8);
-  --color-kumo-brand-hover: light-dark(#1e1947, #6c64b8);
-  --text-color-kumo-brand: light-dark(#2b2463, #b9b2ea);
-  --text-color-kumo-link: light-dark(#2b2463, #b9b2ea);
-  /* Long / short stay data colours (design/tokens.json). */
-  --color-dualis-long: light-dark(#1e7a57, #4cc28f);
-  --color-dualis-long-soft: light-dark(#e3f1ea, #13281f);
-  --color-dualis-short: light-dark(#b0353a, #e46b6e);
-  --color-dualis-short-soft: light-dark(#f7e4e4, #2e1618);
+  --color-kumo-brand: var(--dualis-brand-fill);
+  --color-kumo-brand-hover: var(--dualis-brand-fill-hover);
+  --text-color-kumo-brand: var(--dualis-brand);
+  --text-color-kumo-link: var(--dualis-brand);
+  /* Long / short stay data colours. */
+  --color-dualis-long: var(--dualis-long);
+  --color-dualis-long-soft: var(--dualis-long-soft);
+  --color-dualis-short: var(--dualis-short);
+  --color-dualis-short-soft: var(--dualis-short-soft);
 }
 
 @layer base {

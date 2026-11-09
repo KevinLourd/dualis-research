@@ -1,0 +1,66 @@
+name: Design edit
+
+# A colour changed on the console's Design system page (design/actions.ts starts this with the console's dispatch
+# token). Same source as a Claude Code PR: design/tokens.json, then the generated files, committed to main. A push by
+# this token starts no workflow, so the site deploy and the skill zip are started here; the console picks the new
+# brand colour up on its next deploy (its Design system page reads GitHub live).
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Colour token
+        required: true
+      light:
+        description: Light theme value
+        required: true
+      dark:
+        description: Dark theme value
+        required: true
+      author:
+        description: Who edited it in the console
+        required: true
+
+concurrency:
+  group: design-edit
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Set the colour and regenerate
+        env:
+          NAME: ${{ inputs.name }}
+          LIGHT: ${{ inputs.light }}
+          DARK: ${{ inputs.dark }}
+        run: |
+          node design/build.mjs --set "$NAME" light "$LIGHT"
+          node design/build.mjs --set "$NAME" dark "$DARK"
+          node design/build.mjs --check
+      - name: Commit to main
+        env:
+          NAME: ${{ inputs.name }}
+          LIGHT: ${{ inputs.light }}
+          DARK: ${{ inputs.dark }}
+          AUTHOR: ${{ inputs.author }}
+        run: |
+          if git diff --quiet; then echo "### $NAME already had these values" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          git config user.name "dualis-console"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "design: $NAME = $LIGHT / $DARK (console, $AUTHOR)"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && break; sleep 5; done
+          echo "### $NAME = $LIGHT (light) / $DARK (dark), by $AUTHOR" >> "$GITHUB_STEP_SUMMARY"
+      - name: Redeploy the site and rebuild the chart skill
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy-site.yml -R "$GITHUB_REPOSITORY" --ref main
+          gh workflow run design-skill.yml -R "$GITHUB_REPOSITORY" --ref main

@@ -9,11 +9,12 @@ import { CanvasRenderer } from "echarts/renderers";
 import type { Line } from "./portfolio-series";
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
+import { COLOR } from "@/design/tokens";
 
 echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, AriaComponent, BrushComponent, ToolboxComponent, CanvasRenderer]);
 
 /** Dualis indigo family = the portfolio or each position; grey = the S&P 500. */
-const POSITION = { light: ["#2b2463", "#2f6fd6", "#0f8a8a", "#7a4fd6"], dark: ["#9c93df", "#8fb8ff", "#4fc4c4", "#b59cff"] };
+const POSITION = { light: [COLOR["brand-chart"].light, "#2f6fd6", "#0f8a8a", "#7a4fd6"], dark: [COLOR["brand-chart"].dark, "#8fb8ff", "#4fc4c4", "#b59cff"] };
 const BENCHMARK = { light: "#6b7280", dark: "#9aa1ab" };
 
 const pct = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v * 100).toFixed(1)}%`;
