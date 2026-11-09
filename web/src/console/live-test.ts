@@ -178,8 +178,9 @@ export function replayStrategy(
       trades: trades.length,
       closed: trades.filter((t) => !t.open).length,
       winners: withReturn.length ? withReturn.filter((t) => t.return! > 0).length / withReturn.length : null,
-      best: ranked[0] ?? null,
-      worst: ranked.length > 1 ? ranked.at(-1)! : null,
+      // Named only when tickers differ: a tie (every trade flat so far) has no best or worst.
+      best: ranked.length > 1 && ranked[0].return > ranked.at(-1)!.return ? ranked[0] : ranked.length === 1 ? ranked[0] : null,
+      worst: ranked.length > 1 && ranked[0].return > ranked.at(-1)!.return ? ranked.at(-1)! : null,
     },
   };
 }
