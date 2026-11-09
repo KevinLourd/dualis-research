@@ -73,7 +73,7 @@ beforeEach(async () => {
   ({ db, close } = await testDb());
   complete.mockClear();
   await seedAnalysedTicker(db, "CCLD", { name: "CareCloud" });
-  // The seeded Signal Change is two days old: the baseline, no alert in this post-loop test (alerts: content-replies.test).
+  // The seeded Signal Change is two days old: the baseline, no alert in this post-loop test (alerts: signal-alerts.test).
   await db.update(signalChanges).set({ at: new Date(Date.now() - 2 * 86400_000) });
   ideaA = await addIdea(1, "CareCloud replaced its lost client.", [{ format: "x-post", score: 90 }, { format: "substack-note", score: 80 }, { format: "substack-article", score: 99 }]);
   ideaB = await addIdea(2, "CareCloud margins turn.", [{ format: "substack-note", score: 70 }, { format: "x-post", score: 40 }]);

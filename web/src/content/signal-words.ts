@@ -35,3 +35,6 @@ export function tagWord(effect: string, strength: string, side: "long" | "short"
   if (effect === "continuation") return `${s} continuation`;
   return `${s} ${side === null ? "reversal" : side === "long" ? "inflection" : "crack"}`;
 }
+
+/** How much of a turn the price already moved, in plain words (console Status column and the alert image). */
+export const PRICED_WORD: Record<string, string> = { none: "Not in the price yet", partly: "Partly in the price", fully: "Already in the price" };

@@ -21,6 +21,7 @@ import { Section } from "./signal";
 import { getThesis } from "./thesis-queries";
 import { saveFairValue } from "./thesis-actions";
 import { ComingNext } from "./ui";
+import { PRICED_WORD } from "@/content/signal-words";
 
 /**
  * Level B: one ticker's analysis. The SAME content renders in the right panel (`variant="panel"`, from a Signals row)
@@ -197,8 +198,7 @@ export function EvidenceRows({ symbol, rows, driverId, side }: { symbol: string;
   );
 }
 
-/** How much of a turn the price already moved, in plain words. */
-export const PRICED_WORD: Record<string, string> = { none: "Not in the price yet", partly: "Partly in the price", fully: "Already in the price" };
+export { PRICED_WORD };
 
 /** A state's timing: since when it holds, how much the price already moved, and when the judge last looked. */
 function StateTiming({ state }: { state: GoldNarrativeState }) {
