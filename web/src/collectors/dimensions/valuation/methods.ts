@@ -1,4 +1,4 @@
-import type { Scenario, ValuationHistory, ValuationInput, ValuationMethodId, ValuationStep } from "@/db/schema/valuation";
+import type { PeerRow, Scenario, ValuationHistory, ValuationInput, ValuationMethodId, ValuationStep } from "@/db/schema/valuation";
 
 /**
  * The fixed catalogue of Valuation Methods (Kevin 2026-11-06). Claude never computes a value: it picks each method's
@@ -17,8 +17,10 @@ export type ValuationFacts = {
   inputs: Partial<Record<FactKey, ValuationInput>>;
   /** Per-year history of each multiple / figure, oldest first. */
   history: Partial<Record<HistoryKey, { period: string; value: number }[]>>;
-  /** Comparable companies' multiples today (peers method). */
-  peers: { symbol: string; name: string | null; currency: string | null; evEbitda: number | null; pe: number | null; sources: string[] }[];
+  /** Comparable companies today: multiples, size, growth, margins (the multiple methods price base and high off them). */
+  peers: PeerRow[];
+  /** The company's own size, growth and margins, from its reported figures (to set a premium or discount against peers). */
+  own?: { marketCap: number | null; revenueGrowth: number | null; ebitdaMargin: number | null; netMargin: number | null };
   /** Analyst price targets (analyst-targets method). */
   targets: { low: number; mean: number; high: number; analysts: number | null; currency: string | null; sources: string[] } | null;
 };
@@ -39,6 +41,11 @@ export type MethodSpec = {
   assumptions: AssumptionSpec[];
   /** Bases the method can be run on, Claude picks one (first = default). */
   bases?: { id: string; label: string }[];
+  /**
+   * Multiples (Thierry 2026-11-06): which peer multiple prices base and high (peers' median x (1 + premium)), per basis;
+   * the low case stays on the company's own history.
+   */
+  peerMultiple?: (basis: string | null) => { key: "evEbitda" | "pe" | "peForward" | "pb"; id: string; label: string };
   /** The history it reads against (chart in the method's panel). */
   history?: { key: HistoryKey; label: string; unit: ValuationInput["unit"] };
   /** Null when it can run, else why not (missing or negative inputs). */
@@ -80,10 +87,11 @@ export const DCF_YEARS = 5;
 export const VALUATION_METHODS: readonly MethodSpec[] = [
   {
     id: "ev-ebitda",
-    name: "EV/EBITDA, own history",
+    name: "EV/EBITDA",
     family: "Multiples",
-    description: "A multiple of EBITDA read against the company's own 5-year range, minus net debt, per share.",
+    description: "Low case on the company's own 5-year EV/EBITDA range; base and high on the listed peers' median, with a premium or discount for size, growth and margins. Minus net debt, per share.",
     assumptions: [{ key: "multiple", label: "EV/EBITDA multiple", unit: "multiple" }],
+    peerMultiple: () => ({ key: "evEbitda", id: "ev-ebitda", label: "EV/EBITDA" }),
     history: { key: "ev-ebitda", label: "EV/EBITDA at each fiscal year end", unit: "multiple" },
     notApplicable: (f) => need(f, ["ebitda", "net-debt", "shares"], ["ebitda", "shares"]),
     uses: () => ["ebitda", "net-debt", "shares"],
@@ -102,12 +110,13 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     id: "pe",
     name: "P/E",
     family: "Multiples",
-    description: "A multiple of earnings per share, on last year's reported EPS or next year's consensus EPS.",
+    description: "A multiple of earnings per share (last year's reported EPS or next year's consensus): low case on the company's own P/E history, base and high on the listed peers' median with a premium or discount.",
     assumptions: [{ key: "multiple", label: "P/E multiple", unit: "multiple" }],
     bases: [
       { id: "trailing", label: "Last fiscal year EPS" },
       { id: "forward", label: "Next fiscal year consensus EPS" },
     ],
+    peerMultiple: (basis) => (basis === "forward" ? { key: "peForward", id: "pe-forward", label: "forward P/E" } : { key: "pe", id: "pe", label: "trailing P/E" }),
     history: { key: "pe", label: "P/E at each fiscal year end", unit: "multiple" },
     notApplicable: (f) => (v(f, "eps-trailing")! > 0 || v(f, "eps-forward")! > 0 ? null : "Earnings per share are negative or not collected."),
     uses: (_f, basis) => [basis === "forward" ? "eps-forward" : "eps-trailing"],
@@ -120,8 +129,9 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     id: "pb",
     name: "P/B, book value",
     family: "Assets",
-    description: "A multiple of shareholders' equity per share, read against the company's own price-to-book history.",
+    description: "A multiple of shareholders' equity per share: low case on the company's own price-to-book history, base and high on the listed peers' median with a premium or discount.",
     assumptions: [{ key: "multiple", label: "P/B multiple", unit: "multiple" }],
+    peerMultiple: () => ({ key: "pb", id: "pb", label: "P/B" }),
     history: { key: "pb", label: "Price to book at each fiscal year end", unit: "multiple" },
     notApplicable: (f) => need(f, ["equity", "shares"], ["equity", "shares"]),
     uses: () => ["equity", "shares"],
@@ -212,35 +222,6 @@ export const VALUATION_METHODS: readonly MethodSpec[] = [
     },
   },
   {
-    id: "peers",
-    name: "Listed peers",
-    family: "Market",
-    description: "The multiple comparable listed companies trade at today, applied to this company's EBITDA or earnings.",
-    assumptions: [{ key: "multiple", label: "Peer multiple", unit: "multiple" }],
-    bases: [
-      { id: "ev-ebitda", label: "Peers' EV/EBITDA on this EBITDA" },
-      { id: "pe", label: "Peers' P/E on this EPS" },
-    ],
-    notApplicable: (f) => (f.peers.some((p) => p.evEbitda !== null || p.pe !== null) ? null : "No comparable company's multiples collected yet."),
-    uses: (_f, basis) => (basis === "pe" ? ["eps-trailing"] : ["ebitda", "net-debt", "shares"]),
-    compute: (f, a, basis) => {
-      if (basis === "pe") {
-        const eps = v(f, "eps-trailing");
-        if (!(eps! > 0)) throw new Error("peers: P/E basis needs a positive EPS");
-        return { value: a.multiple * eps!, steps: [{ label: "EPS, last fiscal year", unit: "per-share", value: eps! }, { label: "x peer P/E", unit: "multiple", value: a.multiple }, { label: "Value per share", unit: "per-share", value: a.multiple * eps! }] };
-      }
-      if (!(v(f, "ebitda")! > 0) || v(f, "net-debt") === null || !(v(f, "shares")! > 0)) throw new Error("peers: EV/EBITDA basis needs EBITDA, net debt and shares");
-      const ev = a.multiple * v(f, "ebitda")!;
-      return perShare(f, ev - v(f, "net-debt")!, [
-        { label: "EBITDA", unit: "currency", value: v(f, "ebitda")! },
-        { label: "x peer EV/EBITDA", unit: "multiple", value: a.multiple },
-        { label: "Enterprise value", unit: "currency", value: ev },
-        { label: "- net debt", unit: "currency", value: v(f, "net-debt")! },
-        { label: "Equity value", unit: "currency", value: ev - v(f, "net-debt")! },
-      ]);
-    },
-  },
-  {
     id: "analyst-targets",
     name: "Analyst price targets",
     family: "Market",
@@ -259,6 +240,23 @@ export const methodSpec = (id: ValuationMethodId): MethodSpec => {
   if (!m) throw new Error(`unknown valuation method "${id}"`);
   return m;
 };
+
+/** The median of the peers' multiple a method prices off, with how many peers carry it; null when none does. */
+export function peerMedian(spec: MethodSpec, f: ValuationFacts, basis: string | null): { id: string; label: string; median: number; count: number } | null {
+  if (!spec.peerMultiple) return null;
+  const m = spec.peerMultiple(basis);
+  const xs = f.peers.map((p) => p[m.key]).filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x > 0);
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const median = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  return { id: m.id, label: m.label, median, count: xs.length };
+}
+
+/** Base and high multiples off the peers: median x (1 + premium), premium a decimal (-0.25 = a 25% discount). */
+export function peerPriced(median: number, premium: { base: number; high: number }): { base: number; high: number } {
+  for (const k of ["base", "high"] as const) if (!(premium[k] > -1)) throw new Error(`peer premium ${k} ${premium[k]} must be above -100%`);
+  return { base: median * (1 + premium.base), high: median * (1 + premium.high) };
+}
 
 /** Runs a method under the three scenarios; the scenario values are ordered low <= base <= high by the VALUE they give. */
 export function runScenarios(spec: MethodSpec, f: ValuationFacts, scenarios: Record<Scenario, Values>, basis: string | null): { low: number; base: number; high: number; steps: ValuationStep[]; order: Scenario[] } {

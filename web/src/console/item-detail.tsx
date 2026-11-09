@@ -15,6 +15,7 @@ import { day, price, utc } from "./format";
 import { Section } from "./signal";
 import { Fact, FactList, SourceTags } from "./ui";
 import { sourceNote } from "./source-labels";
+import type { PeerRow } from "@/db/schema/valuation";
 
 /**
  * Level C: the detail of one item of the analysis (`?item=` on the Analysis page): what it says, its chart, and where
@@ -308,6 +309,18 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
   };
 }
 
+/** The peer multiple a method's table shows: the one it priced off, else its own family's. */
+function peerColumn(method: string, multiple: string | undefined): { label: string; read: (p: PeerRow) => number | null | undefined } {
+  const id = multiple ?? (method === "pb" ? "pb" : method === "pe" ? "pe" : "ev-ebitda");
+  if (id === "pb") return { label: "P/B", read: (p) => p.pb };
+  if (id === "pe-forward") return { label: "Forward P/E", read: (p) => p.peForward };
+  if (id === "pe") return { label: "P/E", read: (p) => p.pe };
+  return { label: "EV/EBITDA", read: (p) => p.evEbitda };
+}
+const premium = (x: number) => (Math.abs(x) < 0.005 ? "at the median" : `${Math.round(Math.abs(x) * 100)}% ${x > 0 ? "premium" : "discount"}`);
+const ratio = (x: number | null | undefined) => (x === null || x === undefined ? "–" : `${(x * 100).toFixed(1)}%`);
+const compact = (x: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(x);
+
 /** One Valuation Method on the ticker (level C): its range, assumptions with why, the calculation step by step, its chart, inputs and report. */
 async function methodItem(symbol: string, method: string): Promise<ItemView | null> {
   const v = await getValuation(symbol);
@@ -392,26 +405,40 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Section>
         )}
         {m.peers.length > 0 && (
-          <Section title="Comparable companies">
+          <Section title="Listed peers">
+            {m.peerPricing && (
+              <p className="text-base text-kumo-default">
+                Base and high start from the peers&apos; median {m.peerPricing.label} of <span className="font-mono tabular">{m.peerPricing.median.toFixed(1)}x</span> ({m.peerPricing.count} {m.peerPricing.count === 1 ? "company" : "companies"}): base{" "}
+                <span className="font-mono tabular">{premium(m.peerPricing.premium.base)}</span>, high <span className="font-mono tabular">{premium(m.peerPricing.premium.high)}</span>. The low case stays on the company&apos;s own history.
+                {m.peerPricing.why && <span className="mt-2 block text-kumo-strong">{m.peerPricing.why}</span>}
+              </p>
+            )}
             <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
                   <KTableRow>
                     <KTableHead className="pl-4">Company</KTableHead>
-                    <KTableHead className="text-right">EV/EBITDA</KTableHead>
-                    <KTableHead className="pr-4 text-right">P/E</KTableHead>
+                    <KTableHead className="text-right">{peerColumn(m.method, m.peerPricing?.multiple).label}</KTableHead>
+                    <KTableHead className="text-right">Market cap</KTableHead>
+                    <KTableHead className="text-right">Revenue growth</KTableHead>
+                    <KTableHead className="pr-4 text-right">EBITDA margin</KTableHead>
                   </KTableRow>
                 </KTableHeader>
                 <KTableBody>
-                  {m.peers.map((p) => (
-                    <KTableRow key={p.symbol}>
-                      <KTableCell className="pl-4">
-                        {p.name ?? p.symbol} <span className="font-mono text-[12px] text-kumo-subtle">{p.symbol}</span>
-                      </KTableCell>
-                      <KTableCell className="text-right font-mono tabular">{p.evEbitda === null ? "–" : `${p.evEbitda.toFixed(1)}x`}</KTableCell>
-                      <KTableCell className="pr-4 text-right font-mono tabular">{p.pe === null ? "–" : `${p.pe.toFixed(1)}x`}</KTableCell>
-                    </KTableRow>
-                  ))}
+                  {m.peers.map((p) => {
+                    const x = peerColumn(m.method, m.peerPricing?.multiple).read(p);
+                    return (
+                      <KTableRow key={p.symbol}>
+                        <KTableCell className="pl-4">
+                          {p.name ?? p.symbol} <span className="font-mono text-[12px] text-kumo-subtle">{p.symbol}</span>
+                        </KTableCell>
+                        <KTableCell className="text-right font-mono tabular">{x === null || x === undefined ? "–" : `${x.toFixed(1)}x`}</KTableCell>
+                        <KTableCell className="text-right font-mono tabular">{p.marketCap ? `${compact(p.marketCap)}${p.currency ? ` ${p.currency}` : ""}` : "–"}</KTableCell>
+                        <KTableCell className="text-right font-mono tabular">{ratio(p.revenueGrowth)}</KTableCell>
+                        <KTableCell className="pr-4 text-right font-mono tabular">{ratio(p.ebitdaMargin)}</KTableCell>
+                      </KTableRow>
+                    );
+                  })}
                 </KTableBody>
               </KTable>
             </div>

@@ -253,6 +253,13 @@
       "when": 1793968511139,
       "tag": "0035_content-visuals",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794208205878,
+      "tag": "0036_peer-pricing",
+      "breakpoints": true
     }
   ]
 }

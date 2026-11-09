@@ -75,8 +75,12 @@ export async function valuationFacts(db: Db, symbol: string, market: MarketReads
   set("dividend-yield", ratio("line:dividends-paid", "metric:market-cap", true));
   set("net-cash", series("metric:net-debt").map((x) => ({ period: x.period, value: -x.value })));
 
+  // The company's own size, growth and margins, last fiscal year (a premium or discount to peers is set from them).
+  const lastOf = (k: string) => last(catalog.get(k))?.[1] ?? null;
+  const own = { marketCap: valuation?.marketCap ?? null, revenueGrowth: lastOf("metric:revenue-growth"), ebitdaMargin: lastOf("metric:ebitda-margin"), netMargin: lastOf("metric:net-margin") };
+
   const q = valuation?.quote !== null && valuation?.quote !== undefined && valuation.quoteCurrency ? { price: valuation.quote, date: valuation.quoteDate ?? "" } : null;
-  return { symbol, name: profile?.name ?? null, currency: valuation?.currency ?? null, quote: q, inputs, history, peers: market.peers, targets: market.targets };
+  return { symbol, name: profile?.name ?? null, currency: valuation?.currency ?? null, quote: q, inputs, history, own, peers: market.peers, targets: market.targets };
 }
 
 /** A target in a quote currency (pence, KRW...) brought to the reporting currency when it matches; else dropped. */

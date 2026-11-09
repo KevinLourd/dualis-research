@@ -13,7 +13,7 @@ import { analysedSymbols } from "../watchlist";
 
 /**
  * Market references for the fair value (Kevin 2026-11-06): the comparable listed companies of each analysed ticker
- * (Claude picks 4 to 6 once per company profile) and, from Yahoo, their EV/EBITDA and P/E today, plus the analyst price
+ * (Claude picks 4 to 6 once per company profile) and, from Yahoo, their EV/EBITDA, P/E and P/B today with size, growth and margins, plus the analyst price
  * targets on the ticker itself. Subjects: `pick:<symbol>` (round 0, Claude), `quote:<yahoo symbol>` (round 1, Yahoo).
  */
 
@@ -70,10 +70,10 @@ type Raw = { raw?: number } | undefined;
 type QuoteSummary = {
   quoteSummary?: {
     result?: {
-      price?: { longName?: string; shortName?: string; currency?: string };
-      summaryDetail?: { trailingPE?: Raw; currency?: string };
-      defaultKeyStatistics?: { enterpriseToEbitda?: Raw };
-      financialData?: { targetLowPrice?: Raw; targetMeanPrice?: Raw; targetHighPrice?: Raw; numberOfAnalystOpinions?: Raw; financialCurrency?: string };
+      price?: { longName?: string; shortName?: string; currency?: string; marketCap?: Raw };
+      summaryDetail?: { trailingPE?: Raw; forwardPE?: Raw; marketCap?: Raw; currency?: string };
+      defaultKeyStatistics?: { enterpriseToEbitda?: Raw; priceToBook?: Raw; forwardPE?: Raw };
+      financialData?: { targetLowPrice?: Raw; targetMeanPrice?: Raw; targetHighPrice?: Raw; numberOfAnalystOpinions?: Raw; financialCurrency?: string; revenueGrowth?: Raw; ebitdaMargins?: Raw };
     }[];
   };
 };
@@ -96,11 +96,16 @@ export const quoteSource: Source = {
   },
 };
 
-/** What one Yahoo summary says: name, currency, multiples today, analyst targets. */
+/** A multiple a peer trades at: positive and below a sanity cap (a negative or absurd one is not a multiple). */
+const multiple = (x: number | null, cap: number) => (x !== null && x > 0 && x < cap ? x : null);
+
+/** What one Yahoo summary says: name, currency, multiples today, size, growth, margins, analyst targets. */
 export function readSummary(payload: unknown) {
   const r = (payload as QuoteSummary).quoteSummary!.result![0];
   const ev = num(r.defaultKeyStatistics?.enterpriseToEbitda);
   const pe = num(r.summaryDetail?.trailingPE);
+  const peForward = num(r.summaryDetail?.forwardPE) ?? num(r.defaultKeyStatistics?.forwardPE);
+  const pb = num(r.defaultKeyStatistics?.priceToBook);
   const t = r.financialData;
   const low = num(t?.targetLowPrice);
   const mean = num(t?.targetMeanPrice);
@@ -108,9 +113,13 @@ export function readSummary(payload: unknown) {
   return {
     name: r.price?.longName ?? r.price?.shortName ?? null,
     currency: r.price?.currency ?? r.summaryDetail?.currency ?? null,
-    // A negative or absurd multiple is not a multiple a peer trades at.
-    evEbitda: ev !== null && ev > 0 && ev < 200 ? ev : null,
-    pe: pe !== null && pe > 0 && pe < 500 ? pe : null,
+    evEbitda: multiple(ev, 200),
+    pe: multiple(pe, 500),
+    peForward: multiple(peForward, 500),
+    pb: multiple(pb, 100),
+    marketCap: num(r.price?.marketCap) ?? num(r.summaryDetail?.marketCap),
+    revenueGrowth: num(r.financialData?.revenueGrowth),
+    ebitdaMargin: num(r.financialData?.ebitdaMargins),
     targets: low !== null && mean !== null && high !== null && mean > 0 ? { low, mean, high, analysts: num(t?.numberOfAnalystOpinions) } : null,
   };
 }
@@ -136,7 +145,7 @@ async function storePicks(db: Db, fetches: BronzeFetch[]): Promise<number> {
 
 export const peersDim: Dimension = {
   name: PEERS_DIMENSION,
-  description: "Comparable listed companies per analysed ticker (Claude picks them once per company profile) with their EV/EBITDA and P/E today, and the analyst price targets on the ticker (Yahoo). Read by the fair value's Listed peers and Analyst price targets methods.",
+  description: "Comparable listed companies per analysed ticker (Claude picks them once per company profile) with their EV/EBITDA, P/E and P/B today, size, growth and margins, and the analyst price targets on the ticker (Yahoo). The fair value's multiple methods price base and high off these peers; Analyst price targets reads the targets.",
   sources: [pickSource, quoteSource],
   subjects: async (db) => (await analysedSymbols(db)).map((s) => `pick:${s}`),
   // Round 1: the picks of round 0 are in silver once stored; quote the ticker itself (targets) and each peer.
@@ -162,7 +171,7 @@ export async function rebuildPeersGold(db: Db, fetches: BronzeFetch[], now = new
     for (const p of sets.get(symbol) ?? []) {
       const q = quotes.get(p.symbol);
       if (!q) continue;
-      peerRows.push({ id: `${symbol}|${p.symbol}`, symbol, peerSymbol: p.symbol, name: q.name ?? p.name, why: p.why, currency: q.currency, evEbitda: q.evEbitda, pe: q.pe, marketCap: null, sources: ["claude", "yahoo"], asOf: now });
+      peerRows.push({ id: `${symbol}|${p.symbol}`, symbol, peerSymbol: p.symbol, name: q.name ?? p.name, why: p.why, currency: q.currency, evEbitda: q.evEbitda, pe: q.pe, peForward: q.peForward, pb: q.pb, marketCap: q.marketCap, revenueGrowth: q.revenueGrowth, ebitdaMargin: q.ebitdaMargin, sources: ["claude", "yahoo"], asOf: now });
     }
     const own = quotes.get(symbol);
     if (own?.targets) targetRows.push({ symbol, ...own.targets, analysts: own.targets.analysts === null ? null : Math.round(own.targets.analysts), currency: own.currency, sources: ["yahoo"], asOf: now });
