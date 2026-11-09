@@ -10,8 +10,10 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentVisuals, pickVisualSubjects, renderSource, VISUALS_VERSION } from ".";
-import { gapWords, videoFrames } from "./render";
-import { chartJudgeInput } from "./choose";
+import { chartSvg, exhibitSvg, gapWords, toneOf, videoFrames } from "./render";
+import { COLOR } from "@/design/tokens";
+import { fetches as bronzeFetches } from "@/db/schema/bronze";
+import { CALLOUT_SYSTEM, calloutPoints, chartJudgeInput, parseCallout } from "./choose";
 import { visualInput } from "./data";
 
 let db: Db;
@@ -49,16 +51,26 @@ afterEach(async () => {
   await close();
 });
 
-/** A fake judge: answers `verdict` and records what it was shown. */
+/** A fake judge: answers `verdict` and records what it was shown; the chart's callout gets its own JSON. */
 function fakeJudge(verdict: string) {
   const prompts: string[] = [];
-  const complete: Complete = async ({ prompt }) => {
+  const callouts: string[] = [];
+  const complete: Complete = async ({ system, prompt }) => {
+    if (system === CALLOUT_SYSTEM) {
+      callouts.push(prompt);
+      const point = prompt.split("Points (id: value):\n")[1].split("\n").at(-1) && [...prompt.matchAll(/^- (\S+): .*$/gm)].map((m) => m[1]);
+      const news = prompt.includes("Reuters") ? { index: 0, domain: "reuters.com" } : null;
+      return { text: JSON.stringify({ point: point![point!.length - (news ? 2 : 1)], note: "Clients back to 45", title: "Look: clients just hit a record", news }), model: "fake" };
+    }
     prompts.push(prompt);
     return { text: JSON.stringify({ verdict, probability: 0.8, cited_sentence: null, reason: "The client count is the striking turn." }), model: "fake" };
   };
-  return { complete, prompts };
+  return { complete, prompts, callouts };
 }
-const ctx = { env: {}, fetch, complete: fakeJudge("price").complete };
+// A 1x1 PNG stands for the publisher's logo.
+const PNG_1PX = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const logoFetch = (async () => new Response(PNG_1PX, { headers: { "content-type": "image/png" } })) as unknown as typeof fetch;
+const ctx = { env: {}, fetch: logoFetch, complete: fakeJudge("price").complete };
 const renderOnly = { ...contentVisuals, sources: [renderSource] };
 
 describe("content-visuals dimension", () => {
@@ -169,5 +181,43 @@ describe("visual helpers", () => {
     expect(frames).toHaveLength(210);
     expect(frames[0]).toMatchObject({ reveal: 0 });
     expect(frames.at(-1)).toEqual({ progress: 1, reveal: 1 });
+  });
+});
+
+describe("the chart shouts (Kevin 2026-11-09)", () => {
+  it("writes the arrow, note, headline and news strip once, into the chart's bronze request", async () => {
+    await addExhibits();
+    const judge = fakeJudge("CCLD:1:1");
+    await runDimension(db, renderOnly, { trigger: "test", ctx: { ...ctx, complete: judge.complete } });
+    const [chart] = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, ideaId)).then((r) => r.filter((v) => v.kind === "chart"));
+    expect(chart.status).toBe("ok");
+    const rows = await db.select().from(bronzeFetches).where(eq(bronzeFetches.subject, `idea:${ideaId}#chart`));
+    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", title: "Look: clients just hit a record", news: { index: 0, domain: "reuters.com" } });
+    // The callout saw the points and the news with its publisher.
+    expect(judge.callouts[0]).toContain("- 2025-12-31: 2025-12 Hospital clients 45");
+    expect(judge.callouts[0]).toContain("- 0: Reuters: CCLD signs a new hospital client");
+  });
+
+  it("colours the one point by the story's side and draws arrow, note and news strip", async () => {
+    await addExhibits();
+    const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
+    const input = await visualInput(db, idea);
+    expect(toneOf(input)).toBe("long"); // 2.02 close under a 3.19 fair value: an inflection
+    const banner = { headline: "CareCloud signs a new hospital client", publisher: "Reuters", logo: PNG_1PX.toString("base64") };
+    const svg = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", title: "Look: clients just hit a record", tone: "long", banner });
+    for (const t of ["Clients back to 45", "Look: clients just hit a record", "REUTERS", "CareCloud signs a new hospital client"]) expect(svg).toContain(t);
+    expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
+    const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", title: "Look: 32% under fair value", tone: "short", banner: null });
+    expect(price).toContain("Sold off");
+    expect(price.toLowerCase()).toContain(COLOR.short.dark.toLowerCase());
+    expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", title: "y", tone: "long", banner: null })).toThrow(/not a period/);
+  });
+
+  it("refuses a callout pointing off the chart or missing its news source", () => {
+    const points = [{ id: "2025-12-31", label: "x" }];
+    expect(() => parseCallout(JSON.stringify({ point: "2020-01-01", note: "n", title: "t", news: null }), points, 0)).toThrow(/not on the chart/);
+    expect(() => parseCallout(JSON.stringify({ point: "2025-12-31", note: "n", title: "t", news: null }), points, 1)).toThrow(/news index/);
+    expect(parseCallout(JSON.stringify({ point: "2025-12-31", note: "n — m", title: "t", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1)).toEqual({ point: "2025-12-31", note: "n, m", title: "t", news: { index: 0, domain: "www.ft.com" } });
+    expect(calloutPoints).toBeTypeOf("function");
   });
 });

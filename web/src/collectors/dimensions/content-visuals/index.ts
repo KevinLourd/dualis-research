@@ -4,14 +4,16 @@ import * as content from "@/db/schema/content";
 import { VISUAL_KINDS, type VisualKind } from "@/db/schema/content";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
-import { chooseChart } from "./choose";
+import { type Callout, chooseChart, writeCallout } from "./choose";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
 // v2 (Thierry 2026-11-06): the chart shows the driver's most striking Exhibit, the price only when the Idea is about price.
 // v3 (Thierry 2026-11-09): Notes and X charts on the deep indigo ground of the design tokens, a palette for many series.
-export const VISUALS_VERSION = "visuals-v3";
+// v4 (Kevin 2026-11-09): the chart shouts: the claim as headline, one point in colour with an arrow and a note, the news
+// headline with its publisher's logo on top.
+export const VISUALS_VERSION = "visuals-v4";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
@@ -58,7 +60,22 @@ function summary(input: VisualInput) {
   };
 }
 
-/** Chart, card and video, drawn from gold (no network). */
+/** The publisher's logo, from Google's public favicon service ($0), as base64 PNG. */
+export async function publisherLogo(domain: string, fetchImpl: typeof fetch): Promise<string> {
+  const res = await fetchImpl(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`);
+  if (!res.ok) throw new Error(`logo of ${domain}: HTTP ${res.status}`);
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.startsWith("image/png")) throw new Error(`logo of ${domain}: ${type || "no content type"}, not a PNG`);
+  return Buffer.from(await res.arrayBuffer()).toString("base64");
+}
+
+async function banner(input: VisualInput, callout: Callout, fetchImpl: typeof fetch) {
+  if (!callout.news) return null;
+  const n = input.news[callout.news.index];
+  return { headline: n.headline, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl) };
+}
+
+/** Chart, card and video, drawn from gold (the chart's news strip fetches its publisher's logo). */
 export const renderSource: Source = {
   name: RENDER_SOURCE,
   requiredEnv: [],
@@ -69,16 +86,20 @@ export const renderSource: Source = {
     const input = await inputFor(ctx.db, ideaId);
     // The chart draws the driver the Idea cites (its most striking Exhibit), the price only when the Idea is about price.
     const choice = kind === "chart" ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
+    const callout = choice && (choice.kind === "exhibit" || input.bars.length >= MIN_BARS) ? await writeCallout(input, choice, ctx.complete) : null;
     const request = {
       version: VISUALS_VERSION,
       ideaId,
       kind,
       input: summary(input),
       ...(choice ? { chart: choice.kind === "exhibit" ? { exhibitId: choice.exhibit.id, why: choice.reason } : { exhibitId: null, why: choice.reason } } : {}),
+      ...(callout ? { callout } : {}),
     };
+    const r0 = callout ? await renderModule() : null;
+    const annotation = callout && r0 ? { point: callout.point, note: callout.note, title: callout.title, tone: r0.toneOf(input), banner: await banner(input, callout, ctx.fetch) } : null;
     if (choice?.kind === "exhibit") {
       const r = await renderModule();
-      const file = r.png(r.exhibitSvg(input, choice.exhibit));
+      const file = r.png(r.exhibitSvg(input, choice.exhibit, annotation));
       const out: Rendered = { file, mime: "image/png", width: r.W, height: r.H, sourceUrl: null, caption: `Exhibit: ${choice.exhibit.title}` };
       rendered.set(subject, out);
       return { request, httpStatus: null, payload: { mime: out.mime, width: out.width, height: out.height, sizeBytes: file.length } };
@@ -90,7 +111,7 @@ export const renderSource: Source = {
         error: `only ${input.bars.length} closes for ${input.symbol} in the last 12 months (a chart needs ${MIN_BARS})`,
       };
     const r = await renderModule();
-    const file = kind === "video" ? await r.video(input) : r.png(kind === "chart" ? r.chartSvg(input) : r.montageSvg(input));
+    const file = kind === "video" ? await r.video(input) : r.png(kind === "chart" ? r.chartSvg(input, undefined, annotation) : r.montageSvg(input));
     const out: Rendered = {
       file,
       mime: kind === "video" ? "video/mp4" : "image/png",

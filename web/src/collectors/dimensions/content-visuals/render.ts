@@ -130,42 +130,125 @@ function axes(input: VisualInput, onCard: boolean) {
   };
 }
 
+/**
+ * What the Note chart says out loud (Kevin 2026-11-09: « une flèche dessus, un texte de note, orienté regardez »): the
+ * claim as its headline, ONE point in colour (green when the story turns up below fair value, red when it cracks above),
+ * an arrow with a short note on it, and the headline of the news it rests on with its publisher's logo above.
+ */
+export type Annotation = {
+  /** The point the arrow hits: an Exhibit period, or a price date. */
+  point: string;
+  note: string;
+  title: string;
+  tone: "long" | "short" | "neutral";
+  banner: { headline: string; publisher: string; logo: string | null } | null;
+};
+
+const BANNER_H = 112;
+const toneColour = (t: Annotation["tone"]) => (t === "long" ? COLOR.long.dark : t === "short" ? COLOR.short.dark : COLOR.accent.dark);
+
+/** The tone of a chart: below fair value an inflection (green), above a crack (red). */
+export function toneOf(input: VisualInput): Annotation["tone"] {
+  const last = input.bars.at(-1);
+  if (!input.fair || !last) return "neutral";
+  return last.close < input.fair.value ? "long" : "short";
+}
+
+/** The news strip on top: the publisher's logo and name, then the headline. */
+function bannerGraphics(b: NonNullable<Annotation["banner"]>) {
+  const textLeft = b.logo ? 56 + 40 + 14 : 56;
+  return [
+    { type: "rect", shape: { x: 0, y: 0, width: W, height: BANNER_H }, style: { fill: "#0E0B26" }, z: 10 },
+    ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: 56, y: 18, width: 40, height: 40 }, z: 11 }] : []),
+    { type: "text", style: { text: b.publisher.toUpperCase(), x: textLeft, y: 38, fill: NOTE.muted, fontSize: 20, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
+    { type: "text", style: { text: b.headline, x: 56, y: 86, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: W - 112 - 80, overflow: "truncate" }, z: 11 },
+  ];
+}
+
+/** Arrow + note box pointing at (px, py), placed where it fits inside the plot. */
+function calloutGraphics(px: number, py: number, note: string, colour: string, plot: { left: number; top: number; right: number; bottom: number }, ring = true) {
+  const boxW = Math.round(note.length * 13.5 + 40);
+  const boxH = 50;
+  const gap = 70;
+  // A bar is hit from the side: the note sits high in the free space over the shorter bars.
+  const candidates = [
+    ...(ring ? [] : [{ x: px - boxW - gap, y: plot.top + 10 }, { x: px + gap, y: plot.top + 10 }]),
+    { x: px - boxW - gap, y: py - boxH - gap / 2 },
+    { x: px + gap, y: py - boxH - gap / 2 },
+    { x: px - boxW - gap, y: py - boxH / 2 },
+    { x: px + gap, y: py - boxH / 2 },
+    { x: px - boxW / 2, y: py + gap },
+  ];
+  const fits = (c: { x: number; y: number }) => c.x >= plot.left && c.x + boxW <= plot.right && c.y >= plot.top && c.y + boxH <= plot.bottom;
+  const box = candidates.find(fits) ?? candidates[0];
+  // The arrow leaves the box edge nearest the point and stops short of it.
+  const sx = Math.min(Math.max(px, box.x), box.x + boxW);
+  const sy = Math.min(Math.max(py, box.y), box.y + boxH);
+  const len = Math.hypot(px - sx, py - sy) || 1;
+  const ux = (px - sx) / len;
+  const uy = (py - sy) / len;
+  const ex = px - ux * 18;
+  const ey = py - uy * 18;
+  const head = 16;
+  const tri = [
+    [ex + ux * 4, ey + uy * 4],
+    [ex - ux * head - uy * head * 0.6, ey - uy * head + ux * head * 0.6],
+    [ex - ux * head + uy * head * 0.6, ey - uy * head - ux * head * 0.6],
+  ];
+  return [
+    ...(ring ? [{ type: "circle", shape: { cx: px, cy: py, r: 13 }, style: { fill: "none", stroke: colour, lineWidth: 4 }, z: 20 }] : []),
+    { type: "line", shape: { x1: sx, y1: sy, x2: ex - ux * head * 0.6, y2: ey - uy * head * 0.6 }, style: { stroke: colour, lineWidth: 4 }, z: 20 },
+    { type: "polygon", shape: { points: tri }, style: { fill: colour }, z: 20 },
+    { type: "rect", shape: { x: box.x, y: box.y, width: boxW, height: boxH, r: 8 }, style: { fill: colour }, z: 20 },
+    { type: "text", style: { text: note, x: box.x + boxW / 2, y: box.y + boxH / 2, fill: INDIGO, fontSize: 24, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 21 },
+  ];
+}
+
 function withMark(svg: string, x: number, y: number, size: number): string {
   return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${MARK}" x="${x}" y="${y}" width="${size}" height="${size}"/></svg>`);
 }
 
-/** Price vs fair value as a Notes and X chart (`NOTE`). */
-export function chartSvg(input: VisualInput, frame: Frame = FULL): string {
+/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow and news strip. */
+export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation | null = null): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const last = input.bars[input.bars.length - 1];
+  const off = a?.banner ? BANNER_H : 0;
+  const subtitle = input.fair ? `Last 12 months · ${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}` : "Last 12 months";
+  const grid = { left: 96, right: 200, top: 160 + off, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT } },
+      { text: a ? a.title : `${input.companyName ?? input.symbol} share price vs fair value`, left: 56, top: 44 + off, textStyle: { color: "#fff", fontSize: 34, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
       {
-        text: input.fair ? `Last 12 months · ${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}` : "Last 12 months",
+        text: a ? `${input.companyName ?? input.symbol} share price · ${subtitle}` : subtitle,
         left: 56,
-        top: 94,
+        top: 94 + off,
         textStyle: { color: NOTE.muted, fontSize: 22, fontWeight: 400, fontFamily: FONT },
       },
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
-    grid: { left: 96, right: 200, top: 160, bottom: 92 },
+    grid,
     ...axes(input, false),
     series: series(input, frame, false),
   });
+  if (a) {
+    const bar = input.bars.find((b) => b.date === a.point);
+    if (!bar) throw new Error(`annotation point ${a.point} is not a close of the chart`);
+    const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [ts(bar.date), bar.close]) as number[];
+    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(px, py, a.note, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom })] });
+  }
   const svg = chart.renderToSVGString();
   chart.dispose();
-  return withMark(svg, W - 56 - 72, 40, 72);
+  return off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
 }
 
 /**
  * A driver's Exhibit as a Notes and X chart (`NOTE`): white columns or line for the lead series, the palette for the others, values
  * on the columns, the takeaway under the title. Every number is the one stored in gold.exhibits.
  */
-export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
+export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation | null = null): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const lead = e.series[0];
   const fmtV = (v: number) => formatUnit(v, lead.unit, lead.currency);
@@ -174,20 +257,25 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
   const bars = e.chart === "bar";
   const legend = e.series.length > 1;
   const note = sourceNote([...e.sources, "dualis"]) ?? "Source: Dualis Research.";
+  const off = a?.banner ? BANNER_H : 0;
+  const hit = a ? e.points.findIndex((p) => p.period === a.point) : -1;
+  if (a && hit === -1) throw new Error(`annotation point ${a.point} is not a period of exhibit ${e.id}`);
+  const accent = a ? toneColour(a.tone) : NOTE.main;
+  const grid = { left: 110, right: bars ? 56 : 170, top: (legend ? 200 : 190) + off, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40, textStyle: { color: "#fff", fontSize: 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - 96, overflow: "truncate" } },
-      { text: e.takeaway, left: 56, top: 88, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
+      { text: a ? a.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: a ? 36 : 32, fontWeight: 600, fontFamily: FONT, width: W - 112 - (off ? 0 : 96), overflow: "truncate" } },
+      { text: a ? `${input.companyName ?? input.symbol}: ${e.title}` : e.takeaway, left: 56, top: 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
       ? // Legend on top, left aligned (design tokens chart rule).
-        { show: true, left: 56, top: 140, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+        { show: true, left: 56, top: 140 + off, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
       : { show: false },
-    grid: { left: 110, right: bars ? 56 : 170, top: legend ? 200 : 190, bottom: 92 },
+    grid,
     xAxis: {
       type: "category",
       data: e.points.map((p) => periodLabel(p.period, period)),
@@ -204,7 +292,12 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
     },
     series: e.series.map((s, i) => {
       const colour = i === 0 ? NOTE.main : NOTE.palette[i % NOTE.palette.length];
-      const data = e.points.map((p) => p.values[s.key] ?? null);
+      const raw = e.points.map((p) => p.values[s.key] ?? null);
+      // With an annotation the lead series fades and its one point takes the tone's colour.
+      const data =
+        a && i === 0 && bars
+          ? raw.map((v, k) => ({ value: v, itemStyle: { color: k === hit ? accent : NOTE.bench }, label: k === hit ? { color: accent, fontSize: 22 } : {} }))
+          : raw;
       return bars
         ? {
             name: s.label,
@@ -228,9 +321,20 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit): string {
           };
     }),
   });
+  if (a) {
+    const v = e.points[hit].values[lead.key];
+    if (typeof v !== "number") throw new Error(`exhibit ${e.id} has no ${lead.label} value at ${a.point}`);
+    const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [hit, v]) as number[];
+    // A bar is hit in the middle of its body (its top carries the value label); a line point gets a ring.
+    const base = (chart.convertToPixel({ seriesIndex: 0 }, [hit, 0]) as number[])[1];
+    const band = (W - grid.left - grid.right) / e.points.length;
+    const half = Math.min(64, band * 0.8) / 2;
+    const [tx, ty] = bars ? [px - half - 6, (py + Math.min(base, H - grid.bottom)) / 2] : [px, py];
+    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(tx, ty, a.note, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars)] });
+  }
   const svg = chart.renderToSVGString();
   chart.dispose();
-  return withMark(svg, W - 56 - 72, 40, 72);
+  return off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
 }
 
 /** The 16:9 post card: the idea in words over the chart, deep indigo, the mark and the brand at the bottom. */
