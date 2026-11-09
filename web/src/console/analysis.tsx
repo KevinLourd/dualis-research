@@ -204,6 +204,7 @@ export const PRICED_WORD: Record<string, string> = { none: "Not in the price yet
 function StateTiming({ state }: { state: GoldNarrativeState }) {
   return (
     <span className="flex flex-col gap-0.5 text-sm text-kumo-subtle md:items-end">
+      {state.headline && state.effect !== "noise" && <span className="font-medium text-kumo-strong md:text-right">{state.headline}</span>}
       {state.since && state.effect !== "noise" && <span className="tabular">Since {day(state.since)}</span>}
       {state.pricedIn && state.effect !== "noise" && <span>{PRICED_WORD[state.pricedIn]}</span>}
       <time dateTime={state.asOf.toISOString()} title={utc(state.asOf)} className="tabular">
@@ -211,6 +212,12 @@ function StateTiming({ state }: { state: GoldNarrativeState }) {
       </time>
     </span>
   );
+}
+
+/** Drivers by the day their current state started, newest first (Kevin 2026-11-09); no date (noise, not judged) last, by rank. */
+function byLatestTurn<T extends { state: GoldNarrativeState | null }>(drivers: T[]): T[] {
+  const since = (d: T) => (d.state && d.state.effect !== "noise" ? d.state.since : null) ?? "";
+  return [...drivers].sort((a, b) => since(b).localeCompare(since(a)));
 }
 
 /**
@@ -226,7 +233,7 @@ function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: D
         <span className="w-44 text-right">Status</span>
       </div>
       <ol className="flex flex-col divide-y divide-kumo-hairline">
-        {drivers.map((d) => (
+        {byLatestTurn(drivers).map((d) => (
           <li key={d.id}>
             <Link href={itemHref(symbol, `driver:${d.id}`, thesis)} scroll={false} className="grid grid-cols-[1fr_auto] gap-6 px-4 py-3.5 transition-colors hover:bg-kumo-tint">
               <span className="flex flex-col gap-2">

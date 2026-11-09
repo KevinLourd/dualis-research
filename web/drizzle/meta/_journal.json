@@ -274,6 +274,13 @@
       "when": 1794223120886,
       "tag": "0038_live-test",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794225660099,
+      "tag": "0039_narrative-state-headline",
+      "breakpoints": true
     }
   ]
 }

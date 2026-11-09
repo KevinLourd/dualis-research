@@ -1,0 +1,1 @@
+ALTER TABLE "gold"."narrative_states" ADD COLUMN "headline" text;
