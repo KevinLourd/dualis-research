@@ -12,7 +12,9 @@ const RETRY_AFTER_MS = 60_000;
 
 export function signed(text: string | null): string {
   const body = text?.trim();
-  return body ? `${SIGNATURE}\n${body}` : SIGNATURE;
+  if (!body) return SIGNATURE;
+  // A message whose own title already names the brand (« *Dualis Research - Nov 9* ») is not signed twice.
+  return body.startsWith(SIGNATURE.slice(0, -1)) ? body : `${SIGNATURE}\n${body}`;
 }
 
 export type OutgoingMessage = {

@@ -3,6 +3,7 @@ import { goldGrowthAudience, goldGrowthOutreach } from "@/db/schema/growth";
 import { whatsappLink, whatsappOutbox } from "@/db/schema/whatsapp";
 import type { Db } from "@/db/types";
 import { briefText, growthBrief } from "@/growth/daily";
+import { signed } from "@/whatsapp/outbox";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { growthBriefDim, planBrief } from ".";
@@ -41,24 +42,26 @@ async function seed() {
 }
 
 describe("growth brief figures", () => {
-  it("says a lead over the pace, nothing when behind", () => {
-    expect(briefText(growthBrief([{ date: "2026-11-04", subscribers: 153 }, { date: "2026-11-05", subscribers: 300 }], [], "2026-11-05"))).toContain("ahead of pace");
-  });
-
-  it("matches the Growth page: count, gain, pace, line, yesterday's contacts", () => {
+  it("Kevin's layout: brand + day, the win per day so far, the pace from now on", () => {
     const b = growthBrief(audience, [], "2026-11-07");
     expect(b).toMatchObject({ current: 160, gained: 7, remaining: 993, daysLeft: 24, perDayNeeded: 42, countedOn: "2026-11-06" });
-    expect(b.vsPlan).toBe(160 - 268);
-    const text = briefText(b);
-    expect(text).toContain("*Analysis Paralysis, Nov 7*");
-    expect(text).toContain("160 subscribers (counted Nov 6), +7 since Nov 4");
-    expect(text).toContain("Goal 1,153 by Nov 30: 993 to go in 24 days");
-    expect(text).toContain("42 new subscribers a day needed");
-    expect(text).not.toMatch(/planned|ahead/i);
-    expect(text).not.toMatch(/\b(test|line|vsPlan|gold)\b/i);
-    expect(text).not.toMatch(/[—–]/);
-    // No outreach yesterday: the line is left out, never « 0 writers contacted ».
-    expect(text).not.toContain("Yesterday");
+    // +7 over the 2 days from Nov 4 to the Nov 6 count = 3.5, rounded to 4.
+    expect(briefText(b)).toBe(
+      [
+        "*Dualis Research - Nov 7*",
+        "",
+        "🎉Celebration: 160 subscribers, +4/day since Nov 4",
+        "",
+        "💪Goal 1,153 by Nov 30: +42/day from now on",
+        "",
+        "Details: https://dualis-console.dualis-research.workers.dev/growth",
+      ].join("\n"),
+    );
+  });
+
+  it("the title is not signed twice", () => {
+    expect(signed("*Dualis Research - Nov 7*\n\nx")).toBe("*Dualis Research - Nov 7*\n\nx");
+    expect(signed("hello")).toBe("*Dualis Research*\nhello");
   });
 });
 
@@ -76,7 +79,7 @@ describe("growth-brief dimension", () => {
     for (const m of rows) {
       expect(m.requestedBy).toBe("growth-brief");
       expect(m.scheduledAt.toISOString()).toBe("2026-11-07T03:00:00.000Z");
-      expect(m.text).toContain("Yesterday: 2 writers contacted, 1 new recommendation");
+      expect(m.text).toContain("🎉Celebration: 160 subscribers");
       expect(m.imageMime).toBe("image/png");
       expect(Buffer.from(m.image!).subarray(1, 4).toString()).toBe("PNG");
     }
