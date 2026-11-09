@@ -139,36 +139,73 @@ export type Annotation = {
   /** The point the arrow hits: an Exhibit period, or a price date. */
   point: string;
   note: string;
+  /** What the price's narrative said, and the driver this point breaks (null when the Idea cites no driver). */
+  priceSays: string;
+  driver: string | null;
   title: string;
   tone: "long" | "short" | "neutral";
-  banner: { headline: string; publisher: string; logo: string | null } | null;
+  /** The breaking-news inset: `ago` is when the news came out, said as « 2h ago ». */
+  banner: { headline: string; publisher: string; logo: string | null; ago: string } | null;
 };
 
 const BANNER_H = 112;
 const toneColour = (t: Annotation["tone"]) => (t === "long" ? COLOR.long.dark : t === "short" ? COLOR.short.dark : COLOR.accent.dark);
 
-/** The tone of a chart: below fair value an inflection (green), above a crack (red). */
-export function toneOf(input: VisualInput): Annotation["tone"] {
+/**
+ * The tone comes from the thesis (CLAUDE.md « Two theses »): a long driver's turn is an inflection (green), a short
+ * one's a crack (red). The price chart takes its drivers' side when they agree, else where the price sits.
+ */
+export function toneOf(input: VisualInput, exhibit: VisualExhibit | null = null): Annotation["tone"] {
+  if (exhibit) return exhibit.side;
+  const sides = [...new Set(input.drivers.map((d) => d.side))];
+  if (sides.length === 1) return sides[0];
   const last = input.bars.at(-1);
   if (!input.fair || !last) return "neutral";
   return last.close < input.fair.value ? "long" : "short";
 }
 
-/** The news strip on top: the publisher's logo and name, then the headline. */
+/** « 2h ago », « 3d ago »: how long before the chart was drawn the news came out. */
+export function timeAgo(at: Date, now: Date): string {
+  const min = Math.max(0, Math.round((now.getTime() - at.getTime()) / 60_000));
+  if (min < 60) return min <= 1 ? "just now" : `${min}m ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+/**
+ * The breaking-news inset (Kevin 2026-11-09: « un encart rectangulaire en mode breaking news, with a time ago »): a
+ * white card on the indigo, a red BREAKING stamp, the publisher's logo, name and time, the headline in black.
+ */
 function bannerGraphics(b: NonNullable<Annotation["banner"]>) {
-  const textLeft = b.logo ? 56 + 40 + 14 : 56;
+  const x = 40;
+  const y = 18;
+  const w = W - 40 - 130;
+  const h = BANNER_H - 30;
+  const stampW = 168;
+  const info = x + stampW + 18 + (b.logo ? 34 : 0);
   return [
-    { type: "rect", shape: { x: 0, y: 0, width: W, height: BANNER_H }, style: { fill: "#0E0B26" }, z: 10 },
-    ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: 56, y: 18, width: 40, height: 40 }, z: 11 }] : []),
-    { type: "text", style: { text: b.publisher.toUpperCase(), x: textLeft, y: 38, fill: NOTE.muted, fontSize: 20, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
-    { type: "text", style: { text: b.headline, x: 56, y: 86, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: W - 112 - 80, overflow: "truncate" }, z: 11 },
+    { type: "rect", shape: { x: x + 5, y: y + 6, width: w, height: h }, style: { fill: "rgba(0,0,0,0.45)" }, z: 10 },
+    { type: "rect", shape: { x, y, width: w, height: h }, style: { fill: "#fff" }, z: 11 },
+    { type: "rect", shape: { x, y, width: stampW, height: h }, style: { fill: COLOR.breaking.dark }, z: 12 },
+    { type: "text", style: { text: "BREAKING", x: x + stampW / 2, y: y + h / 2, fill: "#fff", fontSize: 26, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 13 },
+    ...(b.logo ? [{ type: "image", style: { image: `data:image/png;base64,${b.logo}`, x: x + stampW + 18, y: y + 10, width: 24, height: 24 }, z: 13 }] : []),
+    { type: "text", style: { text: `${b.publisher.toUpperCase()}  ·  ${b.ago}`, x: info, y: y + 22, fill: "#555", fontSize: 17, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 13 },
+    { type: "text", style: { text: b.headline, x: x + stampW + 18, y: y + 56, fill: "#111", fontSize: 24, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle", width: w - stampW - 36, overflow: "truncate" }, z: 13 },
   ];
 }
 
 /** Arrow + note box pointing at (px, py), placed where it fits inside the plot. */
-function calloutGraphics(px: number, py: number, note: string, colour: string, plot: { left: number; top: number; right: number; bottom: number }, ring = true) {
-  const boxW = Math.round(note.length * 13.5 + 40);
-  const boxH = 50;
+type Rect = { x: number; y: number; w: number; h: number };
+function calloutGraphics(px: number, py: number, a: Annotation, colour: string, plot: { left: number; top: number; right: number; bottom: number }, ring = true, obstacles: Rect[] = []) {
+  // Three lines: the fact, what the price said, the driver it breaks (Kevin 2026-11-09).
+  const lines = [
+    { text: a.note, size: 24 },
+    { text: `VS price narrative: "${a.priceSays}"`, size: 18 },
+    ...(a.driver ? [{ text: `Driver broken: ${a.driver}`, size: 18 }] : []),
+  ];
+  const boxW = Math.min(560, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
+  const boxH = 22 + lines.reduce((t, l) => t + l.size + 10, 0);
   const gap = 70;
   // A bar is hit from the side: the note sits high in the free space over the shorter bars.
   const candidates = [
@@ -179,7 +216,10 @@ function calloutGraphics(px: number, py: number, note: string, colour: string, p
     { x: px + gap, y: py - boxH / 2 },
     { x: px - boxW / 2, y: py + gap },
   ];
-  const fits = (c: { x: number; y: number }) => c.x >= plot.left && c.x + boxW <= plot.right && c.y >= plot.top && c.y + boxH <= plot.bottom;
+  // Over the shorter bars: slide the box left and down until it hides no other bar or its value.
+  if (!ring) for (let dy = 0; dy <= 200; dy += 20) for (let dx = 0; dx <= 600; dx += 40) candidates.push({ x: px - boxW - gap - dx, y: plot.top + 10 + dy });
+  const clear = (c: { x: number; y: number }) => obstacles.every((o) => c.x + boxW < o.x || o.x + o.w < c.x || c.y + boxH < o.y || o.y + o.h < c.y);
+  const fits = (c: { x: number; y: number }) => c.x >= plot.left && c.x + boxW <= plot.right && c.y >= plot.top && c.y + boxH <= plot.bottom && clear(c);
   const box = candidates.find(fits) ?? candidates[0];
   // The arrow leaves the box edge nearest the point and stops short of it.
   const sx = Math.min(Math.max(px, box.x), box.x + boxW);
@@ -200,7 +240,22 @@ function calloutGraphics(px: number, py: number, note: string, colour: string, p
     { type: "line", shape: { x1: sx, y1: sy, x2: ex - ux * head * 0.6, y2: ey - uy * head * 0.6 }, style: { stroke: colour, lineWidth: 4 }, z: 20 },
     { type: "polygon", shape: { points: tri }, style: { fill: colour }, z: 20 },
     { type: "rect", shape: { x: box.x, y: box.y, width: boxW, height: boxH, r: 8 }, style: { fill: colour }, z: 20 },
-    { type: "text", style: { text: note, x: box.x + boxW / 2, y: box.y + boxH / 2, fill: INDIGO, fontSize: 24, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 21 },
+    ...lines.map((l, i) => ({
+      type: "text",
+      style: {
+        text: l.text,
+        x: box.x + 20,
+        y: box.y + 16 + lines.slice(0, i).reduce((t, p) => t + p.size + 10, 0),
+        fill: INDIGO,
+        fontSize: l.size,
+        fontWeight: i === 1 ? 400 : 600,
+        fontFamily: FONT,
+        verticalAlign: "top",
+        width: boxW - 40,
+        overflow: "truncate",
+      },
+      z: 21,
+    })),
   ];
 }
 
@@ -237,7 +292,7 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     const bar = input.bars.find((b) => b.date === a.point);
     if (!bar) throw new Error(`annotation point ${a.point} is not a close of the chart`);
     const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [ts(bar.date), bar.close]) as number[];
-    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(px, py, a.note, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom })] });
+    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom })] });
   }
   const svg = chart.renderToSVGString();
   chart.dispose();
@@ -286,6 +341,8 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     yAxis: {
       type: "value",
       scale: !bars,
+      // Room above the bars for the note (Kevin 2026-11-09): the tallest bar stops at about 60% of the plot.
+      ...(a && bars ? { max: (v: { max: number }) => v.max * 1.7 } : {}),
       splitNumber: 4,
       axisLabel: { ...label, formatter: (v: number) => fmtV(v) },
       splitLine: { lineStyle: { color: NOTE.grid } },
@@ -330,7 +387,16 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     const band = (W - grid.left - grid.right) / e.points.length;
     const half = Math.min(64, band * 0.8) / 2;
     const [tx, ty] = bars ? [px - half - 6, (py + Math.min(base, H - grid.bottom)) / 2] : [px, py];
-    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(tx, ty, a.note, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars)] });
+    // Every other bar with its value label on top is an obstacle for the note.
+    const obstacles: Rect[] = bars
+      ? e.points.flatMap((p, k) => {
+          const val = p.values[lead.key];
+          if (k === hit || typeof val !== "number") return [];
+          const [cx, top] = chart.convertToPixel({ seriesIndex: 0 }, [k, val]) as number[];
+          return [{ x: cx - half - 30, y: Math.min(top, base) - 34, w: 2 * half + 60, h: Math.abs(base - top) + 34 }];
+        })
+      : [];
+    chart.setOption({ graphic: [...(a.banner ? bannerGraphics(a.banner) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
   }
   const svg = chart.renderToSVGString();
   chart.dispose();

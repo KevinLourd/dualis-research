@@ -47,6 +47,10 @@ export const COLOR = {
     "light": "#F7E4E4",
     "dark": "#2E1618"
   },
+  "breaking": {
+    "light": "#D7191F",
+    "dark": "#D7191F"
+  },
   "accent": {
     "light": "#2B2463",
     "dark": "#B9B2EA"
