@@ -24,4 +24,4 @@ What a sell-side exhibit looks like: calm, exact, readable in two seconds on a p
 - The chart takes the space the two cards held: full width under the title.
 - Words: the same one Claude call as the BREAKING chart writes the title, label and note as one story; the text of the post carries the alarm, the image the proof.
 
-Every change to this look bumps `VISUALS_VERSION` and is rendered and LOOKED at before merge (`.context/` probe, real data).
+Code: visual kind `x-chart` (`content-visuals`, `style: "pro"` in `render.ts`), sent with the daily X post (`content/post-image.ts`); X text rules in `content-drafts/format.ts` (`drafts-v8`). Every change to this look bumps `VISUALS_VERSION` and is rendered and LOOKED at before merge (`.context/` probe, real data).
