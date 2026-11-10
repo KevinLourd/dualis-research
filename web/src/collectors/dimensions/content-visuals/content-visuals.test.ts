@@ -80,7 +80,7 @@ describe("content-visuals dimension", () => {
     await addIdea([EVIDENCE], false); // no draft yet: nothing to draw
     const subjects = await pickVisualSubjects(db);
     expect(subjects.sort()).toEqual(
-      [`idea:${ideaId}#montage`, `idea:${ideaId}#video`, `idea:${ideaId}#chart`, `idea:${ideaId}#capture`, `idea:${noNews}#montage`, `idea:${noNews}#video`, `idea:${noNews}#chart`].sort(),
+      [`idea:${ideaId}#montage`, `idea:${ideaId}#video`, `idea:${ideaId}#chart`, `idea:${ideaId}#x-chart`, `idea:${ideaId}#capture`, `idea:${noNews}#montage`, `idea:${noNews}#video`, `idea:${noNews}#chart`, `idea:${noNews}#x-chart`].sort(),
     );
   });
 
@@ -91,12 +91,13 @@ describe("content-visuals dimension", () => {
     expect(byKind.montage).toMatchObject({ status: "ok", mime: "image/png", width: 1280, height: 720, version: VISUALS_VERSION, caption: "Prices: Yahoo Finance" });
     expect(byKind.montage.file!.subarray(1, 4).toString()).toBe("PNG");
     expect(byKind.chart.status).toBe("ok");
+    expect(byKind["x-chart"].status).toBe("ok");
     // No ffmpeg here: the video says why, nothing pretends.
     expect(byKind.video).toMatchObject({ status: "failed", file: null });
     expect(byKind.video.error).toMatch(/ENOENT|ffmpeg/);
 
     const g = await db.select().from(content.goldContentVisuals).where(eq(content.goldContentVisuals.ideaId, ideaId));
-    expect(g.map((v) => v.kind).sort()).toEqual(["chart", "montage", "video"]);
+    expect(g.map((v) => v.kind).sort()).toEqual(["chart", "montage", "video", "x-chart"]);
     expect(g.find((v) => v.kind === "montage")!.sizeBytes).toBe(byKind.montage.file!.length);
 
     // Done ones are not drawn again; the fresh failure waits a day.
@@ -247,6 +248,14 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(ticks.map((t) => new Date(t).toISOString().slice(0, 7))).toEqual(["2026-01", "2026-03", "2026-05", "2026-07", "2026-09", "2026-11"]);
     expect(monthTicks(Date.UTC(2026, 8, 7), Date.UTC(2026, 10, 6))).toHaveLength(2);
     expect(priceNews).not.toContain("32% under fair value");
+    // The X post chart (skill x-post): the same point, arrow and note, no news card, no pasted price card, a factual title.
+    const xPrice = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "long", banner, style: "pro" });
+    for (const t of ["Sold off", "VS price narrative", "CareCloud: Hospitals that pay us"]) expect(xPrice).toContain(t);
+    for (const t of ["BREAKING", "REUTERS", "32% under fair value", '<image href="data:image/png;base64,']) expect(xPrice).not.toContain(t);
+    const xExhibit = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner, style: "pro" });
+    expect(xExhibit).toContain("Clients back to 45");
+    expect(xExhibit).toContain("below fair value");
+    for (const t of ["BREAKING", "Clients just hit a record", '<image href="data:image/png;base64,']) expect(xExhibit).not.toContain(t);
     if (process.env.RENDER_SAMPLE) (await import("node:fs")).writeFileSync(process.env.RENDER_SAMPLE, priceNews);
     expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", ...say, title: "y", tone: "long", banner: null })).toThrow(/not a period/);
   });

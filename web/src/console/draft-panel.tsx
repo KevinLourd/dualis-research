@@ -151,7 +151,7 @@ function StatusForm({ id, status, label, variant }: { id: string; status: string
   );
 }
 
-const VISUAL_WORD: Record<string, string> = { montage: "Post card", video: "Video", chart: "Chart", capture: "News capture" };
+const VISUAL_WORD: Record<string, string> = { montage: "Post card", video: "Video", chart: "Note chart", "x-chart": "X chart", capture: "News capture" };
 
 /** The Idea's visuals, ready to attach to the post: a click enlarges one, with its Download. A failed one says why. */
 function Visuals({ visuals, name }: { visuals: GoldContentVisual[]; name: string }) {
