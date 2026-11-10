@@ -293,6 +293,11 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
     body: (
       <>
         {r && <RangeCards low={r.low} base={r.base} high={r.high} currency={r.currency} baseLabel={f.author === "thierry" ? "Weighted methods" : "Fair value"} />}
+        {f.conversion && (
+          <p className="text-base text-kumo-default">
+            Valued in {f.conversion.from} from the company&apos;s statements: {price(f.conversion.value)} {f.conversion.from}, shown in {f.conversion.to} at {f.conversion.rate.toFixed(4)} {f.conversion.to} per {f.conversion.from} ({f.conversion.date}).
+          </p>
+        )}
         {f.author === "thierry" && <p className="text-base text-kumo-default">Your number wins{f.method ? ` (${f.method})` : ""}. The methods below are Claude&apos;s, for reference.</p>}
         {r && <p className="text-lg leading-relaxed text-kumo-strong">{r.summary}</p>}
         <ValuationField v={v} />
@@ -308,7 +313,7 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
             </article>
           </Section>
         )}
-        <SourceNote sources={f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]} />
+        <SourceNote sources={[...(f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]), ...(f.conversion ? f.conversion.source.split(", ") : [])]} />
       </>
     ),
   };

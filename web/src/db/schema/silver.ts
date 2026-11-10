@@ -187,3 +187,21 @@ export const filings = silver.table(
   (t) => [uniqueIndex("filings_natural_key").on(t.registry, t.filingKey), index("filings_symbol_filed").on(t.symbol, t.filedAt)],
 );
 
+
+/**
+ * Daily exchange rates (dimension `fx`): `rate` = units of `quote` per 1 `base` at that day's close (CAD/USD 0.72 =
+ * 1 CAD buys 0.72 USD). Built only from bronze; every source that gave the day is in `sources`.
+ */
+export const fxRates = silver.table(
+  "fx_rates",
+  {
+    base: text("base").notNull(),
+    quote: text("quote").notNull(),
+    date: text("date").notNull(),
+    rate: doublePrecision("rate").notNull(),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.base, t.quote, t.date] })],
+);

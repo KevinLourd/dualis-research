@@ -19,6 +19,7 @@ import {
 import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { fnv } from "../analysis/facts";
+import { fxReader, quoteCurrencies } from "../fx";
 import { analysedSymbols } from "../watchlist";
 import { bookValueJudgment } from "./book-value";
 import { targetsIn, valuationFacts } from "./facts";
@@ -286,6 +287,8 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
   }));
   const rRows: (typeof valuationReports.$inferInsert)[] = [];
   const fRows: (typeof fairValues.$inferInsert)[] = [];
+  const quoteCur = await quoteCurrencies(db, symbols);
+  const fx = fxReader(db);
   for (const symbol of symbols) {
     const s = synth.get(`${symbol}|synthesis`);
     const t = thesisRows.get(symbol);
@@ -293,20 +296,33 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
     const mix = s ? s.result.weights.filter((w) => w.weight > 0).sort((a, b) => b.weight - a.weight).map((w) => `${name(w.method)} ${Math.round(w.weight * 100)}%`).join(", ") : null;
     if (s) rRows.push({ symbol, currency: s.result.currency, low: s.result.low, base: s.result.base, high: s.result.high, weights: s.result.weights, label: s.result.label, summary: s.result.summary, markdown: s.result.report, version: s.id, asOf: s.createdAt });
     if (!s && thierry === null) continue;
+    const currency = thierry !== null ? (t?.currency ?? s?.result.currency ?? null) : s!.result.currency;
+    const value = thierry ?? s!.result.base;
+    const low = thierry !== null ? null : s!.result.low;
+    const high = thierry !== null ? null : s!.result.high;
+    // A dual-listed company (CAD statements, USD listing): the Fair Value is shown and compared in the quote currency,
+    // at the latest stored rate; the figure in its own currency stays in `conversion`. No rate stored = left as is,
+    // and the analysis writes a failed fetch naming the missing pair (never a silent skip).
+    const to = quoteCur.get(symbol);
+    const conv = (from: string | null) => (from && to && from !== to ? fx(from, to) : Promise.resolve(null));
+    const [r, rc] = await Promise.all([conv(currency), conv(s?.result.currency ?? null)]);
+    const k = r?.rate ?? 1;
+    const kc = rc?.rate ?? 1;
     fRows.push({
       symbol,
-      value: thierry ?? s!.result.base,
-      currency: thierry !== null ? (t?.currency ?? s?.result.currency ?? null) : s!.result.currency,
-      low: thierry !== null ? null : s!.result.low,
-      high: thierry !== null ? null : s!.result.high,
+      value: value * k,
+      currency: r ? to! : currency,
+      low: low === null ? null : low * k,
+      high: high === null ? null : high * k,
       method: thierry !== null ? (t?.fairValueBasis ?? null) : mix,
       label: thierry !== null ? (t?.fairValueBasis ?? null) : s!.result.label,
       author: thierry !== null ? "thierry" : "claude",
-      claudeValue: s?.result.base ?? null,
+      claudeValue: s ? s.result.base * kc : null,
       claudeMethod: mix,
-      inputs: s ? s.result.weights.filter((w) => w.weight > 0).map((w) => ({ label: `${name(w.method)} (${Math.round(w.weight * 100)}%)`, value: methods.get(`${symbol}|${w.method}`)?.result.base ?? 0, period: "base case" })) : [],
+      inputs: s ? s.result.weights.filter((w) => w.weight > 0).map((w) => ({ label: `${name(w.method)} (${Math.round(w.weight * 100)}%)`, value: (methods.get(`${symbol}|${w.method}`)?.result.base ?? 0) * kc, period: "base case" })) : [],
       version: s?.id ?? null,
       asOf: s?.createdAt ?? null,
+      conversion: r && currency ? { from: currency, to: to!, rate: r.rate, date: r.date, source: r.source, value, low, high } : null,
     });
   }
   await db.transaction(async (tx) => {

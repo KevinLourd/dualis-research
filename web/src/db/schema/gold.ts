@@ -141,3 +141,18 @@ export const earnings = gold.table(
   },
   (t) => [primaryKey({ columns: [t.symbol, t.period] })],
 );
+
+/** Daily exchange rates as the collectors read them (from silver.fx_rates): a fair value in CAD shown against a USD quote. */
+export const fxRates = gold.table(
+  "fx_rates",
+  {
+    base: text("base").notNull(),
+    quote: text("quote").notNull(),
+    date: text("date").notNull(),
+    rate: doublePrecision("rate").notNull(),
+    sources: text("sources").array().notNull(),
+    rebuiltAt,
+  },
+  (t) => [primaryKey({ columns: [t.base, t.quote, t.date] })],
+);
+export type GoldFxRate = typeof fxRates.$inferSelect;

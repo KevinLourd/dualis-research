@@ -18,6 +18,7 @@ import { financials } from "./dimensions/financials";
 import { analysis } from "./dimensions/analysis";
 import { peersDim } from "./dimensions/peers";
 import { valuationDim } from "./dimensions/valuation";
+import { fxDim } from "./dimensions/fx";
 import { evidenceDim } from "./dimensions/evidence";
 import { marketReactionDim } from "./dimensions/market-reaction";
 import { narrativeStateDim } from "./dimensions/narrative-state";
@@ -43,6 +44,7 @@ import type { Dimension } from "./types";
  * Consensus after earnings: analyst expectations vs actuals, read by the signal that says "above / below what the market expects".
  * Financials after price and filings: EV reads the quote, EDINET the fiscal year end, the PDF extraction the annual report link.
  * Portfolio right after watchlist: Thierry's positions (his posts + console edits); price also fetches the S&P 500 (`^GSPC`) the Portfolio page compares against.
+ * FX (daily exchange rates, Yahoo) after peers, before valuation: a fair value computed in the reporting currency is shown in the quote currency.
  * Peers (comparables + analyst targets) after consensus; Valuation (the fair value pyramid) after peers; Analysis after valuation (it reads the Fair Value; one thesis below or above the fair value range, both inside it); Market Reaction beside it (the fair value history and what the price did around each news, code only); Narrative Since after analysis (the month the current story took hold); Evidence after it (every item since that month against each driver, older ones Too old); Narrative State after it (each driver's tag, then the ticker's); Signals last (fair value x the ticker's tag).
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
@@ -51,7 +53,7 @@ import type { Dimension } from "./types";
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -72,6 +74,7 @@ export const STAGES: readonly (readonly string[])[] = [
   ["thesis", "onedrive-filings", "consensus"],
   ["financials"],
   ["peers"],
+  ["fx"],
   ["valuation"],
   ["analysis", "market-reaction"],
   ["narrative-since"],

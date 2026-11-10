@@ -27,19 +27,39 @@ export function parseThesisId(id: string): { symbol: string; side: ThesisSide } 
 }
 export const driverIdOf = (symbol: string, side: ThesisSide, rank: number) => `${symbol}:${side}:${rank}`;
 
-/** The fair value (base, low, high) and the quote in the same unit, or null when either is missing or currencies differ. */
-export async function priceAndFairValue(db: Db, symbol: string): Promise<{ price: number; date: string; stamp: string; currency: string | null; fv: { value: number; low: number | null; high: number | null; currency: string | null } } | null> {
+type PriceAndFairValue = { price: number; date: string; stamp: string; currency: string | null; fv: { value: number; low: number | null; high: number | null; currency: string | null } };
+
+/**
+ * The fair value (base, low, high) and the quote in the same unit, or the reason they cannot be compared. A fair value
+ * computed in another currency (CAD statements of a USD listing) is converted by `valuation` into the quote currency
+ * (dimension `fx`); a pair with no stored rate is a reason, said by name.
+ */
+export async function comparablePrice(db: Db, symbol: string): Promise<{ ok: PriceAndFairValue } | { reason: string }> {
   const [[fv], [q]] = await Promise.all([db.select().from(fairValues).where(eq(fairValues.symbol, symbol)), db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol))]);
-  if (!fv || !q || !(fv.value > 0)) return null;
+  if (!fv) return { reason: "no fair value yet (the valuation produced none for this ticker)" };
+  if (!(fv.value > 0)) return { reason: `fair value ${fv.value} ${fv.currency ?? ""} is not positive`.trim() };
+  if (!q) return { reason: "no quote collected for this ticker" };
   const m = majorUnit(q.close, q.currency);
-  if (fv.currency && m.currency && fv.currency !== m.currency) return null;
-  return { price: m.price, date: q.date, stamp: quoteStamp(q), currency: m.currency ?? fv.currency, fv: { value: fv.value, low: fv.low, high: fv.high, currency: fv.currency } };
+  if (fv.currency && m.currency && fv.currency !== m.currency) return { reason: `fair value in ${fv.currency}, quote in ${m.currency}: no ${fv.currency}/${m.currency} exchange rate stored (dimension fx)` };
+  return { ok: { price: m.price, date: q.date, stamp: quoteStamp(q), currency: m.currency ?? fv.currency, fv: { value: fv.value, low: fv.low, high: fv.high, currency: fv.currency } } };
+}
+
+/** The fair value (base, low, high) and the quote in the same unit, or null when they cannot be compared (`comparablePrice` says why). */
+export async function priceAndFairValue(db: Db, symbol: string): Promise<PriceAndFairValue | null> {
+  const p = await comparablePrice(db, symbol);
+  return "ok" in p ? p.ok : null;
+}
+
+/** The ticker's current theses, or why it has none (written as a failed fetch by `analysis`, never skipped silently). */
+export async function sidesOrReason(db: Db, symbol: string): Promise<{ sides: ThesisSide[] } | { reason: string }> {
+  const p = await comparablePrice(db, symbol);
+  return "ok" in p ? { sides: sidesFor(p.ok.price, p.ok.fv) } : p;
 }
 
 /** The ticker's current theses (none without a fair value and a comparable quote). */
 export async function currentSides(db: Db, symbol: string): Promise<ThesisSide[]> {
-  const p = await priceAndFairValue(db, symbol);
-  return p ? sidesFor(p.price, p.fv) : [];
+  const p = await sidesOrReason(db, symbol);
+  return "sides" in p ? p.sides : [];
 }
 
 /** How each thesis reads in the prompts and on screen: its story and what its turn is. */

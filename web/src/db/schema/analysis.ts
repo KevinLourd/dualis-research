@@ -102,6 +102,12 @@ export type AnalysisAnswer = {
 const rebuiltAt = timestamp("rebuilt_at", { withTimezone: true }).notNull().defaultNow();
 
 /** Fair Value per ticker: Thierry's number when he typed one, else Claude's, with its one-line method. */
+/**
+ * A figure computed in the reporting currency and shown in the quote currency (a dual-listed company: CAD statements,
+ * USD listing). The figure in its own currency, the rate (quote currency per 1 reporting currency), its date and source.
+ */
+export type FxConversion = { from: string; to: string; rate: number; date: string; source: string; value: number; low: number | null; high: number | null };
+
 export const fairValues = gold.table("fair_values", {
   symbol: text("symbol").primaryKey(),
   value: doublePrecision("value").notNull(),
@@ -123,6 +129,8 @@ export const fairValues = gold.table("fair_values", {
   /** = silver.analyses.id of Claude's version. */
   version: uuid("version"),
   asOf: timestamp("as_of", { withTimezone: true }),
+  /** Set when the valuation's currency differs from the quote's: value / low / high above are converted (EV-FX-1110). */
+  conversion: jsonb("conversion").$type<FxConversion>(),
   rebuiltAt,
 });
 export type GoldFairValue = typeof fairValues.$inferSelect;
@@ -477,6 +485,8 @@ export const fairValueHistory = gold.table(
     low: doublePrecision("low"),
     high: doublePrecision("high"),
     currency: text("currency"),
+    /** Set when the synthesis' currency differs from the quote's: the figures above are converted at that day's rate. */
+    conversion: jsonb("conversion").$type<FxConversion>(),
     rebuiltAt,
   },
   (t) => [index("gold_fair_value_history_symbol").on(t.symbol, t.day)],

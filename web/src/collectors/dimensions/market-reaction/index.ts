@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { fairValueHistory, fairValues, marketReactions, type GoldFairValueHistory, type GoldMarketReaction } from "@/db/schema/analysis";
+import { fairValueHistory, fairValues, marketReactions, type FxConversion, type GoldFairValueHistory, type GoldMarketReaction } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import { valuationSyntheses } from "@/db/schema/valuation";
 import type { Db } from "@/db/types";
@@ -8,6 +8,7 @@ import { BENCHMARK } from "../../benchmark";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
 import { itemsOf, EVIDENCE_WINDOW_DAYS } from "../evidence/items";
 import { majorUnit } from "../financials/derive";
+import { fxReader } from "../fx";
 import { analysedSymbols } from "../watchlist";
 import { reactionOf, type Bar, type FvPoint, type Minute } from "./compute";
 import { latestPrice, priceKnownAt } from "@/console/live-test";
@@ -56,6 +57,23 @@ export async function fairValuePoints(db: Db, symbol: string): Promise<(FvPoint 
   return [...byDay.values()];
 }
 
+/**
+ * Each day's fair value in the quote currency (a CAD valuation of a USD listing), at that day's stored rate: the
+ * judges compare it with the price, so both must be in one unit. A pair with no stored rate keeps its own currency.
+ */
+export async function inQuoteCurrency(db: Db, points: (FvPoint & { currency: string | null })[], to: string | null): Promise<(FvPoint & { currency: string | null; conversion: FxConversion | null })[]> {
+  const fx = fxReader(db);
+  return Promise.all(
+    points.map(async (p) => {
+      if (!to || !p.currency || p.currency === to) return { ...p, conversion: null };
+      const r = await fx(p.currency, to, p.day);
+      if (!r) return { ...p, conversion: null };
+      const k = r.rate;
+      return { ...p, value: p.value * k, low: p.low === null ? null : p.low * k, high: p.high === null ? null : p.high * k, currency: to, conversion: { from: p.currency, to, rate: k, date: r.date, source: r.source, value: p.value, low: p.low, high: p.high } };
+    }),
+  );
+}
+
 export const marketReactionSource: Source = {
   name: "rules",
   requiredEnv: [],
@@ -67,7 +85,8 @@ export const marketReactionSource: Source = {
     const currency = q?.currency ?? null;
     let bench = runBench.get(ctx.fetch);
     if (!bench) runBench.set(ctx.fetch, (bench = closes(db, BENCHMARK, null)));
-    const [bars, benchBars, points, items] = await Promise.all([closes(db, symbol, currency), bench, fairValuePoints(db, symbol), itemsOf(db, symbol)]);
+    const [bars, benchBars, rawPoints, items] = await Promise.all([closes(db, symbol, currency), bench, fairValuePoints(db, symbol), itemsOf(db, symbol)]);
+    const points = await inQuoteCurrency(db, rawPoints, currency ? majorUnit(1, currency).currency : null);
     const now: FvPoint | null = fv ? { day: (fv.asOf ?? new Date()).toISOString().slice(0, 10), value: fv.value, low: fv.low, high: fv.high } : null;
     const major = currency ? majorUnit(1, currency).currency : null;
     // The minute view: the 5-minute bar already closed when each item came out (one query), and the latest bar.
@@ -85,7 +104,7 @@ export const marketReactionSource: Source = {
         ? { eventAt: at, atEvent: priceKnownAt(bars, own, at, market), now: latestPrice(bars, own, market), benchAtEvent: priceKnownAt(benchBars, spx, at, "US"), benchNow: latestPrice(benchBars, spx, "US") }
         : null;
     const reactions = items.map((it) => reactionOf({ id: `${symbol}|${it.kind}:${it.id}`, symbol, day: it.at.toISOString().slice(0, 10) }, bars, benchBars, points, now, fv?.currency ?? major, minuteOf(it.at)));
-    const history = points.map((p) => ({ id: `${symbol}|${p.day}`, symbol, day: p.day, value: p.value, low: p.low, high: p.high, currency: p.currency }));
+    const history = points.map((p) => ({ id: `${symbol}|${p.day}`, symbol, day: p.day, value: p.value, low: p.low, high: p.high, currency: p.currency, conversion: p.conversion }));
     const payload: Payload = { history, reactions };
     return { request: { symbol, items: items.length, bars: bars.length }, httpStatus: null, payload };
   },
