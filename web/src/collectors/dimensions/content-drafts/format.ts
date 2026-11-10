@@ -18,7 +18,7 @@ export const ARTICLE_DISCLAIMER =
 
 export const X_LIMIT = 280;
 
-export const PROMPT_VERSION = "drafts-v7";
+export const PROMPT_VERSION = "drafts-v8";
 
 const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
@@ -36,7 +36,7 @@ const GAME = [
 const FORMAT_RULES: Record<DraftFormat, string> = {
   "x-post": [
     "Format: one X post, much smaller than a Note: one or two short sentences, at most 160 characters, the ticker as a $cashtag once after the opening.",
-    "Lead with the alarm and its number. The chart of the Idea is attached, so the words carry only the hook. Answer with the post text only.",
+    "Lead with the alarm and its number. The chart attached is a sober exhibit with no news card and no signal on it, so the words carry the breaking news: name its source when it is a big publisher (\"per Reuters\"), and the live signal when there is one (\"Shares 28% under fair value\"). Answer with the post text only.",
   ].join("\n"),
   "linkedin-post": "Format: one LinkedIn post, 600 to 1200 characters, short paragraphs, ends with one question to the reader. Answer with the post text only.",
   "substack-note": [

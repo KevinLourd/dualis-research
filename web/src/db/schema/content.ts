@@ -465,12 +465,12 @@ const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array | strin
 
 /**
  * Visuals of an Idea, shared by every draft made from it (Kevin 2026-11-06: each draft carries an image or a video):
- * `chart` (price vs fair value, his black Note style), `montage` (16:9 card: the idea, the chart, the mark),
+ * `chart` (the Note chart, skill breaking-chart), `x-chart` (the same chart, professional, for X posts: skill x-post), `montage` (16:9 card: the idea, the chart, the mark),
  * `video` (the same card, the line drawing itself, MP4) and `capture` (a screenshot of the news the idea cites).
  * Rendered at $0 in GitHub Actions. The file itself sits here once (bytea); bronze keeps what was rendered from and
  * its size, gold the list the console shows (no bytes): `/api/visuals/<id>` streams the file. Natural key: (idea, kind, version).
  */
-export const VISUAL_KINDS = ["montage", "video", "chart", "capture"] as const;
+export const VISUAL_KINDS = ["montage", "video", "chart", "x-chart", "capture"] as const;
 export type VisualKind = (typeof VISUAL_KINDS)[number];
 
 export const contentVisuals = silver.table(

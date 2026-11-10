@@ -33,7 +33,7 @@ async function addIdea(rank: number, title: string, scores: { format: string; sc
 }
 
 /** A card as content-visuals stores it. */
-const addCard = (ideaId: string, status: "ok" | "failed", kind: "montage" | "chart" = "montage") =>
+const addCard = (ideaId: string, status: "ok" | "failed", kind: "montage" | "chart" | "x-chart" = "montage") =>
   db.insert(content.contentVisuals).values({
     ideaId, kind, version: "v-test", status, error: status === "failed" ? "boom" : null, mime: status === "ok" ? "image/png" : null,
     file: status === "ok" ? PNG : null, sizeBytes: status === "ok" ? PNG.length : null, sources: ["render"], bronzeIds: [],
@@ -109,7 +109,7 @@ describe("the WhatsApp post loop, end to end on Kevin's number", () => {
     await run(contentDispatch);
     expect(await db.select().from(whatsappOutbox)).toHaveLength(0);
 
-    await addCard(ideaA, "ok");
+    await addCard(ideaA, "ok", "x-chart"); // the X post goes out with its professional chart (skill x-post)
     await addCard(ideaB, "ok"); // the Note waits for its chart, never the card
     await run(contentDispatch);
     expect(await serviceSends()).toHaveLength(1);

@@ -22,7 +22,8 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v11 (Kevin 2026-11-09): the price vs fair value chart gets the same layout: BREAKING card, signal top right, range shaded.
 // v12 (Kevin 2026-11-09): the price chart takes the driver charts' pasted price card; month axis « Sep-25 », one per tick.
 // v13 (Kevin 2026-11-09): the price callout picks among what the line shows (latest close, 12-month high and low), its number = the point it hits.
-export const VISUALS_VERSION = "visuals-v13";
+// v14 (Kevin 2026-11-10): + the X post chart (`x-chart`, skill x-post): professional, point + arrow + note, no news or price card.
+export const VISUALS_VERSION = "visuals-v14";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
@@ -45,7 +46,7 @@ const rendered = new Map<string, Rendered>();
 
 const subjectOf = (ideaId: string, kind: VisualKind) => `idea:${ideaId}#${kind}`;
 function parseSubject(subject: string): { ideaId: string; kind: VisualKind } {
-  const m = /^idea:([0-9a-f-]{36})#(\w+)$/.exec(subject);
+  const m = /^idea:([0-9a-f-]{36})#([\w-]+)$/.exec(subject);
   if (!m || !(VISUAL_KINDS as readonly string[]).includes(m[2])) throw new Error(`bad subject ${subject}`);
   return { ideaId: m[1], kind: m[2] as VisualKind };
 }
@@ -95,7 +96,9 @@ export const renderSource: Source = {
     const { ideaId, kind } = parseSubject(subject);
     const input = await inputFor(ctx.db, ideaId);
     // The chart draws the driver the Idea cites (its most striking Exhibit), the price only when the Idea is about price.
-    const choice = kind === "chart" ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
+    // `x-chart` = the same chart in the professional style of X posts (skill x-post): no news card, no price card.
+    const charted = kind === "chart" || kind === "x-chart";
+    const choice = charted ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
     const callout = choice && (choice.kind === "exhibit" || input.bars.length >= MIN_BARS) ? await writeCallout(input, choice, ctx.complete) : null;
     const request = {
       version: VISUALS_VERSION,
@@ -106,7 +109,7 @@ export const renderSource: Source = {
       ...(callout ? { callout } : {}),
     };
     const r0 = callout ? await renderModule() : null;
-    const annotation = callout && r0 ? { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: await banner(input, callout, ctx.fetch, r0.timeAgo) } : null;
+    const annotation = callout && r0 ? { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: kind === "x-chart" ? null : await banner(input, callout, ctx.fetch, r0.timeAgo), style: kind === "x-chart" ? ("pro" as const) : ("breaking" as const) } : null;
     if (choice?.kind === "exhibit") {
       const r = await renderModule();
       const file = r.png(r.exhibitSvg(input, choice.exhibit, annotation));
@@ -121,7 +124,7 @@ export const renderSource: Source = {
         error: `only ${input.bars.length} closes for ${input.symbol} in the last 12 months (a chart needs ${MIN_BARS})`,
       };
     const r = await renderModule();
-    const file = kind === "video" ? await r.video(input) : r.png(kind === "chart" ? r.chartSvg(input, undefined, annotation) : r.montageSvg(input));
+    const file = kind === "video" ? await r.video(input) : r.png(charted ? r.chartSvg(input, undefined, annotation) : r.montageSvg(input));
     const out: Rendered = {
       file,
       mime: kind === "video" ? "video/mp4" : "image/png",
@@ -190,7 +193,7 @@ export const captureSource: Source = {
 };
 
 /**
- * Every Idea that has a draft and lacks one of its visuals at this version: montage, video and chart always; a
+ * Every Idea that has a draft and lacks one of its visuals at this version: montage, video, chart and x-chart always; a
  * capture only when the Idea cites a news item with a link.
  */
 export async function pickVisualSubjects(db: Db): Promise<string[]> {
@@ -223,7 +226,7 @@ export async function pickVisualSubjects(db: Db): Promise<string[]> {
     .where(inArray(content.contentIdeas.id, ideaIds));
   const out: string[] = [];
   for (const i of ideas) {
-    const kinds: VisualKind[] = ["montage", "video", "chart", ...(i.refs.some((r) => r.kind === "evidence") ? (["capture"] as const) : [])];
+    const kinds: VisualKind[] = ["montage", "video", "chart", "x-chart", ...(i.refs.some((r) => r.kind === "evidence") ? (["capture"] as const) : [])];
     for (const k of kinds) if (!done.has(subjectOf(i.id, k))) out.push(subjectOf(i.id, k));
   }
   return out;

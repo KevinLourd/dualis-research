@@ -4,10 +4,10 @@ import type { VisualKind } from "@/db/schema/content";
 import type { Db } from "@/db/types";
 
 /**
- * The image a post goes out with on WhatsApp (content-visuals): a Substack Note is a paragraph with its chart (#59), an X
- * post carries the 16:9 post card; each falls back on the other.
+ * The image a post goes out with on WhatsApp (content-visuals): a Substack Note is a paragraph with its BREAKING chart
+ * (#59), an X post its professional chart (skill x-post, Kevin 2026-11-10); each falls back on the post card.
  */
-const PREFERRED: Record<string, readonly VisualKind[]> = { "substack-note": ["chart", "montage"] };
+const PREFERRED: Record<string, readonly VisualKind[]> = { "substack-note": ["chart", "montage"], "x-post": ["x-chart", "montage"] };
 const DEFAULT: readonly VisualKind[] = ["montage", "chart"];
 
 export type PostImage = { state: "ready"; visualId: string; image: Buffer; mime: string } | { state: "waiting" } | { state: "none" };

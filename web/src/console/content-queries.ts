@@ -46,7 +46,7 @@ export const listIdeas = cache(async () =>
  * Panel order: the chart first (the driver's key graph is the default visual, Thierry 2026-11-06), then the video, the
  * news capture, and the post card last (an option for once in a while).
  */
-const VISUAL_ORDER: readonly VisualKind[] = ["chart", "video", "capture", "montage"];
+const VISUAL_ORDER: readonly VisualKind[] = ["chart", "x-chart", "video", "capture", "montage"];
 
 /** The visuals of an Idea (latest per kind), in the order the panel shows them. */
 export async function listVisuals(ideaId: string) {
