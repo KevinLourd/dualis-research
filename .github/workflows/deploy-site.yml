@@ -21,6 +21,7 @@ jobs:
         working-directory: site
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -28,7 +29,7 @@ jobs:
         working-directory: .
         run: |
           missing=""
-          for name in DATABASE_URL CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+          for name in DATABASE_URL SITE_PASSWORD CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -51,7 +52,7 @@ jobs:
         run: pnpm cf:build
       - name: Deploy to Cloudflare Workers (runtime secret uploaded with the version)
         run: |
-          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/site-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL }))'
+          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/site-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, SITE_PASSWORD: process.env.SITE_PASSWORD }))'
           set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
           pnpm cf:deploy -- --secrets-file "$RUNNER_TEMP/site-secrets.json" | tee deploy.log
           rm -f "$RUNNER_TEMP/site-secrets.json"
