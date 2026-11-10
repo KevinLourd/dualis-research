@@ -112,6 +112,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     catalog,
     quote: q,
     currency,
-    hasFinancials: catalog.has("line:revenue"),
+    // Annual revenue, reported or derived from what the company reported (gross profit + cost of revenue, 4 quarters).
+    hasFinancials: catalog.has("line:revenue") || catalog.has("metric:revenue"),
   };
 }

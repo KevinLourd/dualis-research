@@ -16,6 +16,11 @@ export function majorUnit(price: number, currency: string | null): { price: numb
 }
 
 const minusYears = (ym: string, n: number) => `${Number(ym.slice(0, 4)) - n}${ym.slice(4)}`;
+/** "2025-12" minus 3 months = "2025-09". */
+export const minusMonths = (ym: string, n: number) => {
+  const t = Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1 - n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+};
 const monthsBetween = (a: string, b: string) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
 export const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -93,6 +98,13 @@ export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
     };
     const g = (line: string) => get(pt, pe, line);
     const prior = (line: string) => get(pt, minusYears(pe, 1), line);
+    // Revenue a source left out (Yahoo serves DRX.TO's annual gross profit and cost of revenue, not its annual revenue):
+    // derived from what the company reported, a metric with its formula and inputs, never a reported line.
+    if (!g("revenue")) {
+      add("revenue", "currency", "gross profit + cost of revenue", [g("gross-profit"), g("cost-of-revenue")], ([gp, cor]) => gp + cor);
+      const quarters = [0, 3, 6, 9].map((n) => get("quarter", minusMonths(pe, n), "revenue"));
+      if (pt === "year" && !metrics.has(`${pt}|${pe}|revenue`)) add("revenue", "currency", "sum of the 4 reported quarters of the fiscal year", quarters, (v) => v.reduce((a, b) => a + b, 0));
+    }
     add("ebitda", "currency", "operating income + depreciation and amortization", [g("operating-income"), g("depreciation-amortization")], ([oi, da]) => oi + da);
     add("fcf", "currency", "cash from operations - capital expenditure", [g("cfo"), g("capex")], ([cfo, capex]) => cfo - capex);
     add("net-debt", "currency", "total debt - cash and equivalents", [g("total-debt"), g("cash")], ([d, c]) => d - c);

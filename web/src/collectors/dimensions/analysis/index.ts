@@ -1,7 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { fetches as bronze, type BronzeFetch } from "@/db/schema/bronze";
 import { analyses, exhibits, narrativeDrivers, narrativeRationales, narratives, researchReports, type AnalysisAnswer, type RationaleAnswer, type ThesisSide } from "@/db/schema/analysis";
-import { goldFinancialLines } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
@@ -10,7 +9,7 @@ import { stripDashes } from "../thesis/structure";
 import { fnv, gatherFacts } from "./facts";
 import { ANALYSIS_SYSTEM, ANALYSIS_VERSION, RATIONALE_SYSTEM, REPORT_SYSTEM, analysisPrompt, parseAnalysis, parseRationale, rationalePrompt, reportPrompt } from "./prompt";
 import { exhibitData, seriesCatalog, type StoredSeries } from "./series";
-import { currentSides, driverIdOf, parseThesisId, thesisId } from "./sides";
+import { currentSides, driverIdOf, parseThesisId, sidesOrReason, thesisId } from "./sides";
 
 export * from "./sides";
 
@@ -40,9 +39,14 @@ export const analysisSource: Source = {
   concurrency: PARALLEL,
   async fetch(subject: string, ctx: SourceContext): Promise<FetchOutcome> {
     if (!ctx.db) throw new Error("analysis: needs the database");
+    // A bare symbol = an analysed ticker with no thesis to ask: its reason lands in bronze as a failed fetch (Data page).
+    if (!subject.includes(":")) {
+      const why = await sidesOrReason(ctx.db, subject);
+      return { request: { symbol: subject }, httpStatus: null, error: "reason" in why ? `no thesis: ${why.reason}` : "no thesis: the price sits nowhere a thesis applies" };
+    }
     const { symbol, side } = parseThesisId(subject);
     const facts = await gatherFacts(ctx.db, symbol);
-    if (!facts.hasFinancials) return { request: { symbol, side }, httpStatus: null, error: "no financial statements collected for this ticker" };
+    if (!facts.hasFinancials) return { request: { symbol, side }, httpStatus: null, error: "no financial statements collected for this ticker (no annual revenue, reported or derivable)" };
     const inputHash = fnv(`${ANALYSIS_VERSION}\n${side}\n${facts.hash}`);
     const [prior] = await ctx.db
       .select({ id: bronze.id, payload: bronze.payload })
@@ -82,11 +86,18 @@ export const analysisSource: Source = {
   },
 };
 
-/** One subject per current thesis (`<symbol>:<side>`) of the tickers with collected statements. */
-async function subjects(db: Db): Promise<string[]> {
-  const withLines = new Set((await db.selectDistinct({ symbol: goldFinancialLines.symbol }).from(goldFinancialLines).where(eq(goldFinancialLines.line, "revenue"))).map((r) => r.symbol));
+/**
+ * One subject per current thesis (`<symbol>:<side>`) of every analysed ticker; a ticker with no thesis to ask (no fair
+ * value, no quote, currencies with no stored rate) is the bare symbol, fetched as a failed fetch with its reason.
+ * No statements: the thesis subject fails on `hasFinancials`, with its reason too (NO-NARRATIVE-1110).
+ */
+export async function analysisSubjects(db: Db): Promise<string[]> {
   const out: string[] = [];
-  for (const symbol of (await analysedSymbols(db)).filter((s) => withLines.has(s))) for (const side of await currentSides(db, symbol)) out.push(thesisId(symbol, side));
+  for (const symbol of await analysedSymbols(db)) {
+    const p = await sidesOrReason(db, symbol);
+    if ("reason" in p || p.sides.length === 0) out.push(symbol);
+    else for (const side of p.sides) out.push(thesisId(symbol, side));
+  }
   return out;
 }
 
@@ -95,7 +106,7 @@ export const analysis: Dimension = {
   description:
     "Per ticker and thesis (long below the fair value range, short above, both inside it), from the reported numbers and the Fair Value: the Narrative, 1 to 5 Narrative Drivers each with Exhibits drawn from stored series, the Narrative Rationale and the Research Report. Kept word for word unless the facts change; once per input hash.",
   sources: [analysisSource],
-  subjects,
+  subjects: analysisSubjects,
   promote: promoteAnalysis,
 };
 

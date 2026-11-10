@@ -18,6 +18,7 @@ export type StoredSeries = ExhibitSeries & { periodType: "year" | "quarter" | "m
 
 const titleCase = (s: string) => s.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const METRIC_NAMES: Record<string, string> = {
+  revenue: "Revenue (derived)",
   ebitda: "EBITDA",
   fcf: "Free cash flow",
   "net-debt": "Net debt",
