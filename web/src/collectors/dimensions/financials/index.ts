@@ -1,13 +1,14 @@
 import { inArray } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { financialLines, financialMetrics, goldFinancialLines, valuations, type LineObservation } from "@/db/schema/financials";
+import { financialLines, financialMetrics, goldFinancialLines, revenueStreams, valuations, type LineObservation } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult } from "../../types";
 import { analysedSymbols } from "../watchlist";
 import { deriveMetrics, deriveValuation } from "./derive";
-import { statementOf } from "./lines";
+import { statementOf, type PeriodType } from "./lines";
 import { lineConsensus } from "./merge";
+import { deriveRevenueStreams } from "./streams";
 import { FINANCIALS_PRIORITY, FINANCIALS_SOURCES } from "./sources";
 
 export const FINANCIALS_DIMENSION = "financials";
@@ -15,9 +16,10 @@ export const FINANCIALS_DIMENSION = "financials";
 export const financials: Dimension = {
   name: FINANCIALS_DIMENSION,
   description:
-    "Income statement, balance sheet and cash flow, 5 fiscal years + recent quarters, as published, every value with its sources. " +
-    "SEC XBRL (US), OpenDART (Korea), EDINET (Japan), Yahoo (every market, cross-check), month-end prices for EV, " +
-    "and Hong Kong annual reports read by Claude with the page of each figure. Derived: EBITDA, FCF, net debt, margins, growth, EV/EBITDA.",
+    "Income statement, balance sheet and cash flow, 5 fiscal years + recent quarters and half years, as published, every value with its sources. " +
+    "SEC XBRL (US, revenue per segment from the filings), OpenDART (Korea), EDINET (Japan), Yahoo (every market, cross-check), month-end prices for EV, " +
+    "and Hong Kong annual and interim reports read by Claude with the page of each figure. Derived: EBITDA, FCF, net debt, margins, growth, EV/EBITDA, " +
+    "revenue per stream (growth, share of total, last 12 months).",
   sources: FINANCIALS_SOURCES,
   subjects: analysedSymbols,
   promote: promoteFinancials,
@@ -40,7 +42,7 @@ export async function promoteFinancials(db: Db, fetches: BronzeFetch[]): Promise
   if (symbols.length === 0) return { silverRowsBySource };
 
   const existing = await db.select().from(financialLines).where(inArray(financialLines.symbol, symbols));
-  const rows = new Map<string, { symbol: string; periodType: "year" | "quarter" | "month"; periodEnd: string; line: string; observations: Record<string, LineObservation>; firstSeenAt: Date }>();
+  const rows = new Map<string, { symbol: string; periodType: PeriodType; periodEnd: string; line: string; observations: Record<string, LineObservation>; firstSeenAt: Date }>();
   const answered = new Set([...latest.keys()]);
   for (const r of existing) {
     // Drop what a source that answered this run said before: its new answer replaces it.
@@ -99,7 +101,7 @@ export async function promoteFinancials(db: Db, fetches: BronzeFetch[]): Promise
 
 type SilverRow = {
   symbol: string;
-  periodType: "year" | "quarter" | "month";
+  periodType: PeriodType;
   periodEnd: string;
   line: string;
   statement: ReturnType<typeof statementOf>;
@@ -130,8 +132,10 @@ async function rebuildGold(db: Db, symbols: string[], silverRows: SilverRow[]): 
   }));
   const metricRows: ReturnType<typeof deriveMetrics> = [];
   const valuationRows: ReturnType<typeof deriveValuation>[] = [];
+  const streamRows: ReturnType<typeof deriveRevenueStreams> = [];
   for (const symbol of symbols) {
     const lines = goldLines.filter((l) => l.symbol === symbol);
+    streamRows.push(...deriveRevenueStreams(symbol, lines));
     const metrics = deriveMetrics(symbol, lines);
     metricRows.push(...metrics);
     const q = quotes.get(symbol);
@@ -141,6 +145,8 @@ async function rebuildGold(db: Db, symbols: string[], silverRows: SilverRow[]): 
     await tx.delete(goldFinancialLines).where(inArray(goldFinancialLines.symbol, symbols));
     await tx.delete(financialMetrics).where(inArray(financialMetrics.symbol, symbols));
     await tx.delete(valuations).where(inArray(valuations.symbol, symbols));
+    await tx.delete(revenueStreams).where(inArray(revenueStreams.symbol, symbols));
+    for (let i = 0; i < streamRows.length; i += 500) await tx.insert(revenueStreams).values(streamRows.slice(i, i + 500));
     for (let i = 0; i < goldLines.length; i += 500) await tx.insert(goldFinancialLines).values(goldLines.slice(i, i + 500));
     for (let i = 0; i < metricRows.length; i += 500) await tx.insert(financialMetrics).values(metricRows.slice(i, i + 500));
     if (valuationRows.length) await tx.insert(valuations).values(valuationRows);

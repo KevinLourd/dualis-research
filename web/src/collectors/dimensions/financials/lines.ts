@@ -3,7 +3,7 @@
  * Values in full currency units; outflows (capex, dividends paid, buybacks) are POSITIVE.
  */
 export type Statement = "income" | "balance" | "cashflow" | "market" | "segment";
-export type PeriodType = "year" | "quarter" | "month";
+export type PeriodType = "year" | "half" | "quarter" | "month";
 
 export const LINES = {
   // Income statement (a period's flow)
@@ -60,7 +60,8 @@ export const LINES = {
 export type LineKey = keyof typeof LINES;
 export const isLineKey = (k: string): k is LineKey => k in LINES;
 
-/** Segment revenue rows: `segment:<axis>:<name>` (axis = product, region, customer). */
+/** Segment revenue rows: `segment:<axis>:<name>` (axis = product, business, region, customer). */
+export const SEGMENT_AXES = ["product", "business", "region", "customer"] as const;
 export const segmentLine = (axis: string, name: string) => `segment:${axis}:${name.trim()}`;
 export const statementOf = (line: string): Statement => (line.startsWith("segment:") ? "segment" : LINES[line as LineKey].statement);
 
