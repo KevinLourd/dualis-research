@@ -7,7 +7,7 @@ import { signed } from "@/whatsapp/outbox";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { growthBriefDim, planBrief } from ".";
-import { briefChartPng } from "./render";
+import { briefChartPng, briefChartSvg } from "./render";
 
 let db: Db;
 let close: () => Promise<void>;
@@ -54,9 +54,19 @@ describe("growth brief figures", () => {
         "",
         "💪Goal 1,153 by Nov 30: +42/day from now on",
         "",
+        "➡️ x11 speed needed",
+        "",
         "Details: https://dualis-console.dualis-research.workers.dev/growth",
       ].join("\n"),
     );
+  });
+
+  it("the speed line shows only when we must go faster than today's pace", () => {
+    // 42 needed / 4 so far = 10.5, rounded to 11 (above). Ahead of pace or no pace yet: no line.
+    const ahead = { ...growthBrief(audience, [], "2026-11-07"), perDayNeeded: 5 };
+    expect(briefText(ahead)).not.toContain("speed needed");
+    const flat = growthBrief([{ date: "2026-11-04", subscribers: 153 }, { date: "2026-11-06", subscribers: 153 }], [], "2026-11-07");
+    expect(briefText(flat)).not.toContain("speed needed");
   });
 
   it("the title is not signed twice", () => {
@@ -116,5 +126,11 @@ describe("brief chart", () => {
     const png = briefChartPng(growthBrief(audience, [], "2026-11-07"));
     expect(png.subarray(1, 4).toString()).toBe("PNG");
     expect(png.length).toBeGreaterThan(10_000);
+  });
+
+  it("shows the count without the stats line under it (Kevin 2026-11-11)", () => {
+    const svg = briefChartSvg(growthBrief(audience, [], "2026-11-07"));
+    expect(svg).toContain(">160<");
+    expect(svg).not.toContain("a day needed");
   });
 });

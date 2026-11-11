@@ -81,6 +81,9 @@ export function briefText(b: GrowthBrief): string {
     "",
     `💪Goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}: +${fmt(b.perDayNeeded)}/day from now on`,
     "",
+    // Kevin 2026-11-11: how many times faster than today's pace, only when we must speed up (needed / so far, the two
+    // figures above, rounded). No pace yet (0 or less a day) = no multiple to state.
+    ...(perDay > 0 && Math.round(b.perDayNeeded / perDay) > 1 ? [`➡️ x${fmt(Math.round(b.perDayNeeded / perDay))} speed needed`, ""] : []),
     `Details: ${GROWTH_PAGE_URL}`,
   ].join("\n");
 }
