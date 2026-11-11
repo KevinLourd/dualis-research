@@ -17,7 +17,7 @@ export default async function Research() {
   const subscribe = subscribeHref(substackUrl);
   return (
     <>
-      <PageBand label="Research" line="Long and short calls on the small caps the market misreads." thread="research" />
+      <PageBand label="Research" line="Investment research for buy-side investors, with aligned incentives." thread="research" />
 
       {posts.length > 0 && (
         <section className="cover-band">
@@ -47,7 +47,7 @@ export default async function Research() {
 
       <section className="section">
         <div className="wrap">
-          <h2 className="fw-head">How a call is made</h2>
+          <h2 className="fw-head">The winnable games we look for</h2>
           <Framework />
         </div>
       </section>

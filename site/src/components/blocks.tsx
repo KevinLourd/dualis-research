@@ -112,17 +112,9 @@ export function CoverStrip({ posts }: { posts: Publication[] }) {
   );
 }
 
-/** Thierry's photo (LinkedIn portrait, extended to 4:5). */
-export function Portrait() {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img className="portrait-img" src="/img/thierry.jpg" alt="Thierry Matin" width={1200} height={1489} />
-  );
-}
-
 /** His career, from his public LinkedIn profile (2026-11-04). */
 export const CAREER = [
-  { when: "2026 - now", where: "Dualis Research", role: "Founder and Lead Analyst" },
+  { when: "2024 - now", where: "Dualis Research", role: "Founder and Lead Analyst" },
   { when: "2023 - 2024", where: "Novacap", role: "Private equity investor" },
   { when: "2022 - 2023", where: "BCA Research", role: "Research associate, FX and fixed income strategy" },
   { when: "2021", where: "Fiera Capital", role: "Analyst, global equities" },
@@ -201,7 +193,7 @@ export function Proof() {
           </a>
         </div>
         <div>
-          <YtdChart source={`Return since January 1, 2026: Thierry Matin's main account (about +55%) vs the S&P 500, from his post of ${formatDate(TRACK_RECORD.asOf)}.`} />
+          <YtdChart source={`Return since January 1, 2026: the main account (about +55%) vs the S&P 500, from the post of ${formatDate(TRACK_RECORD.asOf)}.`} />
           <p className="footnote">*{TRACK_RECORD.note}</p>
         </div>
       </div>
@@ -209,75 +201,19 @@ export function Proof() {
   );
 }
 
-/**
- * The best calls as a scoreboard (Kevin 2026-11-06: « trop verbeux, le message clé pas assez mis en avant »): the
- * result first, big; the side, the name, ONE line of thesis, the report. Then every published call as one line.
- */
-export function CallsBoard({ posts }: { posts: Publication[] }) {
-  const calls = posts.filter((p) => p.category === "coverage");
-  return (
-    <>
-      <ol className="calls-board">
-        {BEST_CALLS.map((c) => {
-          const report = posts.find((p) => p.title.includes(c.report));
-          const body = (
-            <>
-              <span className={`call-side ${c.side === "Long" ? "long" : "short"}`}>{c.side}</span>
-              <span className="call-name">
-                {c.name} <small>{c.ticker}</small>
-              </span>
-              <span className="call-line">{c.line}</span>
-              <span className="call-result">
-                {c.result} <small>{c.resultNote}</small>
-              </span>
-              <span className="cl-go" aria-hidden="true">{report ? "↗" : ""}</span>
-            </>
-          );
-          return (
-            <li key={c.name}>
-              {report ? (
-                <a className="call-row" target="_blank" rel="noopener noreferrer" href={report.url}>
-                  {body}
-                </a>
-              ) : (
-                <div className="call-row">{body}</div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-      {calls.length > 0 && (
-        <>
-          <h3 className="calls-all">Every published call</h3>
-          <ol className="calls-list">
-            {calls.map((p) => (
-              <li key={p.id}>
-                <a target="_blank" rel="noopener noreferrer" href={p.url}>
-                  <span className="cl-date">{formatDate(p.publishedAt)}</span>
-                  <span className="cl-title">{p.title}</span>
-                  <span className="cl-go" aria-hidden="true">↗</span>
-                </a>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-    </>
-  );
-}
-
 const FRAMEWORK = [
-  { title: "Narrative", line: "What the price believes" },
-  { title: "Fair value", line: "What the business is worth" },
-  { title: "The gap", line: "Long below, short above" },
-  { title: "Catalyst", line: "The news that turns the story" },
-  { title: "Exit", line: "Closed and reported" },
+  { title: "Small caps", line: "Fewer experts, wider mispricing" },
+  { title: "Cyclical stocks", line: "Each turn meets fewer rivals" },
+  { title: "Narrative turns", line: "Long when a bad story turns, short when a hyped one cracks" },
+  { title: "Turnaround stories", line: "Crushed names few dare to own" },
+  { title: "Under-covered geographies", line: "Markets most analysts skip" },
 ] as const;
 
 /**
- * How a call is made, drawn on the logo (Kevin 2026-11-06: « dans la structure des composants comme Citrini »): the
- * engraved knot faint behind, one vertical line through it, five steps alternating left and right. The middle step,
- * the gap between price and value, sits on the knot's centre square, where the two loops cross.
+ * The winnable games we look for, drawn on the logo (Kevin 2026-11-06: « dans la structure des composants comme
+ * Citrini »; Thierry 2026-11-09: the types of winnable games, never a timeline of steps): the engraved knot faint
+ * behind, one vertical line through it, five games alternating left and right. The narrative turn, the play Thierry
+ * trains most, sits on the knot's centre square, where the two loops cross.
  */
 export function Framework() {
   return (
