@@ -5,6 +5,8 @@ description: The daily distribution loop for Dualis Research - 2 posts/day on Su
 
 # Daily content loop
 
+Tones, formats (X Article, Substack Article) and angles side by side: skill `content-matrix` (the Sandbox compares them before one goes live).
+
 **Cadence**: 2 posts/day, each published on Substack Notes AND X (adapted per platform).
 
 **Morning message to Thierry** (WhatsApp or equivalent): 2-4 drafts, each with source link + which watchlist ticker/driver it comes from. He approves, edits or skips. Nothing publishes without his OK.

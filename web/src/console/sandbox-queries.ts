@@ -1,7 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { cache } from "react";
 import { getDb } from "@/db/client";
-import { goldSandboxAccounts, goldSandboxPosts, type SandboxPlatform } from "@/db/schema/sandbox";
+import { goldSandboxAccounts, goldSandboxPosts, SANDBOX_ANGLES, SANDBOX_FORMATS, type SandboxAngle, type SandboxFormat, type SandboxPlatform } from "@/db/schema/sandbox";
+import type { SandboxView } from "./sandbox-ui";
 
 /** Sandbox pages (fake accounts, never published): gold only. A timeline reads its last 60 posts (12 days at 5 a day). */
 
@@ -18,4 +19,16 @@ export async function sandboxAccount(platform: SandboxPlatform, handle: string) 
   if (!account) return null;
   const posts = await db.select().from(goldSandboxPosts).where(eq(goldSandboxPosts.accountId, account.id)).orderBy(desc(goldSandboxPosts.postAt), desc(goldSandboxPosts.slot)).limit(60);
   return { account, posts };
+}
+
+/** The page's filters from its search params; unknown values are ignored. */
+export function sandboxView(q: Record<string, string | string[] | undefined>): SandboxView {
+  const one = (k: string) => (typeof q[k] === "string" ? (q[k] as string) : null);
+  const format = one("format");
+  const angle = one("angle");
+  return {
+    format: (SANDBOX_FORMATS as readonly string[]).includes(format ?? "") ? (format as SandboxFormat) : null,
+    angle: (SANDBOX_ANGLES as readonly string[]).includes(angle ?? "") ? (angle as SandboxAngle) : null,
+    article: one("article"),
+  };
 }
