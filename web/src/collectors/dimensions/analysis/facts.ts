@@ -81,6 +81,25 @@ export function streamsText(rows: GoldRevenueStream[]): string | null {
   if (coverage.some(Boolean)) out.push(`Coverage: ${coverage.filter(Boolean).join("; ")}.`);
   return out.join("\n");
 }
+/**
+ * The reported numbers every judge of the story reads (evidence, driver and thesis state): the last fiscal years,
+ * quarters and half years, and revenue by stream. A results filing arrives as a title; these are its figures.
+ */
+export async function figuresText(db: Db, symbol: string): Promise<string> {
+  const catalog = await seriesCatalog(db, symbol);
+  const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
+  const keys = (prefix: string) => ["revenue", "operating-income", "net-income"].map((l) => `${prefix}:${l}`).filter((k) => catalog.has(k));
+  return [
+    "The company's reported figures:",
+    keys("line").length ? `Fiscal years:\n${table(catalog, keys("line"), 4)}` : "Fiscal years: none collected.",
+    keys("qline").length ? `Last quarters:\n${table(catalog, keys("qline"), 4)}` : null,
+    keys("hline").length ? `Last half years:\n${table(catalog, keys("hline"), 4)}` : null,
+    streamsText(streams),
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
 const minusYear = (ym: string) => (ym ? `${Number(ym.slice(0, 4)) - 1}${ym.slice(4)}` : "");
 
 function table(catalog: Map<string, StoredSeries>, keys: string[], last: number): string {
