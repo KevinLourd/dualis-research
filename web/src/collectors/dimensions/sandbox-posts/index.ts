@@ -1,38 +1,71 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { narratives } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
 import type { DraftInputs, VisualKind } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
+import { goldNewsItems } from "@/db/schema/news";
 import * as sandbox from "@/db/schema/sandbox";
-import type { SandboxPlatform, SandboxTone } from "@/db/schema/sandbox";
+import type { SandboxAngle, SandboxFormat, SandboxInput, SandboxPlatform } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import { utcDay } from "@/content/ideas";
 import { memo } from "../../markets";
 import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
 import { ideaContext } from "../content-drafts";
-import { draftPrompt, FORMAT_RULES, GAME, stripDashes, withDisclaimer } from "../content-drafts/format";
+import { draftPrompt, stripDashes, withDisclaimer } from "../content-drafts/format";
+import { REFERENCE_PUBLICATIONS } from "../content-posts";
+import { topMacroHeadline } from "../macro-news";
+import { topTrending } from "../substack-trending";
 
 /**
- * Sandbox posts (Kevin 2026-11-11): each day the top 5 Ideas, written once per fake account in its tone (X post on the
- * X accounts, Substack Note on the Substacks), so Thierry compares tones idea by idea. ONE LLM call per account per day
- * returns its 5 posts; a rerun the same day does nothing. Never published: the console's Sandbox pages show them.
+ * Sandbox posts (Kevin 2026-11-11, skill content-matrix): every day each fake account writes 5 posts, 4 short (X post or
+ * Note) + 1 Article, over the 4 angles (signal x2, macro-24h, trending-format, competitor). Every account of a channel
+ * writes the same inputs in the same formats, so only the tone differs. The writer's rules are the skill files in
+ * `.claude/skills/`, read at run time (never copied here): a skill edit changes the next day's posts, never a past day.
+ * ONE LLM call per account per day; a rerun the same day does nothing. Never published.
  */
 
 export const SANDBOX_POSTS_DIMENSION = "sandbox-posts";
 export const CLAUDE_SOURCE = "claude";
 export const POSTS_PER_DAY = 5;
-export const PROMPT_VERSION = "sandbox-v1";
+/** Bump to rewrite the next day's posts with a new prompt frame; the skills' own text is hashed on top. */
+export const SANDBOX_VERSION = "sandbox-v2";
 /** Display times on the fake timeline: 08:00, 11:00, 14:00, 17:00, 20:00 Astana (UTC+5). */
 export const SLOT_HOURS_UTC = [3, 6, 9, 12, 15] as const;
+/** The angle of each slot; the Ideas used by the signal, trending and competitor slots, in order. */
+export const SLOT_ANGLES: readonly SandboxAngle[] = ["signal", "macro-24h", "signal", "trending-format", "competitor"];
+const ANGLE_ROTATION: readonly SandboxAngle[] = ["signal", "macro-24h", "trending-format", "competitor"];
 
-const FORMAT_OF: Record<SandboxPlatform, "x-post" | "substack-note"> = { x: "x-post", substack: "substack-note" };
-/** The image each platform takes from the Idea's visuals (same order as the WhatsApp post loop, content/post-image.ts). */
-const VISUAL_ORDER: Record<SandboxPlatform, readonly VisualKind[]> = { x: ["x-chart", "montage"], substack: ["chart", "montage"] };
+const SHORT: Record<SandboxPlatform, SandboxFormat> = { x: "x-post", substack: "substack-note" };
+const ARTICLE: Record<SandboxPlatform, SandboxFormat> = { x: "x-article", substack: "substack-article" };
+export const FORMAT_NAME: Record<SandboxFormat, string> = { "x-post": "X post", "x-article": "X Article", "substack-note": "Substack Note", "substack-article": "Substack Article" };
+/** The image each format takes from the Idea's visuals (same order as the WhatsApp post loop, content/post-image.ts). */
+const VISUAL_ORDER: Record<SandboxPlatform, readonly VisualKind[]> = { x: ["x-chart", "montage", "chart"], substack: ["chart", "montage", "x-chart"] };
+
+// ------------------------------------------------------------------------------------------------ skills
+
+const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
+const ANGLE_SKILLS = ["angle-signal", "angle-macro-24h", "angle-trending-format", "angle-competitor"];
+
+/** The skills a channel x tone account writes with, frontmatter removed, read from the repo at run time. */
+export async function loadSkills(platform: SandboxPlatform, tone: string): Promise<{ text: string; hash: string }> {
+  const { readFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
+  // Built at run time: webpack bundles a literal `new URL("...", import.meta.url)` as an asset (the console imports this file).
+  const root = new URL(`${"../".repeat(5)}.claude/skills/`, import.meta.url);
+  const names = ["content-matrix", `${platform}-${tone}`, ...ANGLE_SKILLS];
+  const texts = await Promise.all(names.map(async (n) => (await readFile(new URL(`${n}/SKILL.md`, root), "utf8")).replace(/^---[\s\S]*?---\s*/, "").trim()));
+  const text = texts.join("\n\n---\n\n");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${SANDBOX_VERSION}\n${text}`));
+  const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  return { text, hash };
+}
+
+// ------------------------------------------------------------------------------------------------ the day's plan
 
 type IdeaPick = { id: string; symbol: string | null; title: string; score: number };
 
-/** The day's top Ideas (the latest day that has some), best score on the two daily formats first, at most 5. */
-export async function topIdeas(db: Db): Promise<IdeaPick[]> {
+/** The day's top Ideas (the latest day that has some), best score on the two daily formats first. */
+export async function topIdeas(db: Db, n = 4): Promise<IdeaPick[]> {
   const [latest] = await db.select({ day: content.goldContentIdeas.day }).from(content.goldContentIdeas).orderBy(desc(content.goldContentIdeas.day)).limit(1);
   if (!latest) return [];
   const ideas = await db.select().from(content.goldContentIdeas).where(eq(content.goldContentIdeas.day, latest.day));
@@ -40,103 +73,182 @@ export async function topIdeas(db: Db): Promise<IdeaPick[]> {
   return ideas
     .map((i) => ({ i, score: best(i) }))
     .sort((a, b) => b.score - a.score || a.i.rank - b.i.rank)
-    .slice(0, POSTS_PER_DAY)
+    .slice(0, n)
     .map(({ i, score }) => ({ id: i.id, symbol: i.symbol, title: i.title, score }));
 }
 
-const TONE_RULES: Record<SandboxTone, Record<SandboxPlatform, string>> = {
-  urgent: {
-    x: [
-      "Tone: clickbait breaking news. Open with \"🚨 BREAKING: \" then the company's short name and a colon, then ONE shock number.",
-      "Make the reader feel he is late: words like \"just\", \"nobody is talking about\", \"wake up\" are welcome. One word in CAPS at most, one exclamation mark at most.",
-      "Format: one X post, at most 200 characters, the ticker as a $cashtag once.",
-    ].join("\n"),
-    substack: [
-      "Tone: clickbait breaking news. Open with \"🚨 BREAKING: \" then the company's short name and a colon, then ONE shock number.",
-      "Make the reader feel he is late. One word in CAPS at most, one exclamation mark at most.",
-      "Format: one Substack Note, one punchy paragraph of 2 or 3 very short sentences, 150 to 300 characters, no line breaks. A chart is attached under it.",
-    ].join("\n"),
-  },
-  balanced: {
-    // The house tone of our drafts (format.ts, skills daily-content and x-post), minus its single-answer line.
-    x: FORMAT_RULES["x-post"].replace(/ ?Answer with[^.]*\./g, ""),
-    substack: FORMAT_RULES["substack-note"].replace(/\n?Answer with[^.]*\./g, ""),
-  },
-  neutral: {
-    x: [
-      "Tone: sober research note. No emoji, no exclamation mark, no alarm words, no CAPS. State the fact with its number, then what it implies for the valuation, in measured words.",
-      "Format: one X post, at most 260 characters, the ticker as a $cashtag once.",
-    ].join("\n"),
-    substack: [
-      "Tone: sober research note. No emoji, no exclamation mark, no alarm words, no CAPS. State the fact with its number, then what it implies for the valuation, then what to watch next.",
-      "Format: one Substack Note, one paragraph of 2 to 4 sentences, 200 to 450 characters, no line breaks, no headings. A chart is attached under it.",
-    ].join("\n"),
-  },
-};
+/** One slot of the day, shared by every account of a channel. `brief` = what the writer reads for it. */
+export type SlotPlan = { slot: number; angle: SandboxAngle; article: boolean; ideaId: string | null; symbol: string | null; input: SandboxInput; brief: string };
 
-const BASE_NEUTRAL = [
-  "You write for an independent equity research writer (small and mid caps, long/short, eight markets).",
-  "The reader is a self-directed, experienced small-cap investor who reads filings.",
-  "Each post tells ONE Idea, given below with the evidence behind it. One claim only: pick the single strongest fact.",
-  "Plain words: subject, verb, object. Short sentences. No accounting jargon a retail investor must decode.",
-  "Never write a disclaimer, it is added after you. Never invent a figure that is not in the inputs. Never an em dash or en dash, no hashtags.",
-].join("\n");
-
-/** System prompt of one account: its tone, its platform's format, and the batch answer (one post per Idea, in order). */
-export function sandboxSystem(tone: SandboxTone, platform: SandboxPlatform, accountName: string, n: number): string {
-  // The balanced tone IS the house prompt (format.ts GAME), without the line naming the real writer.
-  const base = tone === "balanced" ? GAME.split("\n").filter((l) => !l.startsWith("You write for ")).join("\n") : BASE_NEUTRAL;
-  return [
-    tone === "balanced" ? "You write for an independent equity research writer (small and mid caps, long/short, eight markets)." : "",
-    base,
-    "",
-    `Account: ${accountName}`,
-    TONE_RULES[tone][platform],
-    "",
-    `You get ${n} Ideas, numbered. Write one post per Idea, each standing alone, in the same order.`,
-    `Answer with JSON only, no prose, no code fence: {"posts": ["<post for Idea 1>", ...]} with exactly ${n} strings.`,
-  ]
-    .filter((l, i, all) => l !== "" || all[i - 1] !== "")
-    .join("\n")
-    .trim();
+/** The angle whose slot is the day's Article: rotates by day. */
+export function articleAngle(day: string): SandboxAngle {
+  return ANGLE_ROTATION[Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400_000) % ANGLE_ROTATION.length];
 }
 
-/** Reads the batch answer: exactly `n` non-empty posts, dashes stripped. Throws with the reason. */
-export function parsePosts(text: string, n: number): string[] {
+/** One Idea in words (the block content-drafts hands its writer). */
+async function ideaBrief(db: Db, ideaId: string): Promise<string> {
+  const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
+  if (!idea) throw new Error(`idea ${ideaId} not found`);
+  const symbol = idea.symbol ?? idea.sourceRefs.find((r) => r.symbol)?.symbol ?? "";
+  const [profile] = symbol ? await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)) : [];
+  const inputs: DraftInputs = { symbol, companyName: profile?.name ?? null, news: null, worthJudgmentId: null, worth: null, thesis: null, driver: null, chart: null, idea: { id: idea.id, title: idea.title, angle: idea.angle, sources: idea.sourceRefs } };
+  return draftPrompt(inputs, await ideaContext(db, idea, symbol));
+}
+
+/** Our covered companies in one line each (name, ticker, the story the price tells), for the macro tie. */
+async function coverage(db: Db): Promise<string> {
+  const tickers = await db.select({ symbol: gold.tickers.symbol }).from(gold.tickers).where(eq(gold.tickers.analysed, true));
+  const symbols = tickers.map((t) => t.symbol);
+  if (symbols.length === 0) return "";
+  const [profiles, narrs] = await Promise.all([
+    db.select({ symbol: gold.companyProfiles.symbol, name: gold.companyProfiles.name }).from(gold.companyProfiles).where(inArray(gold.companyProfiles.symbol, symbols)),
+    db.select({ symbol: narratives.symbol, text: narratives.text }).from(narratives).where(inArray(narratives.symbol, symbols)),
+  ]);
+  const name = new Map(profiles.map((p) => [p.symbol, p.name]));
+  return symbols.map((s) => `- ${name.get(s) ?? s} (${s}): ${narrs.filter((n) => n.symbol === s).map((n) => n.text).join(" / ") || "no narrative yet"}`).join("\n");
+}
+
+/** The day's plan (memoized per run): the same inputs for every account. A missing input falls back to a signal Idea. */
+export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ctx: SourceContext): Promise<SlotPlan[]> {
+  return memo(ctx, `sandbox-plan:${platform}:${day}`, async () => {
+    const ideas = await memo(ctx, "sandbox-ideas", () => topIdeas(db));
+    if (ideas.length === 0) return [];
+    const ideaAt = (i: number) => ideas[i % ideas.length];
+    const brief = (id: string) => memo(ctx, `sandbox-idea:${id}`, () => ideaBrief(db, id));
+    const articleFor = articleAngle(day);
+    const plans: SlotPlan[] = [];
+    let ideaIndex = 0;
+    for (const [slot, wanted] of SLOT_ANGLES.entries()) {
+      const idea = wanted === "macro-24h" ? null : ideaAt(ideaIndex++);
+      const signal = async (i: IdeaPick, note = ""): Promise<Omit<SlotPlan, "slot" | "article">> => ({
+        angle: "signal",
+        ideaId: i.id,
+        symbol: i.symbol,
+        input: { kind: "signal", label: `Idea: ${i.title}${note}`, url: null },
+        brief: `Angle: signal.\n${await brief(i.id)}`,
+      });
+      let p: Omit<SlotPlan, "slot" | "article">;
+      if (wanted === "signal") p = await signal(idea!);
+      else if (wanted === "macro-24h") {
+        const head = await memo(ctx, "sandbox-macro", () => topMacroHeadline(db));
+        if (!head) p = await signal(ideaAt(ideaIndex++), " (no macro headline today)");
+        else {
+          const since = new Date(Date.now() - 24 * 3600_000);
+          const tickerNews = await db.select({ title: goldNewsItems.title, publisher: goldNewsItems.publisher, symbols: goldNewsItems.symbols }).from(goldNewsItems).where(gte(goldNewsItems.publishedAt, since)).orderBy(desc(goldNewsItems.publishedAt)).limit(8);
+          p = {
+            angle: "macro-24h",
+            ideaId: null,
+            symbol: null,
+            input: { kind: "macro-24h", label: `${head.title}${head.publisher ? ` (${head.publisher})` : ""}`, url: head.url },
+            brief: [
+              "Angle: macro-24h.",
+              `Headline of the last 24 h: ${head.title}${head.publisher ? `, per ${head.publisher}` : ""}${head.publishedAt ? ` (${head.publishedAt.toISOString().slice(0, 16).replace("T", " ")} UTC)` : ""}. Found by searches: ${head.queries.join(", ")}.`,
+              "",
+              "Companies we cover (tie the headline to one only when its story supports the link):",
+              await memo(ctx, "sandbox-coverage", () => coverage(db)),
+              ...(tickerNews.length ? ["", "Their own headlines of the last 24 h:", ...tickerNews.map((n) => `- ${n.symbols.join(", ")}: ${n.title}${n.publisher ? ` (${n.publisher})` : ""}`)] : []),
+            ].join("\n"),
+          };
+        }
+      } else if (wanted === "trending-format") {
+        const [top] = platform === "substack" ? await memo(ctx, "sandbox-trending", () => topTrending(db, 1)) : [];
+        const format =
+          platform === "x"
+            ? "X has no free source of trending posts: pick the best fitting format from the curated list of skill angle-trending-format."
+            : top
+              ? `The best performing recent finance Substack post (${top.reactions} likes, ${top.restacks} restacks, ${top.comments} comments in ${Math.max(1, Math.round((Date.now() - top.postDate.getTime()) / 86400_000))} days, ${top.wordcount ?? "?"} words): title « ${top.title} »${top.subtitle ? `, subtitle « ${top.subtitle} »` : ""}. Copy its SHAPE only.`
+              : null;
+        if (!format) p = await signal(idea!, " (no trending post today)");
+        else
+          p = {
+            angle: "trending-format",
+            ideaId: idea!.id,
+            symbol: idea!.symbol,
+            input: platform === "x" ? { kind: "trending-format", label: `Curated X format, on: ${idea!.title}`, url: null } : { kind: "trending-format", label: `Format of « ${top!.title} » (${top!.publicationName ?? top!.host}), on: ${idea!.title}`, url: top!.url },
+            brief: `Angle: trending-format.\n${format}\n\nOur Idea to put in that shape:\n${await brief(idea!.id)}`,
+          };
+      } else {
+        const refs = await memo(ctx, "sandbox-competitor", async () => {
+          const hosts = REFERENCE_PUBLICATIONS.map((r) => r.host);
+          const since = new Date(Date.now() - 60 * 86400_000);
+          return db
+            .select({ url: content.contentPosts.url, host: content.contentPosts.publicationHost, title: content.contentPosts.title, subtitle: content.contentPosts.subtitle, excerpt: content.contentPosts.excerpt, publishedAt: content.contentPosts.publishedAt })
+            .from(content.contentPosts)
+            .where(and(inArray(content.contentPosts.publicationHost, hosts), gte(content.contentPosts.publishedAt, since)))
+            .orderBy(desc(content.contentPosts.publishedAt))
+            .limit(20);
+        });
+        const ref = refs.length ? refs[Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400_000) % refs.length] : null;
+        if (!ref) p = await signal(idea!, " (no competitor post today)");
+        else {
+          const pub = REFERENCE_PUBLICATIONS.find((r) => r.host === ref.host)?.name ?? ref.host;
+          p = {
+            angle: "competitor",
+            ideaId: idea!.id,
+            symbol: idea!.symbol,
+            input: { kind: "competitor", label: `Pattern of « ${ref.title} » (${pub}), on: ${idea!.title}`, url: ref.url },
+            brief: [
+              "Angle: competitor.",
+              `A reference publication's recent post: « ${ref.title} »${ref.subtitle ? `, « ${ref.subtitle} »` : ""}.`,
+              `Its opening (to learn the pattern, never to copy): ${(ref.excerpt ?? "").slice(0, 1200)}`,
+              "",
+              "Our Idea to rebuild in that pattern:",
+              await brief(idea!.id),
+            ].join("\n"),
+          };
+        }
+      }
+      plans.push({ slot, article: false, ...p });
+    }
+    // The Article: the first slot of the day's rotating angle (else the first slot).
+    (plans.find((p) => p.angle === articleFor) ?? plans[0]).article = true;
+    return plans;
+  });
+}
+
+// ------------------------------------------------------------------------------------------------ writer
+
+/** Frame of the call; the rules themselves are the skills. */
+export function sandboxSystem(skills: string, accountName: string, platform: SandboxPlatform, tone: string): string {
+  return [
+    `You write for the fake ${platform === "x" ? "X account" : "Substack publication"} « ${accountName} » in the ${tone.toUpperCase()} tone. It is a sandbox: nothing is published.`,
+    `Follow the skills below: content-matrix, ${platform}-${tone} (the section of each post's format), and the angle skill of each post.`,
+    "",
+    skills,
+  ].join("\n");
+}
+
+export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): string {
+  const blocks = plans.map((p) => `## Post ${p.slot + 1}: ${FORMAT_NAME[p.article ? ARTICLE[platform] : SHORT[platform]]}, angle ${p.angle}\n${p.brief}`);
+  return [
+    ...blocks,
+    "",
+    `Write the ${plans.length} posts in this order. Answer with JSON only, no prose, no code fence: {"posts": [...]} with exactly ${plans.length} items:`,
+    `a string for each ${FORMAT_NAME[SHORT[platform]]}, and {"title": "...", "subtitle": "...", "body": "<markdown with ## headings>"} for the ${FORMAT_NAME[ARTICLE[platform]]}.`,
+  ].join("\n\n");
+}
+
+export type ParsedPost = { title: string | null; subtitle: string | null; text: string };
+
+/** Reads the batch answer: one item per slot, the Article as an object. Throws with the reason. */
+export function parsePosts(text: string, plans: Pick<SlotPlan, "article">[]): ParsedPost[] {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end <= start) throw new Error("answer holds no JSON object");
   const posts = (JSON.parse(text.slice(start, end + 1)) as { posts?: unknown }).posts;
-  if (!Array.isArray(posts) || posts.length !== n) throw new Error(`expected ${n} posts, got ${Array.isArray(posts) ? posts.length : "none"}`);
+  if (!Array.isArray(posts) || posts.length !== plans.length) throw new Error(`expected ${plans.length} posts, got ${Array.isArray(posts) ? posts.length : "none"}`);
   return posts.map((p, i) => {
+    if (plans[i].article) {
+      const o = p as { title?: unknown; subtitle?: unknown; body?: unknown };
+      if (typeof o?.title !== "string" || typeof o.body !== "string" || !o.title.trim() || !o.body.trim()) throw new Error(`post ${i + 1} is not an article (title, subtitle, body)`);
+      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(o.body.trim()) };
+    }
     if (typeof p !== "string" || !p.trim()) throw new Error(`post ${i + 1} is empty`);
-    return stripDashes(p.trim());
+    return { title: null, subtitle: null, text: stripDashes(p.trim()) };
   });
 }
 
-/** One Idea in words (the same block content-drafts hands its writer), read once per run for every account. */
-function ideaBlock(db: Db, ctx: SourceContext, ideaId: string): Promise<string> {
-  return memo(ctx, `sandbox-idea:${ideaId}`, async () => {
-    const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
-    if (!idea) throw new Error(`idea ${ideaId} not found`);
-    const symbol = idea.symbol ?? idea.sourceRefs.find((r) => r.symbol)?.symbol ?? "";
-    const [profile] = symbol ? await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)) : [];
-    const inputs: DraftInputs = {
-      symbol,
-      companyName: profile?.name ?? null,
-      news: null,
-      worthJudgmentId: null,
-      worth: null,
-      thesis: null,
-      driver: null,
-      chart: null,
-      idea: { id: idea.id, title: idea.title, angle: idea.angle, sources: idea.sourceRefs },
-    };
-    return draftPrompt(inputs, await ideaContext(db, idea, symbol));
-  });
-}
-
-type PostsRequest = { promptVersion: string; model: string; accountId: string; day: string; ideas: IdeaPick[]; system: string; prompt: string };
+type PostsRequest = { version: string; skillHash: string; model: string; accountId: string; platform: SandboxPlatform; day: string; plans: SlotPlan[]; prompt: string };
 
 /** One call per account per day: its 5 posts. Subject `<account id>|<day>`. */
 export const claudePosts: Source = {
@@ -151,18 +263,17 @@ export const claudePosts: Source = {
     const [accountId, day] = subject.split("|");
     const [account] = await db.select().from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, accountId));
     if (!account) throw new Error(`sandbox account ${accountId} not found`);
-    const ideas = await memo(ctx, "sandbox-top-ideas", () => topIdeas(db));
-    if (ideas.length === 0) throw new Error("no Ideas to write");
-    const blocks = await Promise.all(ideas.map((i) => ideaBlock(db, ctx, i.id)));
-    const prompt = blocks.map((b, i) => `## Idea ${i + 1}\n${b}`).join("\n\n");
-    const system = sandboxSystem(account.tone, account.platform, account.displayName, ideas.length);
-    const { text, model } = await ctx.complete({ system, prompt });
-    const request: PostsRequest = { promptVersion: PROMPT_VERSION, model, accountId, day, ideas, system, prompt };
+    const plans = await dayPlan(db, account.platform, day, ctx);
+    if (plans.length === 0) throw new Error("no Ideas to write");
+    const skills = await loadSkills(account.platform, account.tone);
+    const prompt = sandboxPrompt(plans, account.platform);
+    const { text, model } = await ctx.complete({ system: sandboxSystem(skills.text, account.displayName, account.platform, account.tone), prompt });
+    const request: PostsRequest = { version: SANDBOX_VERSION, skillHash: skills.hash, model, accountId, platform: account.platform, day, plans, prompt };
     const outcome = { request, httpStatus: null, payloadText: text };
     try {
-      parsePosts(text, ideas.length);
+      parsePosts(text, plans);
     } catch (err) {
-      return { ...outcome, error: `answer is not ${ideas.length} posts: ${err instanceof Error ? err.message : String(err)}` };
+      return { ...outcome, error: `answer is not the ${plans.length} posts: ${err instanceof Error ? err.message : String(err)}` };
     }
     return outcome;
   },
@@ -183,14 +294,15 @@ export async function sandboxPostSubjects(db: Db, _ctx?: unknown, now = new Date
 
 export const sandboxPosts: Dimension = {
   name: SANDBOX_POSTS_DIMENSION,
-  description: "Sandbox: each day the top 5 Ideas written by every fake account in its tone (X posts, Substack Notes). Never published.",
+  description: "Sandbox: every fake account writes 5 posts a day (4 short + 1 Article) over 4 angles, in its tone, from the skills. Never published.",
   sources: [claudePosts],
   subjects: sandboxPostSubjects,
   promote: promoteSandboxPosts,
 };
 
 /** The Idea's image for a platform: its newest ready visual of the first kind that exists (gold, no bytes). */
-async function visualFor(db: Db, ideaId: string, platform: SandboxPlatform): Promise<string | null> {
+async function visualFor(db: Db, ideaId: string | null, platform: SandboxPlatform): Promise<string | null> {
+  if (!ideaId) return null;
   const rows = await db
     .select({ id: content.goldContentVisuals.id, kind: content.goldContentVisuals.kind, mime: content.goldContentVisuals.mime })
     .from(content.goldContentVisuals)
@@ -209,22 +321,26 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
   const touched: { accountId: string; day: string }[] = [];
   for (const f of rows.filter((r) => r.source === CLAUDE_SOURCE && !r.error)) {
     const req = f.request as PostsRequest;
-    const [account] = await db.select({ platform: sandbox.sandboxAccounts.platform }).from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, req.accountId));
-    if (!account) continue;
-    const posts = parsePosts(f.payloadText ?? "", req.ideas.length);
-    for (const [slot, text] of posts.entries()) {
-      const idea = req.ideas[slot];
+    const posts = parsePosts(f.payloadText ?? "", req.plans);
+    for (const [i, post] of posts.entries()) {
+      const plan = req.plans[i];
       const inserted = await db
         .insert(sandbox.sandboxPosts)
         .values({
           accountId: req.accountId,
           day: req.day,
-          slot,
-          ideaId: idea.id,
-          symbol: idea.symbol,
-          text,
-          visualId: await visualFor(db, idea.id, account.platform),
-          postAt: new Date(`${req.day}T${String(SLOT_HOURS_UTC[slot]).padStart(2, "0")}:00:00Z`),
+          slot: plan.slot,
+          ideaId: plan.ideaId,
+          symbol: plan.symbol,
+          format: plan.article ? ARTICLE[req.platform] : SHORT[req.platform],
+          angle: plan.angle,
+          title: post.title,
+          subtitle: post.subtitle,
+          text: post.text,
+          input: plan.input,
+          skillHash: req.skillHash,
+          visualId: await visualFor(db, plan.ideaId, req.platform),
+          postAt: new Date(`${req.day}T${String(SLOT_HOURS_UTC[plan.slot]).padStart(2, "0")}:00:00Z`),
           model: req.model,
           sources: [CLAUDE_SOURCE],
           bronzeIds: [f.id],
@@ -241,10 +357,9 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
 
 /** gold.sandbox_posts for one account's day (the only rows a run changes), each text as it would be published. */
 export async function rebuildGoldPosts(db: Db, accountId: string, day: string) {
-  const [account] = await db.select({ platform: sandbox.sandboxAccounts.platform }).from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, accountId));
   const posts = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, accountId), eq(sandbox.sandboxPosts.day, day)));
-  if (!account || posts.length === 0) return;
-  await db.delete(sandbox.goldSandboxPosts).where(and(eq(sandbox.goldSandboxPosts.accountId, accountId), eq(sandbox.goldSandboxPosts.day, day), inArray(sandbox.goldSandboxPosts.slot, posts.map((p) => p.slot))));
+  if (posts.length === 0) return;
+  await db.delete(sandbox.goldSandboxPosts).where(and(eq(sandbox.goldSandboxPosts.accountId, accountId), eq(sandbox.goldSandboxPosts.day, day)));
   await db.insert(sandbox.goldSandboxPosts).values(
     posts.map((p) => ({
       id: p.id,
@@ -253,7 +368,12 @@ export async function rebuildGoldPosts(db: Db, accountId: string, day: string) {
       slot: p.slot,
       ideaId: p.ideaId,
       symbol: p.symbol,
-      text: withDisclaimer(FORMAT_OF[account.platform], p.text),
+      format: p.format,
+      angle: p.angle,
+      title: p.title,
+      subtitle: p.subtitle,
+      text: withDisclaimer(p.format === "x-article" || p.format === "substack-article" ? "substack-article" : "x-post", p.text),
+      input: p.input,
       visualId: p.visualId,
       postAt: p.postAt,
     })),
