@@ -11,7 +11,7 @@ import {
   LinkSimpleIcon,
 } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
-import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat, SandboxTone } from "@/db/schema/sandbox";
+import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat } from "@/db/schema/sandbox";
 
 /**
  * Sandbox pages (Kevin 2026-11-11): fake X profiles and Substack publications drawn as close to the real sites as we can,
@@ -20,19 +20,14 @@ import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat, 
  * (skill content-matrix); an Article shows as a card that opens in the page (`?article=<id>`).
  */
 
-export const TONE_LABEL: Record<SandboxTone, { name: string; line: string }> = {
-  urgent: { name: "Urgent", line: "Breaking-news alarm, one shock number." },
-  balanced: { name: "Balanced", line: "Our current drafts' tone." },
-  neutral: { name: "Neutral", line: "Sober research note, no emoji." },
-};
 export const FORMAT_LABEL: Record<SandboxFormat, string> = { "x-post": "X post", "x-article": "X Article", "substack-note": "Note", "substack-article": "Article" };
 export const ANGLE_LABEL: Record<SandboxAngle, string> = { signal: "Signal", "macro-24h": "Macro 24h", "trending-format": "Trending format", competitor: "Competitor" };
 const ANGLES = Object.keys(ANGLE_LABEL) as SandboxAngle[];
 const isArticle = (f: SandboxFormat) => f === "x-article" || f === "substack-article";
 
-export function SandboxLabel() {
+function SandboxLabel() {
   return (
-    <Badge variant="outline" className="self-start">
+    <Badge variant="outline">
       Sandbox, not published
     </Badge>
   );
@@ -64,7 +59,7 @@ function hrefWith(base: string, view: SandboxView, change: Partial<SandboxView>)
   return s ? `${base}?${s}` : base;
 }
 
-/** Format and angle chips above the timeline (Dualis console look: they are ours, not the site's). */
+/** One row: the « not published » badge, then format and angle chips above the timeline (Dualis console look: they are ours, not the site's). */
 export function SandboxFilters({ base, view, formats }: { base: string; view: SandboxView; formats: SandboxFormat[] }) {
   const chip = (active: boolean, href: string, label: string) => (
     <Link key={href + label} href={href} className={`rounded-full border px-3 py-1 text-sm ${active ? "border-transparent bg-kumo-brand text-white" : "border-kumo-line bg-kumo-base text-kumo-default hover:bg-kumo-tint"}`}>
@@ -72,17 +67,14 @@ export function SandboxFilters({ base, view, formats }: { base: string; view: Sa
     </Link>
   );
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-sm text-kumo-subtle">Format</span>
-        {chip(view.format === null, hrefWith(base, view, { format: null, article: null }), "All")}
-        {formats.map((f) => chip(view.format === f, hrefWith(base, view, { format: f, article: null }), FORMAT_LABEL[f]))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="w-16 text-sm text-kumo-subtle">Angle</span>
-        {chip(view.angle === null, hrefWith(base, view, { angle: null, article: null }), "All")}
-        {ANGLES.map((a) => chip(view.angle === a, hrefWith(base, view, { angle: a, article: null }), ANGLE_LABEL[a]))}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <SandboxLabel />
+      <span className="ml-4 text-sm text-kumo-subtle">Format</span>
+      {chip(view.format === null, hrefWith(base, view, { format: null, article: null }), "All")}
+      {formats.map((f) => chip(view.format === f, hrefWith(base, view, { format: f, article: null }), FORMAT_LABEL[f]))}
+      <span className="ml-4 text-sm text-kumo-subtle">Angle</span>
+      {chip(view.angle === null, hrefWith(base, view, { angle: null, article: null }), "All")}
+      {ANGLES.map((a) => chip(view.angle === a, hrefWith(base, view, { angle: a, article: null }), ANGLE_LABEL[a]))}
     </div>
   );
 }
@@ -240,9 +232,6 @@ export function XProfile({ account, posts, total, pairedHref, base, view }: Page
   return (
     <div className="mx-auto w-full max-w-[600px] border-x bg-white" style={{ borderColor: X.rule, color: X.ink, fontFamily: X.font }}>
       <div className="flex items-center gap-8 px-4 py-1.5">
-        <Link href="/sandbox" aria-label="Back" className="rounded-full p-2 hover:bg-black/5">
-          <ArrowLeftIcon size={20} />
-        </Link>
         <div className="flex flex-col">
           <span className="text-[20px] leading-6 font-extrabold">{account.displayName}</span>
           <span className="text-[13px]" style={{ color: X.muted }}>
