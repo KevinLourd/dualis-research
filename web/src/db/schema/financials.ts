@@ -4,7 +4,8 @@ import { silver } from "./silver";
 
 /**
  * Financial statements, 5 years, as published (dimension `financials`).
- * A period = (period_type, period_end): "year" (fiscal year) or "quarter" (3 months), end = fiscal period end month
+ * A period = (period_type, period_end): "year" (fiscal year), "half" (6 months, an interim report) or "quarter"
+ * (3 months), end = fiscal period end month
  * "YYYY-MM"; "month" carries the month-end share price only (statement "market").
  * Values are in full currency units (KRW, not KRW million), per share for EPS and prices, a count for shares.
  * Outflows (capex, dividends paid, buybacks) are stored POSITIVE.
@@ -30,7 +31,7 @@ export const financialLines = silver.table(
   "financial_lines",
   {
     symbol: text("symbol").notNull(),
-    periodType: text("period_type").$type<"year" | "quarter" | "month">().notNull(),
+    periodType: text("period_type").$type<"year" | "half" | "quarter" | "month">().notNull(),
     periodEnd: text("period_end").notNull(),
     /** Canonical line key (`lines.ts`): revenue, operating-income, cash... or `segment:<axis>:<name>`. */
     line: text("line").notNull(),
@@ -56,7 +57,7 @@ export const goldFinancialLines = gold.table(
   "financial_lines",
   {
     symbol: text("symbol").notNull(),
-    periodType: text("period_type").$type<"year" | "quarter" | "month">().notNull(),
+    periodType: text("period_type").$type<"year" | "half" | "quarter" | "month">().notNull(),
     periodEnd: text("period_end").notNull(),
     line: text("line").notNull(),
     statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment">().notNull(),
@@ -99,6 +100,46 @@ export const financialMetrics = gold.table(
   (t) => [primaryKey({ columns: [t.symbol, t.periodType, t.periodEnd, t.metric] }), index("gold_financial_metrics_symbol").on(t.symbol)],
 );
 export type GoldFinancialMetric = typeof financialMetrics.$inferSelect;
+
+/**
+ * Revenue per stream (`streams.ts`), rebuilt from gold.financial_lines each run: one row per (ticker, stream, period).
+ * A stream = one business line on one axis (`segment:<axis>:<name>`: product, business, region, customer) or the
+ * total (`revenue`). Each row says how the stream moved against the same period a year earlier, its share of total
+ * revenue, and its last 12 months when an interim period follows the last fiscal year. Data only: the analysis reads
+ * these rows and judges what they mean.
+ */
+export const revenueStreams = gold.table(
+  "revenue_streams",
+  {
+    symbol: text("symbol").notNull(),
+    /** "revenue" for the total, else the segment line key. */
+    line: text("line").notNull(),
+    /** "total", "product", "business", "region", "customer". */
+    axis: text("axis").notNull(),
+    name: text("name").notNull(),
+    periodType: text("period_type").$type<"year" | "half" | "quarter">().notNull(),
+    periodEnd: text("period_end").notNull(),
+    value: doublePrecision("value").notNull(),
+    currency: text("currency"),
+    /** Same stream, same period length, one year earlier; growth = value / prior - 1 (null when prior <= 0). */
+    priorValue: doublePrecision("prior_value"),
+    growth: doublePrecision("growth"),
+    /** Stream / total revenue of the same period (null for the total or when the total is missing). */
+    shareOfTotal: doublePrecision("share_of_total"),
+    /** Sum of the axis' streams / total revenue of that period: 1 = the streams add up to the total. */
+    axisCoverage: doublePrecision("axis_coverage"),
+    /** Last 12 months ending at this period end: last fiscal year + interim periods since - the same periods a year earlier. */
+    ltmValue: doublePrecision("ltm_value"),
+    ltmPrior: doublePrecision("ltm_prior"),
+    ltmGrowth: doublePrecision("ltm_growth"),
+    ltmFormula: text("ltm_formula"),
+    sources: text("sources").array().notNull(),
+    citation: jsonb("citation").$type<LineObservation["citation"]>(),
+    rebuiltAt,
+  },
+  (t) => [primaryKey({ columns: [t.symbol, t.line, t.periodType, t.periodEnd] }), index("gold_revenue_streams_symbol").on(t.symbol)],
+);
+export type GoldRevenueStream = typeof revenueStreams.$inferSelect;
 
 /**
  * One row per ticker: the valuation inputs a fair value needs. EV/EBITDA history over the last 5 fiscal years

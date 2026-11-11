@@ -8,13 +8,13 @@ import { LINES, type LineKey } from "../financials/lines";
 /**
  * The stored series a ticker's Exhibits can draw from: every number on a chart comes from here (gold), never from
  * the model. Keys:
- *   line:<line> / qline:<line>        reported line, fiscal years / quarters (gold.financial_lines)
+ *   line:<line> / hline:<line> / qline:<line>   reported line, fiscal years / half years / quarters (gold.financial_lines)
  *   metric:<m> / qmetric:<m>          derived metric (gold.financial_metrics)
  *   consensus:<m> / actual:<m>        analyst mean vs reported actual per fiscal year (gold.consensus)
  *   qconsensus:<m> / qactual:<m>      same per quarter
  *   price                             month-end close, 5 years
  */
-export type StoredSeries = ExhibitSeries & { periodType: "year" | "quarter" | "month"; points: Map<string, number> };
+export type StoredSeries = ExhibitSeries & { periodType: "year" | "half" | "quarter" | "month"; points: Map<string, number> };
 
 const titleCase = (s: string) => s.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const METRIC_NAMES: Record<string, string> = {
@@ -51,7 +51,9 @@ export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string,
     if (l.periodType === "month") continue;
     const name = l.line.startsWith("segment:") ? `Segment revenue: ${l.line.split(":").slice(2).join(":")}` : (LINES[l.line as LineKey]?.name ?? titleCase(l.line));
     const unit = /^eps-/.test(l.line) ? "per-share" : /^shares-/.test(l.line) ? "count" : "currency";
-    put(`${l.periodType === "year" ? "line" : "qline"}:${l.line}`, { label: l.periodType === "year" ? name : `${name} (quarterly)`, unit, currency: unit === "count" ? null : l.currency, periodType: l.periodType }, l.periodEnd, l.value, l.sources);
+    const prefix = { year: "line", half: "hline", quarter: "qline" }[l.periodType];
+    const suffix = { year: "", half: " (half-yearly)", quarter: " (quarterly)" }[l.periodType];
+    put(`${prefix}:${l.line}`, { label: `${name}${suffix}`, unit, currency: unit === "count" ? null : l.currency, periodType: l.periodType }, l.periodEnd, l.value, l.sources);
   }
   for (const m of await db.select().from(financialMetrics).where(eq(financialMetrics.symbol, symbol))) {
     const name = METRIC_NAMES[m.metric] ?? titleCase(m.metric);
@@ -69,7 +71,7 @@ export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string,
 }
 
 /** How many periods an exhibit shows per period type. */
-const WINDOW = { year: 6, quarter: 8, month: 60 } as const;
+const WINDOW = { year: 6, half: 6, quarter: 8, month: 60 } as const;
 
 /** The data of one exhibit: the union of its series' periods (latest window), one value per series, null when unpublished. */
 export function exhibitData(catalog: Map<string, StoredSeries>, keys: string[]): { series: ExhibitSeries[]; points: ExhibitPoint[]; sources: string[] } | null {

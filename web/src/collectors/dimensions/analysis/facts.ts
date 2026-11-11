@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { quoteStamp } from "../intraday-price";
 import { consensus } from "@/db/schema/consensus";
 import { fairValues } from "@/db/schema/analysis";
-import { valuations } from "@/db/schema/financials";
+import { revenueStreams, valuations, type GoldRevenueStream } from "@/db/schema/financials";
 import { valuationReports } from "@/db/schema/valuation";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
@@ -44,6 +44,44 @@ export function fnv(text: string): string {
 
 const TABLE_LINES = ["line:revenue", "line:gross-profit", "line:operating-income", "line:depreciation-amortization", "metric:ebitda", "line:net-income", "line:eps-diluted", "line:eps-basic", "metric:operating-margin", "metric:ebitda-margin", "metric:revenue-growth", "line:cfo", "line:capex", "metric:fcf", "line:dividends-paid", "line:buybacks", "line:cash", "line:total-debt", "metric:net-debt", "line:equity", "line:shares-outstanding", "metric:ev-ebitda", "metric:pe"];
 const QUARTER_LINES = ["qline:revenue", "qline:operating-income", "qline:net-income", "qmetric:operating-margin"];
+const HALF_LINES = ["hline:revenue", "hline:gross-profit", "hline:operating-income", "hline:net-income"];
+
+const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
+const periodName = (r: Pick<GoldRevenueStream, "periodType" | "periodEnd">) => (r.periodType === "year" ? `FY ${r.periodEnd}` : `${r.periodType === "half" ? "6 months" : "3 months"} to ${r.periodEnd}`);
+
+/**
+ * Every revenue stream the filings report (gold.revenue_streams), the total first: the last 3 fiscal years and the
+ * interim periods after them, each with its growth on the same period a year earlier, its share of total revenue,
+ * and the last 12 months at an interim end. Facts only: what they mean is the model's call.
+ */
+export function streamsText(rows: GoldRevenueStream[]): string | null {
+  if (rows.length === 0) return null;
+  const byLine = new Map<string, GoldRevenueStream[]>();
+  for (const r of rows) byLine.set(r.line, [...(byLine.get(r.line) ?? []), r]);
+  const latestYear = (rs: GoldRevenueStream[]) => rs.filter((r) => r.periodType === "year").sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+  const lines = [...byLine.entries()].sort(([a, ra], [b, rb]) => (a === "revenue" ? -1 : b === "revenue" ? 1 : ra[0].axis.localeCompare(rb[0].axis) || (latestYear(rb)?.value ?? 0) - (latestYear(ra)?.value ?? 0)));
+  const out = ["Revenue by stream (each period against the same period a year earlier; share = of total revenue that period; LTM = last 12 months):"];
+  for (const [, rs] of lines) {
+    const years = rs.filter((r) => r.periodType === "year").sort((a, b) => a.periodEnd.localeCompare(b.periodEnd)).slice(-3);
+    const lastYear = years.at(-1)?.periodEnd ?? "";
+    const interim = rs.filter((r) => r.periodType !== "year" && r.periodEnd > minusYear(lastYear)).sort((a, b) => a.periodEnd.localeCompare(b.periodEnd) || a.periodType.localeCompare(b.periodType));
+    const cells = [...years, ...interim].map((r) => {
+      const notes = [pct(r.growth), r.shareOfTotal !== null ? `${(r.shareOfTotal * 100).toFixed(0)}% of total` : null].filter(Boolean).join(", ");
+      const ltm = r.ltmValue !== null ? `; LTM ${fmt(r.ltmValue)}${r.ltmGrowth !== null ? ` (${pct(r.ltmGrowth)} on the LTM a year earlier)` : ""} = ${r.ltmFormula}` : "";
+      return `${periodName(r)} ${fmt(r.value)}${notes ? ` (${notes})` : ""}${ltm}`;
+    });
+    out.push(`- ${rs[0].axis === "total" ? rs[0].name : `${rs[0].axis}: ${rs[0].name}`}: ${cells.join(" | ")}`);
+  }
+  // How much of the total each axis covers in its latest period: streams that do not add up are said so.
+  const axes = [...new Set(rows.filter((r) => r.axis !== "total").map((r) => r.axis))];
+  const coverage = axes.map((axis) => {
+    const r = rows.filter((x) => x.axis === axis && x.axisCoverage !== null).sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+    return r ? `${axis} streams add up to ${(r.axisCoverage! * 100).toFixed(0)}% of total revenue (${periodName(r)})` : null;
+  });
+  if (coverage.some(Boolean)) out.push(`Coverage: ${coverage.filter(Boolean).join("; ")}.`);
+  return out.join("\n");
+}
+const minusYear = (ym: string) => (ym ? `${Number(ym.slice(0, 4)) - 1}${ym.slice(4)}` : "");
 
 function table(catalog: Map<string, StoredSeries>, keys: string[], last: number): string {
   const rows = keys.map((k) => catalog.get(k)).filter((s): s is StoredSeries => !!s);
@@ -62,7 +100,8 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const [vreport] = await db.select({ summary: valuationReports.summary }).from(valuationReports).where(eq(valuationReports.symbol, symbol));
   const catalog = await seriesCatalog(db, symbol);
   const currency = valuation?.currency ?? profile?.currency ?? null;
-  const segments = [...catalog.values()].filter((s) => s.key.startsWith("line:segment:"));
+  const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
+  const halves = HALF_LINES.filter((k) => catalog.has(k));
   const price = catalog.get("price");
   const closes = price ? [...price.points].sort((a, b) => a[0].localeCompare(b[0])).slice(-24) : [];
   const items = (await itemsOf(db, symbol)).slice(0, 40);
@@ -79,7 +118,8 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     "",
     "Last quarters:",
     table(catalog, QUARTER_LINES, 6),
-    segments.length ? `\nSegment revenue:\n${table(catalog, segments.map((s) => s.key), 3)}` : null,
+    halves.length ? `\nLast half years:\n${table(catalog, halves, 4)}` : null,
+    streams.length ? `\n${streamsText(streams)}` : null,
     "",
     valuation
       ? `Valuation from gold: EV/EBITDA over fiscal years ${valuation.evEbitdaYears.join(", ") || "none"}: low ${fmt(valuation.evEbitdaLow, "multiple")}, median ${fmt(valuation.evEbitdaMedian, "multiple")}, high ${fmt(valuation.evEbitdaHigh, "multiple")}. Latest shares outstanding ${fmt(valuation.sharesOutstanding)}; net debt ${fmt(valuation.netDebt)} (${valuation.inputs["total-debt"]?.period ?? "n/a"}); EBITDA ${fmt(valuation.ebitda)} (${valuation.ebitdaBasis ?? "n/a"}).`

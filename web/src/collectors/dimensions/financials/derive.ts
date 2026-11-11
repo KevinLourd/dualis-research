@@ -72,7 +72,8 @@ export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
   const currency = reportingCurrency(lines);
   const at = new Map(lines.map((l) => [`${l.periodType}|${l.periodEnd}|${l.line}`, l]));
   const get = (pt: string, pe: string, line: string) => at.get(`${pt}|${pe}|${line}`);
-  const periods = [...new Set(lines.filter((l) => l.periodType !== "month").map((l) => `${l.periodType}|${l.periodEnd}`))].map((k) => k.split("|") as ["year" | "quarter", string]);
+  // Metrics per fiscal year and quarter; half years feed the revenue streams (`streams.ts`).
+  const periods = [...new Set(lines.filter((l) => l.periodType === "year" || l.periodType === "quarter").map((l) => `${l.periodType}|${l.periodEnd}`))].map((k) => k.split("|") as ["year" | "quarter", string]);
   const out: Metric[] = [];
   const metrics = new Map<string, number>();
 

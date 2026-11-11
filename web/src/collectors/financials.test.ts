@@ -3,7 +3,7 @@ import { deflateRawSync } from "node:zlib";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fetches } from "@/db/schema/bronze";
-import { financialLines, financialMetrics, goldFinancialLines, valuations } from "@/db/schema/financials";
+import { financialLines, financialMetrics, goldFinancialLines, revenueStreams, valuations } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { analyseEveryTicker, testDb } from "@/test/db";
@@ -54,6 +54,14 @@ const TEN_K = `<html><body>
 <p>Series A, issued and outstanding <ix:nonFraction name="us-gaap:PreferredStockSharesIssued" contextRef="c-A" unitRef="Shares"><ix:nonFraction name="us-gaap:PreferredStockSharesOutstanding" contextRef="c-A" unitRef="Shares">1,000,000</ix:nonFraction></ix:nonFraction> shares.
 Series B <ix:nonFraction name="us-gaap:PreferredStockSharesIssued" contextRef="c-B" unitRef="Shares" format="ixt:fixed-zero">-</ix:nonFraction> shares.</p>
 <p>Liquidation preference of $<ix:nonFraction name="us-gaap:PreferredStockLiquidationPreference" contextRef="c-A-terms" unitRef="USDPShares">25.00</ix:nonFraction> per share.</p>
+<xbrli:context id="d-fy-svc"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="srt:ProductOrServiceAxis">mnro:ServiceMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2025-03-30</xbrli:startDate><xbrli:endDate>2026-03-28</xbrli:endDate></xbrli:period></xbrli:context>
+<xbrli:context id="d-fy-tires"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="srt:ProductOrServiceAxis">mnro:TiresMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2025-03-30</xbrli:startDate><xbrli:endDate>2026-03-28</xbrli:endDate></xbrli:period></xbrli:context>
+<xbrli:context id="d-py-svc"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="srt:ProductOrServiceAxis">mnro:ServiceMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:startDate>2024-03-31</xbrli:startDate><xbrli:endDate>2025-03-29</xbrli:endDate></xbrli:period></xbrli:context>
+<xbrli:context id="d-fy-total"><xbrli:entity><xbrli:identifier scheme="x">1</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-03-30</xbrli:startDate><xbrli:endDate>2026-03-28</xbrli:endDate></xbrli:period></xbrli:context>
+<table><tr><td>Service <ix:nonFraction name="us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax" contextRef="d-fy-svc" unitRef="USD" scale="6">690</ix:nonFraction></td>
+<td>Tires <ix:nonFraction name="us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax" contextRef="d-fy-tires" unitRef="USD" scale="6">460</ix:nonFraction></td>
+<td>Service prior <ix:nonFraction name="us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax" contextRef="d-py-svc" unitRef="USD" scale="6">600</ix:nonFraction></td>
+<td>Total <ix:nonFraction name="us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax" contextRef="d-fy-total" unitRef="USD" scale="6">1,150</ix:nonFraction></td></tr></table>
 </body></html>`;
 const SEC_SUBMISSIONS = { filings: { recent: { form: ["8-K", "10-K"], reportDate: ["2026-06-01", "2026-03-28"], accessionNumber: ["0001-26-2", "0001-26-1"], primaryDocument: ["x8k.htm", "mnro-10k.htm"] } } };
 
@@ -186,6 +194,20 @@ describe("financials dimension", () => {
     await runDimension(db, financials, { trigger: "test", ctx: { ...ctx(), fetch: counting } });
     expect(seen.filter((u) => u.includes("/Archives/"))).toEqual([]);
     expect((await line("MNRO", "year", "2026-03", "preferred-stock")).value).toBe(25_000_000);
+  });
+
+  it("reads revenue per segment from the 10-K and writes each stream with its growth and share of total", async () => {
+    await runDimension(db, financials, { trigger: "test", ctx: ctx() });
+    expect(await line("MNRO", "year", "2026-03", "segment:product:Service")).toMatchObject({ value: 690_000_000, sources: ["sec-filings"], statement: "segment" });
+    const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, "MNRO"));
+    const service = streams.find((r) => r.line === "segment:product:Service" && r.periodEnd === "2026-03")!;
+    expect(service).toMatchObject({ axis: "product", name: "Service", periodType: "year", priorValue: 600_000_000 });
+    expect(service.growth).toBeCloseTo(0.15, 6);
+    expect(service.shareOfTotal).toBeCloseTo(0.6, 6);
+    expect(service.axisCoverage).toBeCloseTo(1, 6);
+    // The undimensioned total is company facts' line, never a segment.
+    expect(streams.filter((r) => r.axis === "total").map((r) => r.periodEnd).sort()).toEqual(["2025-03", "2026-03"]);
+    expect(streams.some((r) => r.name === "")).toBe(false);
   });
 
   it("reads Korean statements from DART: borrowings summed into debt, the key never stored", async () => {

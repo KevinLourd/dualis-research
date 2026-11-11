@@ -5,7 +5,7 @@ import { getJson, isUsSymbol } from "../../http";
 import { BROWSER_HEADERS, SEC_HEADERS, dartCorpCode, isMarket, isoDate, memo, tickerBase } from "../../markets";
 import type { FetchOutcome, Source, SourceContext } from "../../types";
 import { parseNumber } from "../company-profile/sources";
-import { LINES, isLineKey, reading, segmentLine, type LineReading, type PeriodType } from "./lines";
+import { LINES, SEGMENT_AXES, isLineKey, reading, segmentLine, type LineReading, type PeriodType } from "./lines";
 import { unzip } from "./zip";
 
 /** A financials source = how to fetch one ticker's statements + how to read canonical lines out of the raw answer. */
@@ -464,19 +464,36 @@ const SEC_FILING_FACTS = new Set([
   "us-gaap:PreferredStockLiquidationPreference",
   "us-gaap:PreferredStockLiquidationPreferenceValue",
 ]);
+/**
+ * Revenue per business line: the segment note tags each line's revenue on ONE axis (product or service, business
+ * segment, region, major customer), which company facts drop with every dimensioned fact.
+ */
+const SEC_REVENUE_FACTS = new Set(["us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax", "us-gaap:Revenues", "us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax"]);
+const SEC_SEGMENT_AXES: Record<string, (typeof SEGMENT_AXES)[number]> = {
+  ProductOrServiceAxis: "product",
+  StatementBusinessSegmentsAxis: "business",
+  StatementGeographicalAxis: "region",
+  MajorCustomersAxis: "customer",
+};
 const SEC_ANNUAL_FORMS = new Set(["10-K", "20-F", "40-F", "10-KT"]);
-/** A tagged fact: its date (instant), the members of its context (share class...), its value in full units. */
-export type SecFilingFact = { name: string; date: string; members: string[]; value: number };
-export type SecFilingDoc = { accession: string; form: string; reportDate: string; url: string; facts: SecFilingFact[] };
+/** What a filing read keeps: a document read under an older version is read again (v2 added revenue per segment). */
+const SEC_FILING_FACTS_VERSION = 2;
+/**
+ * A tagged fact: its date (instant, or the end of a duration), the start of a duration, the members of its context
+ * (share class, segment...) with their axes, its value in full units.
+ */
+export type SecFilingFact = { name: string; date: string; start?: string; members: string[]; axes?: string[]; unit?: string; value: number };
+export type SecFilingDoc = { accession: string; form: string; reportDate: string; url: string; facts: SecFilingFact[]; factsVersion?: number };
 
-/** Reads the preferred-stock facts out of one inline XBRL document. */
+/** Reads the preferred-stock facts and the revenue per segment out of one inline XBRL document. */
 export function inlineXbrlFacts(html: string): SecFilingFact[] {
-  const contexts = new Map<string, { date: string; members: string[] }>();
+  const contexts = new Map<string, { date: string; start?: string; members: string[]; axes: string[] }>();
   for (const m of html.matchAll(/<(?:xbrli:)?context\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/(?:xbrli:)?context>/g)) {
     const date = m[2].match(/<(?:xbrli:)?instant>\s*([\d-]+)\s*</)?.[1] ?? m[2].match(/<(?:xbrli:)?endDate>\s*([\d-]+)\s*</)?.[1];
     if (!date) continue;
-    const members = [...m[2].matchAll(/<xbrldi:explicitMember\b[^>]*>\s*([^<\s]+)\s*</g)].map((x) => x[1]);
-    contexts.set(m[1], { date, members });
+    const start = m[2].match(/<(?:xbrli:)?startDate>\s*([\d-]+)\s*</)?.[1];
+    const dims = [...m[2].matchAll(/<xbrldi:explicitMember\b([^>]*)>\s*([^<\s]+)\s*</g)];
+    contexts.set(m[1], { date, ...(start ? { start } : {}), members: dims.map((x) => x[2]), axes: dims.map((x) => x[1].match(/\bdimension="([^"]+)"/)?.[1] ?? "") });
   }
   const out: SecFilingFact[] = [];
   // Facts nest (an "issued" fact wrapping the "outstanding" one): each opening tag reads the text up to the next close.
@@ -485,17 +502,49 @@ export function inlineXbrlFacts(html: string): SecFilingFact[] {
     if (end < 0) continue;
     const attr = (k: string) => m[1].match(new RegExp(`\\b${k}="([^"]*)"`))?.[1];
     const name = attr("name");
-    if (!name || !SEC_FILING_FACTS.has(name)) continue;
+    if (!name || !(SEC_FILING_FACTS.has(name) || SEC_REVENUE_FACTS.has(name))) continue;
     const ctx = contexts.get(attr("contextRef") ?? "");
     if (!ctx) continue;
+    // Revenue: one segment axis and a duration only (a total, or a line split on two axes, is read elsewhere or skipped).
+    if (SEC_REVENUE_FACTS.has(name) && !(ctx.start && ctx.axes.length === 1 && SEC_SEGMENT_AXES[ctx.axes[0].replace(/^.*:/, "")])) continue;
     const text = html.slice(m.index + m[0].length, end).replace(/<[^>]+>/g, "").trim();
     const zero = /zerodash|fixed-zero/.test(attr("format") ?? "") || /^[-–—]$/.test(text);
     const raw = zero ? 0 : parseNumber(text.replace(/[()]/g, ""));
     if (raw === null) continue;
     const value = raw * 10 ** Number(attr("scale") ?? 0) * (attr("sign") === "-" ? -1 : 1);
-    out.push({ name: name.replace(/^us-gaap:/, ""), date: ctx.date, members: ctx.members, value });
+    out.push({ name: name.replace(/^us-gaap:/, ""), date: ctx.date, ...(ctx.start ? { start: ctx.start, axes: ctx.axes, unit: attr("unitRef") } : {}), members: ctx.members, value });
   }
   return out;
+}
+
+/** "spcb:ElectronicMonitoringMember" -> "Electronic Monitoring"; "country:US" -> "US". */
+const memberName = (member: string) => member.replace(/^.*:/, "").replace(/Member$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").trim();
+
+/**
+ * Revenue per segment, per fiscal year and 3-month quarter (a year-to-date 6 or 9 months is skipped: the quarters
+ * and the year carry it). One tag per (period, line): the first of SEC_REVENUE_FACTS the filings use; a later filing's
+ * figure for the same period (a restatement) wins. Pure.
+ */
+export function segmentsFromFilings(docs: SecFilingDoc[]): LineReading[] {
+  const tags = [...SEC_REVENUE_FACTS].map((t) => t.replace(/^us-gaap:/, ""));
+  const best = new Map<string, LineReading & { rank: number }>();
+  for (const doc of [...docs].sort((a, b) => a.reportDate.localeCompare(b.reportDate))) {
+    for (const f of doc.facts) {
+      const rank = tags.indexOf(f.name);
+      if (rank < 0 || !f.start || f.axes?.length !== 1) continue;
+      const axis = SEC_SEGMENT_AXES[f.axes[0].replace(/^.*:/, "")];
+      const months = Math.round((Date.parse(f.date) - Date.parse(f.start)) / (30.44 * 86_400_000));
+      const periodType: PeriodType | null = months === 12 ? "year" : months === 3 ? "quarter" : null;
+      if (!axis || !periodType) continue;
+      const line = segmentLine(axis, memberName(f.members[0]));
+      const key = `${periodType}|${month(f.date)}|${line}`;
+      const held = best.get(key);
+      if (held && held.rank < rank) continue;
+      const currency = f.unit && /^[A-Za-z]{3}$/.test(f.unit) ? f.unit.toUpperCase() : "USD";
+      best.set(key, { periodType, periodEnd: month(f.date), line, value: f.value, currency, label: `${memberName(f.members[0])} (${f.name})`, consolidated: true, rank });
+    }
+  }
+  return [...best.values()].map(({ rank, ...r }) => (void rank, r));
 }
 
 /** "us-gaap:SeriesAPreferredStockMember" -> "Series A preferred"; no class -> "preferred". */
@@ -568,7 +617,7 @@ const SEC_FILING_MAX = 28;
 
 export const secFilings: FinancialsSource = {
   name: "sec-filings",
-  publisher: "SEC EDGAR 10-K and 10-Q filings (inline XBRL), 5 years: preferred stock per series at its liquidation value",
+  publisher: "SEC EDGAR 10-K, 10-Q and 20-F filings (inline XBRL), 5 years: preferred stock per series at its liquidation value, revenue per segment",
   requiredEnv: [],
   covers: isUsSymbol,
   async fetch(symbol, ctx) {
@@ -587,7 +636,7 @@ export const secFilings: FinancialsSource = {
       : undefined;
     const documents: SecFilingDoc[] = [];
     for (const f of wanted) {
-      const known = previous?.documents?.find((d) => d.accession === f.accession);
+      const known = previous?.documents?.find((d) => d.accession === f.accession && d.factsVersion === SEC_FILING_FACTS_VERSION);
       if (known) {
         documents.push(known);
         continue;
@@ -595,17 +644,18 @@ export const secFilings: FinancialsSource = {
       const url = `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${f.accession.replace(/-/g, "")}/${f.doc}`;
       const res = await ctx.fetch(url, { headers: SEC_HEADERS });
       if (!res.ok) return { request: { url }, httpStatus: res.status, payloadText: (await res.text()).slice(0, 500), error: `SEC filing ${f.accession}: HTTP ${res.status}` };
-      documents.push({ accession: f.accession, form: f.form, reportDate: f.reportDate, url, facts: inlineXbrlFacts(await res.text()) });
+      documents.push({ accession: f.accession, form: f.form, reportDate: f.reportDate, url, facts: inlineXbrlFacts(await res.text()), factsVersion: SEC_FILING_FACTS_VERSION });
     }
     return {
-      request: { url: subUrl, cik, filings: wanted.map((f) => `${f.form} ${f.reportDate}`), kept: "preferred stock facts (shares per series, liquidation preference)" },
+      request: { url: subUrl, cik, filings: wanted.map((f) => `${f.form} ${f.reportDate}`), kept: "preferred stock facts (shares per series, liquidation preference), revenue per segment" },
       httpStatus: 200,
       payload: { cik, documents },
       ...(documents.length === 0 ? { error: "no 10-K, 20-F or 10-Q filed as HTML" } : {}),
     };
   },
   extract(payload) {
-    return preferredFromFilings((payload as { documents: SecFilingDoc[] }).documents);
+    const docs = (payload as { documents: SecFilingDoc[] }).documents;
+    return [...preferredFromFilings(docs), ...segmentsFromFilings(docs)];
   },
 };
 
@@ -803,16 +853,21 @@ export const edinetFinancials: FinancialsSource = {
   },
 };
 
-// ---------- Annual report PDF, read by Claude: markets without a free structured source (Hong Kong) ----------
+// ---------- Annual and interim report PDFs, read by Claude: markets without a free structured source (Hong Kong) ----------
 
-export const PDF_EXTRACT_VERSION = "pdf-extract@v1";
+export const PDF_EXTRACT_VERSION = "pdf-extract@v2";
 type PdfPage = { page: number; text: string };
+/** `months` = how long the column's period is: 12 a fiscal year (a balance sheet at the year end too), 6 a half year, 3 a quarter. */
 type PdfExtraction = {
   currency?: string;
-  periods?: { periodEnd: string; lines: { line: string; printed: string; unit: string; page: number; label: string }[] }[];
-  segments?: { periodEnd: string; axis: string; name: string; printed: string; unit: string; page: number }[];
+  periods?: { periodEnd: string; months?: number; lines: { line: string; printed: string; unit: string; page: number; label: string }[] }[];
+  segments?: { periodEnd: string; months?: number; axis: string; name: string; printed: string; unit: string; page: number }[];
 };
-type PdfPayload = { version: string; document: { title: string; url: string; filedAt: string }; pages: PdfPage[]; extraction: PdfExtraction; model: string };
+type ReportKind = "annual" | "interim";
+type PdfDocument = { title: string; url: string; filedAt: string };
+type PdfRead = { kind: ReportKind; version: string; document: PdfDocument; pages: PdfPage[]; extraction: PdfExtraction; model: string };
+/** v2: one read per report (the latest annual one and the interim one filed after it). v1 = one annual report, top level. */
+type PdfPayload = { version: string; documents: PdfRead[] } | { version: string; document: PdfDocument; pages: PdfPage[]; extraction: PdfExtraction; model: string };
 
 /** Pages worth reading: the 5-year summary, the primary statements, the segment note. */
 const PAGE_PATTERNS = [
@@ -822,6 +877,8 @@ const PAGE_PATTERNS = [
   /consolidated statement of cash flows/i,
   /segment information/i,
 ];
+/** A numbered note that opens mid-page ("5. REVENUE AND SEGMENT INFORMATION"): interim reports run their notes on. */
+const SEGMENT_NOTE = /(^|\s)\d{1,2}\.\s+(revenue and |operating )?segments? information/i;
 const MAX_PAGES = 12;
 const MAX_PAGE_CHARS = 7000;
 
@@ -829,9 +886,12 @@ const MAX_PAGE_CHARS = 7000;
 export function pickPages(pages: string[]): PdfPage[] {
   // A table of contents names every statement: never a figure page.
   const isContents = (t: string) => PAGE_PATTERNS.filter((re) => re.test(t)).length >= 3;
+  // A title wraps over two lines ("Condensed Consolidated Statement of\nFinancial Position"): match on single spaces.
+  const flat = pages.map((t) => t.replace(/\s+/g, " "));
   const picked: number[] = [];
   for (const re of PAGE_PATTERNS) {
-    const hits = pages.map((t, i) => (!isContents(t) && re.test(t.slice(0, 400)) ? i : -1)).filter((i) => i >= 0);
+    const segment = re === PAGE_PATTERNS[4];
+    const hits = flat.map((t, i) => (!isContents(t) && (re.test(t.slice(0, 400)) || (segment && SEGMENT_NOTE.test(t))) ? i : -1)).filter((i) => i >= 0);
     for (const i of hits.slice(0, 2)) for (const j of /summary/i.test(re.source) ? [i] : [i, i + 1]) if (j < pages.length && !picked.includes(j)) picked.push(j);
   }
   // Pattern order = priority (the 5-year summary first), capped, then read in page order.
@@ -839,26 +899,30 @@ export function pickPages(pages: string[]): PdfPage[] {
 }
 
 const PDF_SYSTEM = [
-  "You read pages of a listed company's annual report and copy its published financial figures. You never compute, estimate or round.",
+  "You read pages of a listed company's annual or interim report and copy its published financial figures. You never compute, estimate or round.",
   "Answer with JSON only, no prose, no code fence.",
 ].join(" ");
 
-const pdfPrompt = (title: string, pages: PdfPage[]) =>
+const pdfPrompt = (kind: ReportKind, title: string, pages: PdfPage[]) =>
   [
-    `Document: ${title}. Each page below starts with its PDF page number.`,
-    "Copy every figure you find for these canonical lines, for every fiscal year shown (the five-year summary gives five):",
+    `Document: ${title} (${kind === "annual" ? "annual report" : "interim report"}). Each page below starts with its PDF page number.`,
+    kind === "annual"
+      ? "Copy every figure you find for these canonical lines, for every fiscal year shown (the five-year summary gives five):"
+      : "Copy every figure you find for these canonical lines, for every period shown: the interim period AND the comparative period a year earlier, and a balance sheet at the prior fiscal year end when printed:",
     Object.entries(LINES)
       .filter(([, v]) => v.statement !== "market")
       .map(([k, v]) => `${k} (${v.name})`)
       .join("; "),
-    "and segment revenue (by product line, brand, region or customer).",
-    'JSON shape: {"currency": "<ISO code of the figures, e.g. HKD>", "periods": [{"periodEnd": "YYYY-MM (fiscal year end month)", "lines": [{"line": "<canonical key>", "printed": "<the figure exactly as printed, e.g. (12,345) or 808,417>", "unit": "one|thousand|million|billion (from the column header, e.g. HK$\'000 = thousand)", "page": <PDF page number>, "label": "<the row label as printed>"}]}], "segments": [{"periodEnd": "YYYY-MM", "axis": "product|region|customer", "name": "<segment name>", "printed": "...", "unit": "...", "page": <n>}]}',
+    "and revenue per segment (by product or service line, business segment, region or customer), every period shown.",
+    'JSON shape: {"currency": "<ISO code of the figures, e.g. HKD>", "periods": [{"periodEnd": "YYYY-MM (the month the period ends)", "months": <12 | 6 | 3>, "lines": [{"line": "<canonical key>", "printed": "<the figure exactly as printed, e.g. (12,345) or 808,417>", "unit": "one|thousand|million|billion (from the column header, e.g. HK$\'000 = thousand)", "page": <PDF page number>, "label": "<the row label as printed>"}]}], "segments": [{"periodEnd": "YYYY-MM", "months": <12 | 6 | 3>, "axis": "product|business|region|customer", "name": "<segment name as printed>", "printed": "...", "unit": "...", "page": <n>}]}',
+    "months = how long the column's period is: 12 for a fiscal year (and a balance sheet at a fiscal year end), 6 for six months (and a balance sheet at the interim date of a six-month report), 3 for three months.",
     "Only figures printed on these pages. EPS: unit one, in the currency per share. Shares: unit one (or thousand when the header says so). Skip a line you cannot find.",
     "",
     ...pages.map((p) => `=== PDF page ${p.page} ===\n${p.text}`),
   ].join("\n");
 
 const UNIT: Record<string, number> = { one: 1, thousand: 1e3, million: 1e6, billion: 1e9 };
+const PERIOD_OF_MONTHS: Record<number, PeriodType> = { 12: "year", 6: "half", 3: "quarter" };
 
 /** "(12,345)" -> -12345; "808,417" -> 808417; "—" -> null. */
 export function parsePrinted(printed: string): number | null {
@@ -868,67 +932,98 @@ export function parsePrinted(printed: string): number | null {
   return n === null ? null : negative ? -n : n;
 }
 
-async function latestAnnualReport(ctx: SourceContext, symbol: string) {
-  if (!ctx.db) return null;
+const REPORT_TITLES: Record<ReportKind, RegExp> = {
+  annual: /^annual report( \d{4}(\/\d{2,4})?)?$/i,
+  interim: /^interim report( \d{4}(\/\d{2,4})?)?$/i,
+};
+
+/** The latest annual report PDF, and the latest interim report PDF when it was filed after it (an older one adds nothing). */
+export async function latestReports(ctx: SourceContext, symbol: string): Promise<{ kind: ReportKind; doc: PdfDocument }[]> {
+  if (!ctx.db) return [];
   const rows = await ctx.db
     .select({ title: gold.filings.title, url: gold.filings.url, filedAt: gold.filings.filedAt })
     .from(gold.filings)
     .where(eq(gold.filings.symbol, symbol))
     .orderBy(desc(gold.filings.filedAt));
-  return rows.find((r) => r.url?.endsWith(".pdf") && /^annual report( \d{4}(\/\d{2,4})?)?$/i.test(r.title.trim())) ?? null;
+  const latest = (kind: ReportKind) => rows.find((r) => r.url?.endsWith(".pdf") && REPORT_TITLES[kind].test(r.title.trim()));
+  const annual = latest("annual");
+  const interim = latest("interim");
+  const out: { kind: ReportKind; doc: PdfDocument }[] = [];
+  if (annual?.url) out.push({ kind: "annual", doc: { title: annual.title, url: annual.url, filedAt: annual.filedAt.toISOString() } });
+  if (interim?.url && (!annual || interim.filedAt > annual.filedAt)) out.push({ kind: "interim", doc: { title: interim.title, url: interim.url, filedAt: interim.filedAt.toISOString() } });
+  return out;
 }
+
+const readsOf = (p: PdfPayload): PdfRead[] => ("documents" in p ? p.documents : [{ kind: "annual", version: p.version, document: p.document, pages: p.pages, extraction: p.extraction, model: p.model }]);
 
 export const pdfExtract: FinancialsSource = {
   name: "pdf-extract",
-  publisher: "Annual report PDF read by Claude (Hong Kong), every value cites its page: an extraction, not published data",
+  publisher: "Annual and interim report PDFs read by Claude (Hong Kong), every value cites its page: an extraction, not published data",
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
   covers: isMarket("HK"),
   async fetch(symbol, ctx) {
-    const report = await latestAnnualReport(ctx, symbol);
-    if (!report?.url) return { request: { symbol }, httpStatus: null, error: "no annual report PDF among the collected filings" };
+    const reports = await latestReports(ctx, symbol);
+    if (reports.length === 0) return { request: { symbol }, httpStatus: null, error: "no annual or interim report PDF among the collected filings" };
     // One extraction per document and prompt version: a later run reuses it.
     const [prior] = ctx.db
       ? await ctx.db.select({ id: fetches.id, payload: fetches.payload }).from(fetches).where(and(eq(fetches.dimension, "financials"), eq(fetches.source, "pdf-extract"), eq(fetches.subject, symbol), isNull(fetches.error))).orderBy(desc(fetches.fetchedAt)).limit(1)
       : [];
-    const priorPayload = prior?.payload as PdfPayload | undefined;
-    if (priorPayload?.document.url === report.url && priorPayload.version === PDF_EXTRACT_VERSION) return { request: { url: report.url, reusedFrom: prior.id }, httpStatus: 200, payload: priorPayload };
-    if (!ctx.complete) return { request: { url: report.url }, httpStatus: null, error: "no LLM in this context" };
-    const res = await ctx.fetch(report.url, { headers: BROWSER_HEADERS });
-    if (!res.ok) return { request: { url: report.url }, httpStatus: res.status, error: `annual report PDF: HTTP ${res.status}` };
-    const { pdfPages } = (await nodeImport(new URL("./pdf-text.ts", import.meta.url).href)) as typeof import("./pdf-text");
-    const pages = pickPages(await pdfPages(new Uint8Array(await res.arrayBuffer())));
-    if (pages.length === 0) return { request: { url: report.url }, httpStatus: 200, error: "no statement page found in the PDF text" };
-    const answer = await ctx.complete({ system: PDF_SYSTEM, prompt: pdfPrompt(report.title, pages) });
-    const { firstJsonObject } = await import("@/llm/judge");
-    const extraction = JSON.parse(firstJsonObject(answer.text)) as PdfExtraction;
-    const payload: PdfPayload = { version: PDF_EXTRACT_VERSION, document: { title: report.title, url: report.url, filedAt: report.filedAt.toISOString() }, pages, extraction, model: answer.model };
-    return { request: { url: report.url, pages: pages.map((p) => p.page), version: PDF_EXTRACT_VERSION }, httpStatus: 200, payload };
+    const known = prior?.payload ? readsOf(prior.payload as PdfPayload) : [];
+    const documents: PdfRead[] = [];
+    const reused: string[] = [];
+    for (const { kind, doc } of reports) {
+      const same = known.find((r) => r.document.url === doc.url && r.version === PDF_EXTRACT_VERSION);
+      if (same) {
+        documents.push(same);
+        reused.push(doc.url);
+        continue;
+      }
+      if (!ctx.complete) return { request: { url: doc.url }, httpStatus: null, error: "no LLM in this context" };
+      const res = await ctx.fetch(doc.url, { headers: BROWSER_HEADERS });
+      if (!res.ok) return { request: { url: doc.url }, httpStatus: res.status, error: `${kind} report PDF: HTTP ${res.status}` };
+      const { pdfPages } = (await nodeImport(new URL("./pdf-text.ts", import.meta.url).href)) as typeof import("./pdf-text");
+      const pages = pickPages(await pdfPages(new Uint8Array(await res.arrayBuffer())));
+      if (pages.length === 0) return { request: { url: doc.url }, httpStatus: 200, error: `no statement page found in the ${kind} report PDF text` };
+      const answer = await ctx.complete({ system: PDF_SYSTEM, prompt: pdfPrompt(kind, doc.title, pages) });
+      const { firstJsonObject } = await import("@/llm/judge");
+      const extraction = JSON.parse(firstJsonObject(answer.text)) as PdfExtraction;
+      documents.push({ kind, version: PDF_EXTRACT_VERSION, document: doc, pages, extraction, model: answer.model });
+    }
+    const payload: PdfPayload = { version: PDF_EXTRACT_VERSION, documents };
+    return { request: { documents: reports.map((r) => `${r.kind} ${r.doc.url}`), reused, version: PDF_EXTRACT_VERSION }, httpStatus: 200, payload };
   },
   extract(payload) {
-    const p = payload as PdfPayload;
-    const currency = p.extraction.currency ?? null;
-    const pageText = new Map(p.pages.map((x) => [x.page, x.text]));
     const out: LineReading[] = [];
-    // A figure is kept only when it is printed on the page it cites: Claude copies, never invents.
-    const onPage = (printed: string, page: number) => (pageText.get(page) ?? "").replace(/\s+/g, "").includes(printed.replace(/\s+/g, ""));
-    for (const period of p.extraction.periods ?? []) {
-      if (!/^\d{4}-\d{2}$/.test(period.periodEnd)) continue;
-      for (const l of period.lines ?? []) {
-        const v = parsePrinted(l.printed);
-        const scale = UNIT[l.unit] ?? null;
-        if (v === null || scale === null || !isLineKey(l.line) || LINES[l.line].statement === "market" || !onPage(l.printed, l.page)) continue;
-        out.push(reading({ periodType: "year", periodEnd: period.periodEnd, line: l.line, value: v * scale, currency, label: l.label, consolidated: true, citation: { document: p.document.title, url: p.document.url, page: l.page, quote: l.printed } }));
+    for (const read of readsOf(payload as PdfPayload)) {
+      const currency = read.extraction.currency ?? null;
+      const pageText = new Map(read.pages.map((x) => [x.page, x.text]));
+      // A figure is kept only when it is printed on the page it cites: Claude copies, never invents.
+      const onPage = (printed: string, page: number) => (pageText.get(page) ?? "").replace(/\s+/g, "").includes(printed.replace(/\s+/g, ""));
+      // An annual report's columns are fiscal years; an old payload carries no `months`.
+      const periodType = (months: number | undefined) => PERIOD_OF_MONTHS[months ?? (read.kind === "annual" ? 12 : 0)] ?? null;
+      const cite = (page: number, quote: string) => ({ document: read.document.title, url: read.document.url, page, quote });
+      for (const period of read.extraction.periods ?? []) {
+        const pt = periodType(period.months);
+        if (!pt || !/^\d{4}-\d{2}$/.test(period.periodEnd)) continue;
+        for (const l of period.lines ?? []) {
+          const v = parsePrinted(l.printed);
+          const scale = UNIT[l.unit] ?? null;
+          if (v === null || scale === null || !isLineKey(l.line) || LINES[l.line].statement === "market" || !onPage(l.printed, l.page)) continue;
+          out.push(reading({ periodType: pt, periodEnd: period.periodEnd, line: l.line, value: v * scale, currency, label: l.label, consolidated: true, citation: cite(l.page, l.printed) }));
+        }
+      }
+      for (const sg of read.extraction.segments ?? []) {
+        const pt = periodType(sg.months);
+        const v = parsePrinted(sg.printed);
+        const scale = UNIT[sg.unit] ?? null;
+        if (!pt || v === null || scale === null || !/^\d{4}-\d{2}$/.test(sg.periodEnd) || !(SEGMENT_AXES as readonly string[]).includes(sg.axis) || !onPage(sg.printed, sg.page)) continue;
+        out.push({ periodType: pt, periodEnd: sg.periodEnd, line: segmentLine(sg.axis, sg.name), value: v * scale, currency, label: sg.name, consolidated: true, citation: cite(sg.page, sg.printed) });
       }
     }
-    for (const s of p.extraction.segments ?? []) {
-      const v = parsePrinted(s.printed);
-      const scale = UNIT[s.unit] ?? null;
-      if (v === null || scale === null || !/^\d{4}-\d{2}$/.test(s.periodEnd) || !["product", "region", "customer"].includes(s.axis) || !onPage(s.printed, s.page)) continue;
-      out.push({ periodType: "year", periodEnd: s.periodEnd, line: segmentLine(s.axis, s.name), value: v * scale, currency, label: s.name, consolidated: true, citation: { document: p.document.title, url: p.document.url, page: s.page, quote: s.printed } });
-    }
-    // One value per (period, line): the first page cited (the summary / statement before the notes).
+    // One value per (period, line): the annual report first (an interim report reprints its year-end balance sheet), then
+    // the first page cited (the summary / statement before the notes).
     const seen = new Map<string, LineReading>();
-    for (const r of out) if (!seen.has(`${r.periodEnd}|${r.line}`)) seen.set(`${r.periodEnd}|${r.line}`, r);
+    for (const r of out) if (!seen.has(`${r.periodType}|${r.periodEnd}|${r.line}`)) seen.set(`${r.periodType}|${r.periodEnd}|${r.line}`, r);
     return [...seen.values()];
   },
 };
