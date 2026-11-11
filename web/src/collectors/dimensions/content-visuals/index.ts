@@ -85,7 +85,7 @@ async function banner(input: VisualInput, callout: Callout, fetchImpl: typeof fe
   if (!callout.news) return null;
   const n = input.news[callout.news.index];
   if (!callout.newsLine) throw new Error("callout picked a news source but wrote no news line");
-  return { headline: callout.newsLine, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl), ago: ago(n.at, new Date()) };
+  return { headline: callout.newsLine, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl).catch(() => null) /* a JPEG or missing favicon: the card shows the name only */, ago: ago(n.at, new Date()) };
 }
 
 /**
