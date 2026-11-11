@@ -1,4 +1,5 @@
 import { WINNABLE, type ThreadPage } from "@/lib/winnable";
+import { CardGlyph } from "./cards";
 
 /**
  * The head of every inner page: a deep indigo band, the section name, one statement in large serif (after Altas's
@@ -10,7 +11,12 @@ export function PageBand({ label, line, thread }: { label: string; line?: string
       <div className="wrap band-inner">
         <p className="band-label">{label}</p>
         {line && <h1 className="band-line">{line}</h1>}
-        {thread && <p className="band-thread">{WINNABLE[thread]}</p>}
+        {thread && (
+          <p className="band-thread">
+            <CardGlyph />
+            {WINNABLE[thread]}
+          </p>
+        )}
       </div>
     </section>
   );

@@ -52,6 +52,19 @@ describe("site copy and colours", () => {
     expect(company?.text).not.toMatch(/CallsBoard|Track record|Every published call/);
   });
 
+  // Kevin 2026-11-11: engraved playing cards are the site's thread (Research hand, Company cards, a small card before each
+  // poker line), static like everything else.
+  it("deals the winnable games as cards, never animated", () => {
+    const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
+    expect(text(join("app", "research", "page.tsx"))).toContain("<Hand ");
+    expect(text(join("app", "company", "page.tsx"))).toContain("<PlayingCard ");
+    expect(text(join("components", "page-band.tsx"))).toContain("<CardGlyph />");
+    const css = text(join("app", "globals.css"));
+    const cardRules = css.match(/\.(pcard|pc-[a-z]+|hand[a-z-]*|card-glyph)[^{]*\{[^}]*\}/g) ?? [];
+    expect(cardRules.length).toBeGreaterThan(5);
+    expect(cardRules.filter((r) => /transition|animation/.test(r))).toEqual([]);
+  });
+
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.
   it.each(["#eceaf5", "#f5f4f9", "#b9b2ea", "#8c82d8", "#e3e1ec"])("never paints the light purple %s", (hex) => {
     expect(files.filter((f) => f.text.toLowerCase().includes(hex)).map((f) => f.path)).toEqual([]);

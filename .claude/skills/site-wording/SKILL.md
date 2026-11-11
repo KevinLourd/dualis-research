@@ -11,9 +11,9 @@ Thierry owns the site's wording since 2026-11-09. You change TEXT only: the word
 | Page | File | What |
 |---|---|---|
 | Home | `app/page.tsx` | title, line under it, link |
-| Company | `app/company/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 cards), the quote, closing band |
+| Company | `app/company/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 playing cards), the quote, closing band |
 | Research | `app/research/page.tsx` | page line, section titles, closing band |
-| Research, winnable games | `components/blocks.tsx` `FRAMEWORK` | the 5 games on the knot (the 3rd sits on its centre) |
+| Research, winnable games | `components/blocks.tsx` `GAMES` | the 5 cards of the hand (the ace in the middle); its caption sits in `app/research/page.tsx` |
 | Research, FAQ | `components/blocks.tsx` `FAQ` | questions and answers |
 | About | `app/about/page.tsx` | his name, role, bio paragraphs |
 | About, career | `components/blocks.tsx` `CAREER` | dates, firms, roles |

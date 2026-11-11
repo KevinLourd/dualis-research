@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { CoverStrip, CtaBand, Faq, Framework, LatestResearch, Proof } from "@/components/blocks";
+import { CoverStrip, CtaBand, Faq, GAMES, LatestResearch, Proof } from "@/components/blocks";
+import { Hand } from "@/components/cards";
 import { PageBand } from "@/components/page-band";
 import { Portal } from "@/components/portal";
 import { DISCLAIMER, subscribeHref } from "@/lib/model";
@@ -48,7 +49,7 @@ export default async function Research() {
       <section className="section">
         <div className="wrap">
           <h2 className="fw-head">The winnable games we look for</h2>
-          <Framework />
+          <Hand cards={GAMES} caption="Five games, one hand. The narrative turn is the ace we train most." />
         </div>
       </section>
 

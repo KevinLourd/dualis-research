@@ -3,6 +3,7 @@ import { BEST_CALLS, categoryLabel, DISCLAIMER, formatDate, PLANS, TRACK_RECORD 
 import type { Publication } from "@/lib/queries";
 import { Cover } from "./cover";
 import { SubscribeButton } from "./subscribe-button";
+import type { Card } from "./cards";
 import { YtdChart } from "./ytd-chart";
 
 export function Plans({ substackUrl }: { substackUrl: string | null }) {
@@ -201,36 +202,14 @@ export function Proof() {
   );
 }
 
-const FRAMEWORK = [
-  { title: "Small caps", line: "Fewer experts, wider mispricing" },
-  { title: "Cyclical stocks", line: "Each turn meets fewer rivals" },
-  { title: "Narrative turns", line: "Long when a bad story turns, short when a hyped one cracks" },
-  { title: "Turnaround stories", line: "Crushed names few dare to own" },
-  { title: "Under-covered geographies", line: "Markets most analysts skip" },
-] as const;
-
 /**
- * The winnable games we look for, drawn on the logo (Kevin 2026-11-06: « dans la structure des composants comme
- * Citrini »; Thierry 2026-11-09: the types of winnable games, never a timeline of steps): the engraved knot faint
- * behind, one vertical line through it, five games alternating left and right. The narrative turn, the play Thierry
- * trains most, sits on the knot's centre square, where the two loops cross.
+ * The winnable games we look for (Thierry 2026-11-09: the types of winnable games, never a timeline of steps), dealt as
+ * a hand on Research (Kevin 2026-11-11: option A). The narrative turn, the play Thierry trains most, is the ace.
  */
-export function Framework() {
-  return (
-    <div className="framework">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="fw-knot" src="/brand/seal.svg" alt="" aria-hidden="true" width={256} height={256} />
-      <ol className="fw-steps">
-        {FRAMEWORK.map((s, i) => (
-          <li key={s.title} className={i % 2 ? "right" : "left"}>
-            <div className="fw-text">
-              <h3>{s.title}</h3>
-              <p>{s.line}</p>
-            </div>
-            <span className="fw-dot" aria-hidden="true" />
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
+export const GAMES: readonly Card[] = [
+  { rank: "10", title: "Small caps", line: "Fewer experts, wider mispricing" },
+  { rank: "J", title: "Cyclical stocks", line: "Each turn meets fewer rivals" },
+  { rank: "A", title: "Narrative turns", line: "Long when a bad story turns, short when a hyped one cracks", ace: true },
+  { rank: "Q", title: "Turnaround stories", line: "Crushed names few dare to own" },
+  { rank: "K", title: "Under-covered geographies", line: "Markets most analysts skip" },
+];

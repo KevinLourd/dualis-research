@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CardGlyph } from "@/components/cards";
 import { WINNABLE } from "@/lib/winnable";
 
 /**
@@ -23,7 +24,10 @@ export default function Home() {
           for Buy-Side Opportunities
         </h1>
         <p className="hero-sub">Long and short ideas in small and mid caps.</p>
-        <p className="band-thread">{WINNABLE.home}</p>
+        <p className="band-thread">
+          <CardGlyph />
+          {WINNABLE.home}
+        </p>
         <Link href="/research" className="hero-link">
           Read the research
         </Link>
