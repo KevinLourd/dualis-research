@@ -1,17 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
-import { cache } from "react";
 import { getDb } from "@/db/client";
 import { goldSandboxAccounts, goldSandboxPosts, SANDBOX_ANGLES, SANDBOX_FORMATS, type SandboxAngle, type SandboxFormat, type SandboxPlatform } from "@/db/schema/sandbox";
 import type { SandboxView } from "./sandbox-ui";
 
 /** Sandbox pages (fake accounts, never published): gold only. A timeline reads its last 60 posts (12 days at 5 a day). */
-
-const TONE_ORDER = { urgent: 0, balanced: 1, neutral: 2 } as const;
-
-export const listSandboxAccounts = cache(async () => {
-  const rows = await getDb().select().from(goldSandboxAccounts);
-  return rows.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone]);
-});
 
 export async function sandboxAccount(platform: SandboxPlatform, handle: string) {
   const db = getDb();

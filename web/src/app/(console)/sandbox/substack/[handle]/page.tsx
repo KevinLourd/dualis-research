@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { sandboxAccount, sandboxView } from "@/console/sandbox-queries";
-import { SandboxFilters, SandboxLabel, SubstackHome } from "@/console/sandbox-ui";
+import { SandboxFilters, SubstackHome } from "@/console/sandbox-ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
   return { title: `Sandbox ${(await params).handle}.substack.com` };
@@ -17,7 +17,6 @@ export default async function Page({ params, searchParams }: Props) {
   const base = `/sandbox/substack/${data.account.handle}`;
   return (
     <>
-      <SandboxLabel />
       <SandboxFilters base={base} view={view} formats={["substack-note", "substack-article"]} />
       <SubstackHome account={data.account} posts={posts} total={data.posts.length} pairedHref={`/sandbox/x/${data.account.handle}`} base={base} view={view} />
     </>
