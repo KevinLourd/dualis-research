@@ -12,8 +12,8 @@ import type { Dimension, PromoteResult, Source } from "../../types";
 import { type AlertInput, alertInput } from "./data";
 
 /**
- * Signal Change alerts on WhatsApp (Kevin 2026-11-09): only when a signal gets BETTER (`isUpgrade`: no signal -> weak
- * or strong, weak -> strong, inflection <-> crack), to Kevin AND Thierry, each with one picture of the level B panel
+ * Signal Change alerts on WhatsApp (Kevin 2026-11-09): only when a STRONG signal appears (`isUpgrade`, Thierry
+ * 2026-11-11: no signal or weak -> strong, a side flip landing strong; a weak signal never sends), to Kevin AND Thierry, each with one picture of the level B panel
  * (price vs fair value + the Narrative Drivers and their Status, `render.ts`) and the Update Note as caption.
  * Runs right after `signals` in every collect (GitHub Actions), never on the box.
  * Bronze = what the picture is drawn from (one fetch per change x recipient); silver.content_messages = one row per
@@ -49,7 +49,7 @@ export const alertPlan: Source = {
 
 export const signalAlertsDim: Dimension = {
   name: SIGNAL_ALERTS_DIMENSION,
-  description: "WhatsApp to Kevin and Thierry when a signal gets better (no signal -> weak / strong, weak -> strong, inflection <-> crack), with the chart and the drivers' Status in one picture.",
+  description: "WhatsApp to Kevin and Thierry when a strong signal appears (no signal or weak -> strong, a side flip landing strong; a weak signal never sends), with the chart and the drivers' Status in one picture.",
   sources: [alertPlan],
   subjects: planAlerts,
   promote: promoteAlerts,
