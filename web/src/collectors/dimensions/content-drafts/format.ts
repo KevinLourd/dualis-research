@@ -20,7 +20,7 @@ export const X_LIMIT = 280;
 
 export const PROMPT_VERSION = "drafts-v8";
 
-const GAME = [
+export const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
   "The game: grow paid Substack subscribers. The reader is a self-directed, experienced small-cap investor who reads filings and pays for ideas the big funds miss.",
   "A post earns a follow when it gives ONE sharp, dated fact and says, bluntly, what it means for holders, so readers feel they must act before the market catches up.",
@@ -33,7 +33,7 @@ const GAME = [
   "Write in the voice of the account below, following its style guide. When the guide and these rules disagree, these rules win.",
 ].join("\n");
 
-const FORMAT_RULES: Record<DraftFormat, string> = {
+export const FORMAT_RULES: Record<DraftFormat, string> = {
   "x-post": [
     "Format: one X post, much smaller than a Note: one or two short sentences, at most 160 characters, the ticker as a $cashtag once after the opening.",
     "Lead with the alarm and its number. The chart attached is a sober exhibit with no news card and no signal on it, so the words carry the breaking news: name its source when it is a big publisher (\"per Reuters\"), and the live signal when there is one (\"Shares 28% under fair value\"). Answer with the post text only.",

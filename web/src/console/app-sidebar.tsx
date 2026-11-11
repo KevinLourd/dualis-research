@@ -10,6 +10,7 @@ import {
   BriefcaseIcon,
   NotePencilIcon,
   PaletteIcon,
+  TestTubeIcon,
   TrendUpIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
@@ -26,6 +27,7 @@ const RESEARCH = [
 const BUSINESS = [
   { href: "/content", label: "Content", icon: NotePencilIcon },
   { href: "/growth", label: "Growth", icon: TrendUpIcon },
+  { href: "/sandbox", label: "Sandbox", icon: TestTubeIcon },
 ] as const;
 
 const GROUPS = [

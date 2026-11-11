@@ -47,7 +47,7 @@ async function accountFor(db: Db, format: DraftFormat) {
 }
 
 /** The ticker's story and the evidence an Idea rests on, in words, read from gold at draft time. */
-async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: string): Promise<IdeaContext> {
+export async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: string): Promise<IdeaContext> {
   const refs = (kind: string) => idea.sourceRefs.filter((r) => r.kind === kind).map((r) => r.ref.slice(kind.length + 1));
   const evidenceIds = refs("evidence");
   const driverIds = refs("driver");
