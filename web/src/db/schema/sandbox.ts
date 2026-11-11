@@ -1,4 +1,4 @@
-import { index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { customType, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { gold } from "./gold";
 import { silver } from "./silver";
 
@@ -198,3 +198,33 @@ export const goldSubstackTrending = gold.table("substack_trending", {
   rebuiltAt: timestamp("rebuilt_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export type GoldSubstackTrending = typeof goldSubstackTrending.$inferSelect;
+
+/** bytea: Neon over HTTP hands back `\\x<hex>`, node-postgres / PGlite a byte array; both read as a Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array | string }>({
+  dataType: () => "bytea",
+  fromDriver: (v) => (typeof v === "string" ? Buffer.from(v.startsWith("\\x") ? v.slice(2) : v, "hex") : Buffer.from(v)),
+});
+
+/**
+ * Pictures only the Sandbox needs (dimension `sandbox-visuals`, Kevin 2026-11-11): the macro-24h post's chart (its
+ * ticker's price vs fair value, X or Note look) and every X Article cover (the whole chart at X's 5:2 cover ratio, never
+ * cropped). Idea charts stay in content_visuals. Natural key: `key` (`price:<symbol>:<kind>:<day>`, `cover:<visual id>`).
+ * `/api/visuals/<id>` streams the file.
+ */
+export const sandboxVisuals = silver.table("sandbox_visuals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  kind: text("kind").$type<"chart" | "x-chart" | "x-cover">().notNull(),
+  symbol: text("symbol"),
+  status: text("status").$type<"ok" | "failed">().notNull(),
+  error: text("error"),
+  mime: text("mime"),
+  width: integer("width"),
+  height: integer("height"),
+  file: bytea("file"),
+  sizeBytes: integer("size_bytes"),
+  caption: text("caption"),
+  sources: text("sources").array().notNull(),
+  bronzeIds: uuid("bronze_ids").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

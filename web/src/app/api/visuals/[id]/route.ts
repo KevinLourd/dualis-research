@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { contentVisuals } from "@/db/schema/content";
+import { sandboxVisuals } from "@/db/schema/sandbox";
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "video/mp4": "mp4" };
 
@@ -13,10 +14,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   await auth.protect();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) return new Response("Not found", { status: 404 });
-  const [v] = await getDb()
+  const db = getDb();
+  // Idea visuals (content-visuals), else the Sandbox's own pictures (macro chart, X Article cover).
+  const [content] = await db
     .select({ file: contentVisuals.file, mime: contentVisuals.mime, kind: contentVisuals.kind })
     .from(contentVisuals)
     .where(and(eq(contentVisuals.id, id), eq(contentVisuals.status, "ok")));
+  const v =
+    content ??
+    (
+      await db
+        .select({ file: sandboxVisuals.file, mime: sandboxVisuals.mime, kind: sandboxVisuals.kind })
+        .from(sandboxVisuals)
+        .where(and(eq(sandboxVisuals.id, id), eq(sandboxVisuals.status, "ok")))
+    )[0];
   if (!v?.file || !v.mime) return new Response("Not found", { status: 404 });
   const headers = new Headers({ "content-type": v.mime, "cache-control": "private, max-age=31536000, immutable" });
   const name = new URL(req.url).searchParams.get("name");

@@ -316,6 +316,13 @@
       "when": 1794385490072,
       "tag": "0044_sandbox-matrix",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794391024853,
+      "tag": "0045_sandbox-visuals",
+      "breakpoints": true
     }
   ]
 }

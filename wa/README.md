@@ -32,7 +32,7 @@ WhatsApp > Settings > Linked devices > Link a device > scan. The card turns **Li
 Every merge to `main`: `deploy.yml` job `whatsapp` (after migrations) tars `wa/` + `web/src` and ships them with the database URL and Claude token over SSH to `WA_DEPLOY_HOST`. That key is a forced command
 (`wa/box/deploy-hook.sh` in `/root/dualis-wa/`): it rebuilds and restarts only when code or env changed. Own compose
 project `dualis-wa`, never inside the host's other stacks; `mem_limit 1500m`. Moving hosts = install the hook + the key
-line (`command="/root/dualis-wa/deploy-hook.sh",no-pty,...`) and change the three `WA_DEPLOY_*` secrets.
+line (`command="/root/dualis-wa/deploy-hook.sh",no-pty,...`) and change the three `WA_DEPLOY_*` secrets (host since 2026-11-11: root@62.83.93.230). `/root/dualis-wa/.hold` = build only, never start (another instance of the same WhatsApp session is live elsewhere: two clients kick each other off, error 440 conflict); `rm` it once the other one is stopped.
 
 ## Test
 **Test the reply loop yourself, never ask Kevin to type it** (Kevin 2026-11-09 « tu peux faire les tests toi-même ? »).
