@@ -12,7 +12,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 - **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
 - **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »). `$TICKER` once.
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
-- **Visual**: the Idea's chart (skill `x-post`).
+- **Visual**: see Image below.
 - Example:
 ```
 🚨 BREAKING: CareCloud just QUADRUPLED profit for shareholders to $4.7M. $CCLD still trades like nothing happened. Nobody is pricing this.
@@ -25,6 +25,13 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 - **Title**: `BREAKING:` + the shock number, at most 90 characters (« BREAKING: CareCloud Quadrupled Shareholder Profit and Wall Street Missed It »).
 - **Subtitle**: one line of urgency.
 - **Structure** (`##` headings): `## The number`, `## Why nobody saw it`, `## What happens next`, `## The risk`.
-- **Visual**: cover = the Idea's chart.
+- **Visual**: see Image below.
 - Do: one bold line per section with its figure.
 - Don't: drop the risk section; fake scarcity (« last chance »).
+
+## Image
+- **style**: `breaking` (news card + price card).
+- **title**: the alarm with its shock number, one word in CAPS allowed (« Profit QUADRUPLED in a year »).
+- **newsLine**: when a news item is listed, the fact that triggered the post, with its number.
+- **note**: the shock number itself, on the point that shows it.
+- **chart**: the series where the move is biggest.

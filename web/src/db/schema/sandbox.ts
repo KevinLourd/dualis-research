@@ -1,4 +1,4 @@
-import { customType, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { gold } from "./gold";
 import { silver } from "./silver";
 
@@ -19,6 +19,27 @@ export const SANDBOX_ANGLES = ["signal", "macro-24h", "trending-format", "compet
 export type SandboxAngle = (typeof SANDBOX_ANGLES)[number];
 /** What the angle read: an Idea, a headline, a trending post, a competitor post. Kept on the post so the page can say where it came from. */
 export type SandboxInput = { kind: SandboxAngle; label: string; url: string | null };
+/**
+ * The picture of one post, written by the post's own writer in the same call as its text (Kevin 2026-11-11: each tone's
+ * skill decides its images too, and the image must say the post's conclusion). `chart` = `price` or an Exhibit id of the
+ * Idea; `point` = the value the arrow hits (`latest` = the last one); `style` = `breaking` (news card + price card) or
+ * `pro` (chart, arrow and note only). Every word on the image is here; the code draws, it never writes.
+ */
+export type SandboxImage = {
+  chart: string;
+  point: string;
+  style: "breaking" | "pro";
+  title: string;
+  chartLabel: string;
+  note: string;
+  priceSays: string;
+  newsLine: string | null;
+  news: { index: number; domain: string } | null;
+};
+/** One post's reading by the reviewer (skill content-review): each check passes or fails with its why. */
+export type SandboxPostReview = { post: number; imageAlone: boolean; aligned: boolean; clear: boolean; why: string };
+/** One edit of a writing skill the reviewer asked for: `old` must appear once in that skill's file. */
+export type SandboxSkillEdit = { skill: string; old: string; new: string; why: string; applied: boolean; reason: string | null };
 
 /** One fake account. id = `<platform>:<handle>`. */
 export const sandboxAccounts = silver.table("sandbox_accounts", {
@@ -77,6 +98,8 @@ export const sandboxPosts = silver.table(
     day: text("day").notNull(),
     /** 0..4: the Idea's rank that day, and its display time. */
     slot: integer("slot").notNull(),
+    /** 1 = the day's first writing; each failed review (skill content-review) writes the day again as the next round. */
+    round: integer("round").notNull().default(1),
     ideaId: uuid("idea_id"),
     symbol: text("symbol"),
     format: text("format").$type<SandboxFormat>().notNull(),
@@ -89,7 +112,9 @@ export const sandboxPosts = silver.table(
     input: jsonb("input").$type<SandboxInput>().notNull(),
     /** Hash of the skill files the writer read: a skill edit shows on the next day's posts. */
     skillHash: text("skill_hash").notNull(),
-    /** The Idea's content visual (silver/gold content_visuals id), when one exists. */
+    /** The picture the writer specified (null on posts written before 2026-11-11). */
+    image: jsonb("image").$type<SandboxImage>(),
+    /** The post's own picture (silver sandbox_visuals id), once drawn. */
     visualId: uuid("visual_id"),
     /** Display time on the fake timeline. */
     postAt: timestamp("post_at", { withTimezone: true }).notNull(),
@@ -98,8 +123,34 @@ export const sandboxPosts = silver.table(
     bronzeIds: uuid("bronze_ids").array().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("sandbox_posts_natural_key").on(t.accountId, t.day, t.slot)],
+  (t) => [uniqueIndex("sandbox_posts_round_key").on(t.accountId, t.day, t.slot, t.round)],
 );
+
+/**
+ * One review of an account's day (skill content-review): the reviewer reads the round's posts with their pictures,
+ * says per post whether the picture stands alone, matches the text's conclusion and reads at once, and edits the
+ * writing skills when one fails. Natural key: (account, day, round). Append-only.
+ */
+export const sandboxReviews = silver.table(
+  "sandbox_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: text("account_id").notNull(),
+    day: text("day").notNull(),
+    round: integer("round").notNull(),
+    pass: boolean("pass").notNull(),
+    posts: jsonb("posts").$type<SandboxPostReview[]>().notNull(),
+    edits: jsonb("edits").$type<SandboxSkillEdit[]>().notNull(),
+    /** Hash of the review skill + the writing skills it read. */
+    skillHash: text("skill_hash").notNull(),
+    model: text("model").notNull(),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("sandbox_reviews_key").on(t.accountId, t.day, t.round)],
+);
+export type SilverSandboxReview = typeof sandboxReviews.$inferSelect;
 
 /** The timeline each Sandbox page reads. Same id as silver. */
 export const goldSandboxPosts = gold.table(
@@ -206,9 +257,9 @@ const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array | strin
 });
 
 /**
- * Pictures only the Sandbox needs (dimension `sandbox-visuals`, Kevin 2026-11-11): the macro-24h post's chart (its
- * ticker's price vs fair value, X or Note look) and every X Article cover (the whole chart at X's 5:2 cover ratio, never
- * cropped). Idea charts stay in content_visuals. Natural key: `key` (`price:<symbol>:<kind>:<day>`, `cover:<visual id>`).
+ * Each Sandbox post's own picture (dimension `sandbox-visuals`, Kevin 2026-11-11): drawn from the image its writer
+ * specified (`SandboxImage`), an X Article's at X's 5:2 cover ratio (`x-cover`). Natural key: `key` = `post:<post id>`
+ * (older rows: `price:...`, `cover:...`).
  * `/api/visuals/<id>` streams the file.
  */
 export const sandboxVisuals = silver.table("sandbox_visuals", {

@@ -11,7 +11,7 @@ A research note in miniature. The sell-side note opens with the view and why the
 - **Length**: at most 260 characters.
 - **Hook**: the company name and the fact with its number. No emoji, no exclamation mark, no CAPS, no alarm word.
 - **Structure**: fact with number, then what it implies for the valuation. `$TICKER` once.
-- **Visual**: the Idea's chart (skill `x-post`).
+- **Visual**: see Image below.
 - Example:
 ```
 CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7M, four times the prior year. The share price still discounts most of it as owed to preferred holders.
@@ -24,6 +24,13 @@ CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7
 - **Title**: descriptive, the company and the finding (« CareCloud: Q3 Profit for Common Shareholders Rose Fourfold »).
 - **Subtitle**: the view in one line.
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence`, `## Valuation` (fair value as given in the inputs, its method in a few words), `## Risks`.
-- **Visual**: cover = the Idea's chart.
+- **Visual**: see Image below.
 - Do: one figure per sentence with its period.
 - Don't: emoji, hype, an unsourced figure.
+
+## Image
+- **style**: `pro`.
+- **chart**: a fundamentals Exhibit (revenue, profit, cash, debt) over the price whenever one is listed: a research exhibit, never an alarm.
+- **note**: the fact with its number, no adjective (« $4.7M in Q3 »).
+- **chartLabel**: the exact measure and period (« Profit for shareholders per quarter, $ millions »).
+- **priceSays**: the belief in neutral words (« profit stays flat »).

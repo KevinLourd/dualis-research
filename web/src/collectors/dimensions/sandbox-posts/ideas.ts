@@ -1,9 +1,8 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import * as content from "@/db/schema/content";
-import * as sandbox from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 
-/** The Sandbox's Ideas, shared by sandbox-posts (what to write) and content-visuals (what to draw). Schema imports only. */
+/** The Sandbox's Ideas, what sandbox-posts writes. Schema imports only. */
 
 export type IdeaPick = { id: string; symbol: string | null; title: string; score: number };
 
@@ -18,11 +17,4 @@ export async function topIdeas(db: Db, n = 4): Promise<IdeaPick[]> {
     .sort((a, b) => b.score - a.score || a.i.rank - b.i.rank)
     .slice(0, n)
     .map(({ i, score }) => ({ id: i.id, symbol: i.symbol, title: i.title, score }));
-}
-
-/** Ideas the Sandbox needs a chart for: the next day's top ones and those its posts used since yesterday. */
-export async function sandboxIdeaIds(db: Db, now = new Date()): Promise<string[]> {
-  const since = new Date(now.getTime() - 86400_000).toISOString().slice(0, 10);
-  const [top, used] = await Promise.all([topIdeas(db), db.selectDistinct({ ideaId: sandbox.sandboxPosts.ideaId }).from(sandbox.sandboxPosts).where(gte(sandbox.sandboxPosts.day, since))]);
-  return [...new Set([...top.map((i) => i.id), ...used.flatMap((u) => (u.ideaId ? [u.ideaId] : []))])];
 }

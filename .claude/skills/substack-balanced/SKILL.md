@@ -11,7 +11,7 @@ The house style (skills `daily-content`, `breaking-chart`, `research-note`, `con
 - **Length**: one paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks. Short Notes break out most often; 600-1,199 characters is a dead zone (Eden, 473k Notes: https://eden.so/blog/how-to-grow-on-substack-notes/).
 - **Hook**: `🚨 <short name>: ` then the alarm with its number.
 - **Structure**: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch.
-- **Visual**: one chart under the text (skill `breaking-chart`). Notes with an image get about 1.6x the engagement of text-only (12.4M Notes: https://thewritingedge.substack.com/p/i-analyzed-12463022-substack-notes).
+- **Visual**: see Image below.
 - Example:
 ```
 🚨 CareCloud: profit for shareholders jumped 4x in Q3, to $4.7M. The price still bets it leaks to preferred holders. Watch the next quarter's payout.
@@ -24,6 +24,11 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 - **Length**: 900 to 1400 words.
 - **Title**: a claim with its figures (« 4x Profit for Shareholders, a Price Still Pricing the Preferred »). Subtitle: one line; it becomes the SEO description (https://on.substack.com/p/substack-seo-guide).
 - **Structure** (`##` headings): `## Key takeaways` (3 bullets), `## What the market believes`, `## What changed`, `## Bull vs bear`, `## What would prove us wrong`.
-- **Visual**: the cover = the Idea's chart (posts with a social image get about 2x the signups: https://on.substack.com/p/grow-3).
+- **Visual**: see Image below.
 - Do: numbers with date and source; the paywall would sit before « Bull vs bear » (Substack's examples put it before the payoff: https://on.substack.com/p/free-vs-paid).
 - Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know.
+
+## Image
+- **style**: `breaking` (skill `breaking-chart`): news card when a news item is listed, else the big title.
+- **title**: the claim, never a label (« Profit quadrupled, the price did not move »).
+- **note**: the proof with its number on the point.

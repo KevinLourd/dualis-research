@@ -31,6 +31,7 @@ import { macroNews } from "./dimensions/macro-news";
 import { sandboxAccounts } from "./dimensions/sandbox-accounts";
 import { substackTrending } from "./dimensions/substack-trending";
 import { sandboxPosts } from "./dimensions/sandbox-posts";
+import { sandboxReview } from "./dimensions/sandbox-review";
 import { sandboxVisuals } from "./dimensions/sandbox-visuals";
 import { substackNetwork } from "./dimensions/substack-network";
 import { filingsDimension } from "./dimensions/filings";
@@ -54,18 +55,18 @@ import type { Dimension } from "./types";
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
  * Intraday price (5-minute bars, Yahoo) alone in its stage right after price (Yahoo rate limit): it moves gold.quotes to the latest 5-minute price, so EV, valuation, every judge and the live test read the real price, and market reaction the price at the minute a news item lands.
- * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11): macro-news (Google News, last 24 h) and substack-trending (finance Substacks' best recent posts) feed their angles; each fake account writes 5 posts a day from the skills (content-matrix). Never published.
+ * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11): macro-news (Google News, last 24 h) and substack-trending (finance Substacks' best recent posts) feed their angles; each fake account writes 5 posts a day, text and picture, from the skills (content-matrix); sandbox-visuals draws each post's picture; sandbox-review (skill content-review) reads them, edits the writing skills on a failure and the day is written again (3 rounds max). Never published.
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, macroNews, substackTrending, sandboxAccounts, sandboxPosts, sandboxVisuals, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, macroNews, substackTrending, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
  * collect runs `core` = everything else, the analysis chain, so it lands in minutes (Kevin 2026-11-05: speed).
  */
-export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-picks", "content-drafts", "content-visuals", "macro-news", "substack-trending", "sandbox-accounts", "sandbox-posts", "sandbox-visuals", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
+export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-picks", "content-drafts", "content-visuals", "macro-news", "substack-trending", "sandbox-accounts", "sandbox-posts", "sandbox-visuals", "sandbox-review", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
 
 /**
  * Stages of a collect (Kevin 2026-11-06: « comment speeder x10 »): the dimensions of one stage run at the same time,
