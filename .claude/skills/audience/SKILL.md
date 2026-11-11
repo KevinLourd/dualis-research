@@ -19,7 +19,7 @@ His 37 tickers: micro and small caps (mostly under US$2B, many under US$300M), s
 
 **Secondary (pays the most per seat)**: small fund PMs, family-office and emerging-manager analysts who need idea flow.
 
-**Our edge for them**: Thierry's "play winnable games" (2026-11-04): English coverage of Japan, Korea, Canada and Europe small caps with filings read at source (TDnet, DART, EDINET...), and the narrative-vs-fundamental read (long when a beaten-down story inflects, short when a hyped one cracks). Few writers cover this; it is the hook.
+**Our edge for them**: Thierry's "play winnable games" (2026-11-04): English coverage of Japan, Korea, Canada and Europe small caps with filings read at source (TDnet, DART, EDINET...), and the narrative-vs-fundamental read (long when a beaten-down story inflects, short when a hyped one cracks). Few writers cover this; it is the hook. **Aligned incentives** (Thierry 2026-11-09): he invests his own capital in every call and publishes his own record, research for buy-side investors, never written for the companies.
 
 **Proof the model pays**: Multibagger Ideas (@multibaggerideas), small caps nobody covers, 0 to 42K readers and 515 paid in 20 months (~$1M/yr, Thierry 2026-11-09); copy his posting (`daily-content`), too big to ask for a swap now.
 
