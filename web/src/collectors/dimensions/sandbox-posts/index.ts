@@ -290,7 +290,8 @@ export function parseImage(raw: unknown, plan: Pick<SlotPlan, "slot" | "charts" 
   const chart = plan.charts.find((c) => c.id === o.chart);
   if (!chart) throw new Error(`post ${n} image draws ${String(o.chart)}, not a chart listed for it`);
   const point = str(o.point, "point");
-  if (!chart.points.some((p) => p.id === point)) throw new Error(`post ${n} image points at ${point}, not a point of ${chart.id}`);
+  // `latest` = the chart's last value, on any chart (the renderer resolves it; writers use it on Idea charts too).
+  if (point !== "latest" && !chart.points.some((p) => p.id === point)) throw new Error(`post ${n} image points at ${point}, not a point of ${chart.id}`);
   if (o.style !== "breaking" && o.style !== "pro") throw new Error(`post ${n} image style ${String(o.style)} is not breaking or pro`);
   let news: SandboxImage["news"] = null;
   if (o.news !== null && o.news !== undefined) {
