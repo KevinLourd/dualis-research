@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
@@ -247,7 +247,9 @@ describe("sandbox-posts", () => {
     await run(sandboxAccounts);
     reviewPlan.fail = "Siren Small Caps », X,";
     const skill = join(skillsDir, "x-urgent/SKILL.md");
-    reviewPlan.edit = { skill: "x-urgent", old: "- **note**: the shock number itself, on the point that shows it.", new: "- **note**: the shock number AND what it measures (« Profit x4 in a year »)." };
+    // The review loop edits the real skills every day: the test edits its own line, never their changing text.
+    await writeFile(skill, `${await readFile(skill, "utf8")}\n- **test line**: the note says the number.\n`);
+    reviewPlan.edit = { skill: "x-urgent", old: "- **test line**: the note says the number.", new: "- **test line**: the number AND what it measures." };
     await run(sandboxPosts);
     await run(sandboxVisuals);
     const r1 = await run(sandboxReview);

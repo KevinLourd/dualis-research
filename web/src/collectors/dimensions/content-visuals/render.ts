@@ -249,8 +249,11 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
     { text: a.note, size: 24 },
     { text: `VS price narrative: "${a.priceSays}"`, size: 18 },
   ];
-  const boxW = Math.min(760, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
-  const boxH = 22 + lines.reduce((t, l) => t + l.size + 10, 0);
+  const boxW = Math.min(620, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
+  // A line longer than the box wraps (never cut with « … »: the reviewer read cut notes as pictures that do not stand alone).
+  const rows = lines.map((l) => Math.max(1, Math.ceil((l.text.length * l.size * 0.5) / (boxW - 40))));
+  const lineTop = (i: number) => lines.slice(0, i).reduce((t, p, k) => t + rows[k] * (p.size + 6) + 4, 0);
+  const boxH = 26 + lineTop(lines.length);
   const gap = 70;
   // A bar is hit from the side: the note sits high in the free space over the shorter bars.
   const candidates = [
@@ -298,18 +301,41 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
       style: {
         text: l.text,
         x: box.x + 20,
-        y: box.y + 16 + lines.slice(0, i).reduce((t, p) => t + p.size + 10, 0),
+        y: box.y + 14 + lineTop(i),
         fill: INDIGO,
         fontSize: l.size,
         fontWeight: i === 1 ? 400 : 600,
         fontFamily: FONT,
         verticalAlign: "top",
         width: boxW - 40,
-        overflow: "truncate",
+        overflow: "break",
+        lineHeight: l.size + 6,
       },
       z: 21,
     })),
   ];
+}
+
+/**
+ * Every line of a line chart, sampled between its points, plus the lead series' end label: the note box never covers a
+ * line or the last value (the reviewer: « the note box covered the line's last point and value »).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lineObstacles(chart: any, series: { index: number; values: (number | null | undefined)[] }[], at: (k: number, v: number) => unknown[]): Rect[] {
+  const out: Rect[] = [];
+  for (const s of series) {
+    const pts = s.values.flatMap((v, k) => (typeof v === "number" ? [chart.convertToPixel({ seriesIndex: s.index }, at(k, v)) as number[]] : []));
+    pts.forEach(([x, y], i) => {
+      out.push({ x: x - 6, y: y - 12, w: 12, h: 24 });
+      const next = pts[i + 1];
+      if (next) for (let t = 1; t < 8; t++) out.push({ x: x + ((next[0] - x) * t) / 8 - 6, y: y + ((next[1] - y) * t) / 8 - 12, w: 12, h: 24 });
+    });
+    if (s.index === 0 && pts.length) {
+      const [x, y] = pts[pts.length - 1];
+      out.push({ x: x - 6, y: y - 18, w: 140, h: 36 });
+    }
+  }
+  return out;
 }
 
 function withMark(svg: string, x: number, y: number, size: number): string {
@@ -341,18 +367,28 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
   const labelTop = newsBox.y + newsBox.h + 26;
   const head = a ? heading(a, company) : null;
   const titleW = card ? W - 56 - CARD_W - 40 - 40 : pro ? W - 112 : W - 112 - 96;
-  const grid = { left: 110, right: 200, top: news ? labelTop + 28 + 44 : card ? cardY + CARD_H + 70 : 160, bottom: 92 };
+  // Words wrap, never cut with « … », and the period is said once (the chart label carries it): the reviewer read
+  // « · Last 12 m... » as a picture that does not stand alone (2026-11-11).
+  const titleText = news ? "" : head ? head.title : `${company} share price vs fair value`;
+  const gap = input.fair ? `${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}`.trim() : "";
+  const subText = news && head ? [head.title, gap].filter(Boolean).join(" · ") : head ? [head.sub, gap].filter(Boolean).join(" · ") : subtitle;
+  const subSize = news ? 21 : 22;
+  const subW = news ? W - 112 : titleW;
+  const wraps = (text: string, size: number, width: number) => Math.min(2, Math.max(1, Math.ceil((text.length * size * 0.55) / width)));
+  const titleExtra = titleText ? (wraps(titleText, 34, titleW) - 1) * 42 : 0;
+  const subExtra = (wraps(subText, subSize, subW) - 1) * 28;
+  const grid = { left: 110, right: 200, top: (news ? labelTop + 28 + 44 : card ? cardY + CARD_H + 70 : 160 + titleExtra) + subExtra, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: news ? "" : head ? head.title : `${company} share price vs fair value`, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
+      { text: titleText, left: 56, top: 44, textStyle: { color: "#fff", fontSize: 34, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: "break" } },
       {
-        text: news && head ? `${head.title} · ${subtitle}` : head ? [head.sub, subtitle].filter(Boolean).join(" · ") : subtitle,
+        text: subText,
         left: 56,
-        top: news ? labelTop : card ? grid.top - 48 : 94,
-        textStyle: { color: NOTE.muted, fontSize: news ? 21 : 22, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : titleW, overflow: "truncate" },
+        top: news ? labelTop : card ? grid.top - 48 - subExtra : 94 + titleExtra,
+        textStyle: { color: NOTE.muted, fontSize: subSize, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: subW, overflow: "break" },
       },
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
@@ -368,8 +404,11 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     // Every close of the line is an obstacle: the note never hides the price.
     const obstacles: Rect[] = input.bars.map((b) => {
       const [x, y] = chart.convertToPixel({ seriesIndex: 0 }, [ts(b.date), b.close]) as number[];
-      return { x: x - 4, y: y - 8, w: 8, h: 16 };
+      return { x: x - 6, y: y - 12, w: 12, h: 24 };
     });
+    // The value printed at the line's end is an obstacle too.
+    const [lx, ly] = chart.convertToPixel({ seriesIndex: 0 }, [ts(last.date), last.close]) as number[];
+    obstacles.push({ x: lx - 6, y: ly - 18, w: 140, h: 36 });
     chart.setOption({
       graphic: [
         ...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []),
@@ -411,22 +450,24 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const titleW = card ? W - 56 - CARD_W - 40 - 40 : pro ? W - 112 : W - 112 - (off ? 0 : 96);
   const titleSize = a ? 34 : 32;
   const head = a ? heading(a, input.companyName ?? input.symbol) : null;
-  const titleLines = card && head ? Math.min(2, Math.ceil((head.title.length * titleSize * 0.55) / titleW)) : 1;
+  // The title wraps (never cut with « … »): every layout below it moves down by its extra line.
+  const titleLines = head && !news ? Math.min(2, Math.max(1, Math.ceil((head.title.length * titleSize * 0.55) / titleW))) : 1;
+  const titleExtra = (titleLines - 1) * 42;
   const subTop = 40 + off + (titleLines - 1) * 42 + 48;
   const labelTop = newsBox.y + newsBox.h + 26;
-  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 : card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off, bottom: 92 };
+  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 : card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off + titleExtra, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
-      { text: news ? "" : head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: card ? "break" : "truncate" } },
-      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : pro ? proSubtitle(input) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
+      { text: news ? "" : head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: "break" } },
+      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : pro ? proSubtitle(input) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off + titleExtra, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
       { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
       ? // Legend on top, left aligned (design tokens chart rule).
-        { show: true, left: 56, top: 140 + off, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+        { show: true, left: 56, top: 140 + off + titleExtra, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
       : { show: false },
     grid,
     xAxis: {
@@ -493,7 +534,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
           const [cx, top] = chart.convertToPixel({ seriesIndex: 0 }, [k, val]) as number[];
           return [{ x: cx - half - 30, y: Math.min(top, base) - 34, w: 2 * half + 60, h: Math.abs(base - top) + 34 }];
         })
-      : [];
+      : lineObstacles(chart, e.series.map((s, i) => ({ index: i, values: e.points.map((p) => p.values[s.key]) })), (k, v) => [k, v]);
     chart.setOption({ graphic: [...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
   }
   let svg = chart.renderToSVGString();
