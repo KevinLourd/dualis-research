@@ -12,7 +12,7 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 - **Hook**: `🚨 BREAKING: <short name>` then ONE shock number.
 - **Structure**: shock number, then one line of urgency.
 - **Allowed**: one word in CAPS, one exclamation mark.
-- **Visual**: the BREAKING chart (skill `breaking-chart`).
+- **Visual**: see Image below.
 - Example:
 ```
 🚨 BREAKING: CareCloud just QUADRUPLED profit for shareholders to $4.7M. The market is asleep on this one!
@@ -23,6 +23,12 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 - **Length**: 700 to 1100 words, short paragraphs.
 - **Title**: `BREAKING:` + the shock number (« BREAKING: CareCloud Quadrupled Shareholder Profit »). Subtitle: one line of urgency.
 - **Structure** (`##` headings): `## The number`, `## Why the market missed it`, `## What happens next`, `## The risk`.
-- **Visual**: cover = the Idea's chart.
+- **Visual**: see Image below.
 - Do: bold the one figure of each section.
 - Don't: drop the risk section; fake scarcity.
+
+## Image
+- **style**: `breaking` (skill `breaking-chart`).
+- **title**: the alarm with its number, one word in CAPS allowed.
+- **newsLine**: the triggering fact when a news item is listed.
+- **note**: the shock number on its point.

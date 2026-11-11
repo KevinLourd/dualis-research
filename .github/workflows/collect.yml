@@ -18,6 +18,10 @@ concurrency:
   group: collect
   cancel-in-progress: false
 
+# The Sandbox review (skill content-review) edits the writing skills: committed to main at the end of the run.
+permissions:
+  contents: write
+
 jobs:
   collect:
     # 24.04: Chrome is on the image (content-visuals captures news pages with it); ffmpeg added below (its card video).
@@ -67,3 +71,21 @@ jobs:
       - run: echo "FFMPEG_PATH=$HOME/ffmpeg/bin/ffmpeg" >> "$GITHUB_ENV" && ~/ffmpeg/bin/ffmpeg -version | head -1
       - run: pnpm db:migrate
       - run: pnpm collect ${{ github.event.inputs.dimension || (github.event.schedule == '15 5 * * *' && 'all') || (github.event.schedule == '0 2 * * *' && 'growth-outreach,substack-network,growth-brief') || 'core' }}
+      # The Sandbox loop (Kevin 2026-11-11): a failed review edited the writing skills, the day is written, drawn and
+      # reviewed again with them, up to round 3 (rounds with nothing to do are no-ops).
+      - name: Sandbox rounds 2 and 3
+        if: github.event.schedule == '15 5 * * *' || github.event.inputs.dimension == 'all' || contains(github.event.inputs.dimension, 'sandbox')
+        run: |
+          pnpm collect sandbox-posts,sandbox-visuals,sandbox-review
+          pnpm collect sandbox-posts,sandbox-visuals,sandbox-review
+      - name: Commit the skills the review edited
+        if: always()
+        working-directory: .
+        run: |
+          if git diff --quiet -- .claude/skills; then exit 0; fi
+          git config user.name "dualis-collector"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude/skills
+          git commit -m "skills: content-review edits after the Sandbox review (run ${{ github.run_id }})"
+          for i in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && break; sleep 5; done
+          git diff HEAD~1 --stat >> "$GITHUB_STEP_SUMMARY"

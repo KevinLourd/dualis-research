@@ -24,8 +24,22 @@ One post = the channel x tone skill (its format section) + the angle skill of th
 - Never write the disclaimer: « Not investment advice. » is added after the writer.
 - Never a person's private data, never Thierry's name or handle on a sandbox account.
 
-## The Sandbox (`/sandbox` in the console, never published)
-6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post).
+## The picture (every post carries one, Kevin 2026-11-11)
+The writer writes the picture with the text, in the same answer (`image`), and each tone skill's **Image** section decides its look. The code only draws. A reader who sees ONLY the picture must get, in five seconds: which company, what is measured, over which period, and the post's conclusion.
+- **chart**: the listed chart that PROVES the post's claim (an Exhibit when the claim is about the business; `price` only when the claim is about the share price).
+- **point**: the one value that proves it; the arrow hits it.
+- **note** (on the arrow): the proof with its number, which IS the point's value as listed; 3 to 7 words.
+- **chartLabel**: what is measured, its unit and period, in plain words (« Profit per quarter, $ millions »); printed as « Company: chartLabel ».
+- **priceSays**: what the share price still assumes, the belief the point contradicts; printed as « VS price narrative: "…" ».
+- **title**: the post's conclusion in 4 to 9 words. Printed big ONLY in the `breaking` style without a news card; otherwise the note carries the conclusion.
+- **newsLine** + **news**: the news fact in plain words (`breaking` style, when a news item is listed), its most prestigious publisher.
+- **One story**: the picture says the SAME conclusion as the text, with the same main number. No number on the picture that the text contradicts, none that the inputs lack.
+- **Plain words** a retail investor reads at once: no EPS, net income, common shareholders, YoY; say profit, profit per share, shareholders, a year earlier.
+- An Article's picture is its cover: its single strongest proof.
+- Each post has its own picture: never repeat the chart, point and words of another post of the day.
+
+## The Sandbox (Business > Sandbox in the console, never published)
+6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post). Skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
 
 ### Daily mix per account (5 posts)
 | Slot (Astana) | Angle | Input |

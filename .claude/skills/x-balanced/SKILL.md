@@ -11,7 +11,7 @@ The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). Th
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
 - **Hook**: opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number.
 - **Structure**: the fact, then why the price has it wrong. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
-- **Visual**: the professional chart (skill `x-post`): one highlighted point and its arrow, no news card. A chart alone does not lift engagement (Buffer 2026, 52M posts: https://buffer.com/resources/state-of-social-media-engagement/), so the words carry the claim.
+- **Visual**: see Image below.
 - **Say in words** what the image no longer says: the news source when it is a big name (« per Reuters »), the live signal (« Shares 28% under fair value »).
 - Example:
 ```
@@ -30,6 +30,11 @@ X Articles carry a title, a cover image, headers, images and embedded posts (htt
   2. `## What the market believes`: the narrative the price tells.
   3. `## Why the price is wrong`: the evidence, 2-4 figures from the inputs.
   4. `## What would prove us wrong`: the kill criterion.
-- **Visual**: the cover = the Idea's chart; no chart is described point by point.
+- **Visual**: see Image below.
 - Do: short paragraphs (2-3 sentences), one figure per sentence.
 - Don't: a heading with no new fact under it, a price target we did not compute.
+
+## Image
+- **style**: `pro` (chart, arrow and note; no news or price card, skill `x-post`). Its heading is « Company: chartLabel », so the **note** carries the conclusion with its number (« Profit up 4x in a year »).
+- **chart**: the Exhibit that proves the claim; the price only for a post about the price.
+- **title**: the conclusion anyway (kept with the post).

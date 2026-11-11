@@ -2,16 +2,18 @@ import { and, asc, desc, eq, gte, inArray, like, sql } from "drizzle-orm";
 import { narratives } from "@/db/schema/analysis";
 import { type BronzeFetch, fetches } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
-import type { DraftInputs, VisualKind } from "@/db/schema/content";
+import type { DraftInputs } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
 import { goldNewsItems } from "@/db/schema/news";
 import * as sandbox from "@/db/schema/sandbox";
-import type { SandboxAngle, SandboxFormat, SandboxInput, SandboxPlatform } from "@/db/schema/sandbox";
+import type { SandboxAngle, SandboxFormat, SandboxImage, SandboxInput, SandboxPlatform } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import { utcDay } from "@/content/ideas";
 import { memo } from "../../markets";
 import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
 import { ideaContext } from "../content-drafts";
+import { calloutPoints } from "../content-visuals/choose";
+import { MIN_BARS, visualInput } from "../content-visuals/data";
 import { draftPrompt, stripDashes, withDisclaimer } from "../content-drafts/format";
 import { REFERENCE_PUBLICATIONS } from "../content-posts";
 import { topMacroHeadline } from "../macro-news";
@@ -32,7 +34,9 @@ export const SANDBOX_POSTS_DIMENSION = "sandbox-posts";
 export const CLAUDE_SOURCE = "claude";
 export const POSTS_PER_DAY = 5;
 /** Bump to rewrite the next day's posts with a new prompt frame; the skills' own text is hashed on top. */
-export const SANDBOX_VERSION = "sandbox-v2";
+export const SANDBOX_VERSION = "sandbox-v3";
+/** A day is written at most this many times: the first writing + one per failed review (skill content-review). */
+export const MAX_ROUNDS = 3;
 /** Display times on the fake timeline: 08:00, 11:00, 14:00, 17:00, 20:00 Astana (UTC+5). */
 export const SLOT_HOURS_UTC = [3, 6, 9, 12, 15] as const;
 /** The angle of each slot; the Ideas used by the signal, trending and competitor slots, in order. */
@@ -42,31 +46,59 @@ const ANGLE_ROTATION: readonly SandboxAngle[] = ["signal", "macro-24h", "trendin
 const SHORT: Record<SandboxPlatform, SandboxFormat> = { x: "x-post", substack: "substack-note" };
 const ARTICLE: Record<SandboxPlatform, SandboxFormat> = { x: "x-article", substack: "substack-article" };
 export const FORMAT_NAME: Record<SandboxFormat, string> = { "x-post": "X post", "x-article": "X Article", "substack-note": "Substack Note", "substack-article": "Substack Article" };
-/** The image each format takes from the Idea's visuals (same order as the WhatsApp post loop, content/post-image.ts). */
-const VISUAL_ORDER: Record<SandboxPlatform, readonly VisualKind[]> = { x: ["x-chart", "montage", "chart"], substack: ["chart", "montage", "x-chart"] };
 
 // ------------------------------------------------------------------------------------------------ skills
 
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
 const ANGLE_SKILLS = ["angle-signal", "angle-macro-24h", "angle-trending-format", "angle-competitor"];
 
+/** The repo's skills folder (`SANDBOX_SKILLS_DIR` = a copy, for tests: the reviewer edits these files). */
+export function skillsRoot(): URL {
+  const dir = process.env.SANDBOX_SKILLS_DIR;
+  // Built at run time: webpack bundles a literal `new URL("...", import.meta.url)` as an asset (the console imports this file).
+  return dir ? new URL(`file://${dir.replace(/\/?$/, "/")}`) : new URL(`${"../".repeat(5)}.claude/skills/`, import.meta.url);
+}
+export const skillFile = (name: string) => new URL(`${name}/SKILL.md`, skillsRoot());
+export async function readSkill(name: string): Promise<string> {
+  const { readFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
+  return readFile(skillFile(name), "utf8");
+}
+export const stripFrontmatter = (s: string) => s.replace(/^---[\s\S]*?---\s*/, "").trim();
+export async function shortHash(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+}
+/** The skills a channel x tone account writes with, in order: the reviewer may edit these and only these. */
+export const writingSkills = (platform: SandboxPlatform, tone: string) => ["content-matrix", `${platform}-${tone}`, ...ANGLE_SKILLS];
+
 /** The skills a channel x tone account writes with, frontmatter removed, read from the repo at run time. */
 export async function loadSkills(platform: SandboxPlatform, tone: string): Promise<{ text: string; hash: string }> {
-  const { readFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
-  // Built at run time: webpack bundles a literal `new URL("...", import.meta.url)` as an asset (the console imports this file).
-  const root = new URL(`${"../".repeat(5)}.claude/skills/`, import.meta.url);
-  const names = ["content-matrix", `${platform}-${tone}`, ...ANGLE_SKILLS];
-  const texts = await Promise.all(names.map(async (n) => (await readFile(new URL(`${n}/SKILL.md`, root), "utf8")).replace(/^---[\s\S]*?---\s*/, "").trim()));
+  const texts = await Promise.all(writingSkills(platform, tone).map(async (n) => stripFrontmatter(await readSkill(n))));
   const text = texts.join("\n\n---\n\n");
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${SANDBOX_VERSION}\n${text}`));
-  const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
-  return { text, hash };
+  return { text, hash: await shortHash(`${SANDBOX_VERSION}\n${text}`) };
 }
 
 // ------------------------------------------------------------------------------------------------ the day's plan
 
 /** One slot of the day, shared by every account of a channel. `brief` = what the writer reads for it. */
-export type SlotPlan = { slot: number; angle: SandboxAngle; article: boolean; ideaId: string | null; symbol: string | null; input: SandboxInput; brief: string };
+export type SlotPlan = { slot: number; angle: SandboxAngle; article: boolean; ideaId: string | null; symbol: string | null; input: SandboxInput; brief: string; charts: ChartOption[]; news: string[] };
+/** A chart the post's picture can draw: `price` or an Exhibit id, with the points its arrow can hit (id + value). */
+export type ChartOption = { id: string; label: string; points: { id: string; label: string }[] };
+
+/** The macro post's chart: the price of the company the writer ties the headline to, known only once it answers. */
+const MACRO_CHART: ChartOption = { id: "price", label: "Share price of the ONE company you tie the headline to (your \"ticker\"), last 12 months, vs its fair value", points: [{ id: "latest", label: "the latest close, printed at the end of the line" }] };
+
+/** The charts an Idea's post can draw (its price, the Exhibits of the drivers it cites) and the news it cites. */
+async function ideaCharts(db: Db, ideaId: string): Promise<{ charts: ChartOption[]; news: string[] }> {
+  const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
+  if (!idea) throw new Error(`idea ${ideaId} not found`);
+  const input = await visualInput(db, idea);
+  const charts: ChartOption[] = [
+    ...(input.bars.length >= MIN_BARS ? [{ id: "price", label: `${input.companyName ?? input.symbol} share price, last 12 months, vs fair value${input.fair ? ` ${input.fair.value} ${input.fair.currency ?? ""}`.trimEnd() : ""}`, points: calloutPoints(input, { kind: "price", reason: null }) }] : []),
+    ...input.exhibits.map((e) => ({ id: e.id, label: `Exhibit of the driver « ${e.driverTitle} »: ${e.title}. ${e.takeaway}`, points: calloutPoints(input, { kind: "exhibit", exhibit: e, reason: null }) })),
+  ];
+  return { charts, news: input.news.map((n) => `${n.publisher}: ${n.headline}${n.citedSentence ? `. Key sentence: ${n.citedSentence}` : ""}`) };
+}
 
 /** The angle whose slot is the day's Article: rotates by day. */
 export function articleAngle(day: string): SandboxAngle {
@@ -103,7 +135,7 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
     const [first] = await db
       .select({ request: fetches.request })
       .from(fetches)
-      .where(and(eq(fetches.dimension, SANDBOX_POSTS_DIMENSION), like(fetches.subject, `${platform}:%|${day}`), sql`${fetches.request}->>'version' = ${SANDBOX_VERSION}`))
+      .where(and(eq(fetches.dimension, SANDBOX_POSTS_DIMENSION), like(fetches.subject, `${platform}:%|${day}|%`), sql`${fetches.request}->>'version' = ${SANDBOX_VERSION}`))
       .orderBy(asc(fetches.fetchedAt))
       .limit(1);
     const earlier = (first?.request as { plans?: SlotPlan[] } | undefined)?.plans;
@@ -117,7 +149,9 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
     let ideaIndex = 0;
     for (const [slot, wanted] of SLOT_ANGLES.entries()) {
       const idea = wanted === "macro-24h" ? null : ideaAt(ideaIndex++);
+      const charts = (id: string) => memo(ctx, `sandbox-charts:${id}`, () => ideaCharts(db, id));
       const signal = async (i: IdeaPick, note = ""): Promise<Omit<SlotPlan, "slot" | "article">> => ({
+        ...(await charts(i.id)),
         angle: "signal",
         ideaId: i.id,
         symbol: i.symbol,
@@ -137,6 +171,8 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
             ideaId: null,
             symbol: null,
             input: { kind: "macro-24h", label: `${head.title}${head.publisher ? ` (${head.publisher})` : ""}`, url: head.url },
+            charts: [MACRO_CHART],
+            news: [],
             brief: [
               "Angle: macro-24h.",
               `Headline of the last 24 h: ${head.title}${head.publisher ? `, per ${head.publisher}` : ""}${head.publishedAt ? ` (${head.publishedAt.toISOString().slice(0, 16).replace("T", " ")} UTC)` : ""}. Found by searches: ${head.queries.join(", ")}.`,
@@ -162,6 +198,7 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
             ideaId: idea!.id,
             symbol: idea!.symbol,
             input: platform === "x" ? { kind: "trending-format", label: `Curated X format, on: ${idea!.title}`, url: null } : { kind: "trending-format", label: `Format of « ${top!.title} » (${top!.publicationName ?? top!.host}), on: ${idea!.title}`, url: top!.url },
+            ...(await charts(idea!.id)),
             brief: `Angle: trending-format.\n${format}\n\nOur Idea to put in that shape:\n${await brief(idea!.id)}`,
           };
       } else {
@@ -184,6 +221,7 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
             ideaId: idea!.id,
             symbol: idea!.symbol,
             input: { kind: "competitor", label: `Pattern of « ${ref.title} » (${pub}), on: ${idea!.title}`, url: ref.url },
+            ...(await charts(idea!.id)),
             brief: [
               "Angle: competitor.",
               `A reference publication's recent post: « ${ref.title} »${ref.subtitle ? `, « ${ref.subtitle} »` : ""}.`,
@@ -209,58 +247,94 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
 export function sandboxSystem(skills: string, accountName: string, platform: SandboxPlatform, tone: string): string {
   return [
     `You write for the fake ${platform === "x" ? "X account" : "Substack publication"} « ${accountName} » in the ${tone.toUpperCase()} tone. It is a sandbox: nothing is published.`,
-    `Follow the skills below: content-matrix, ${platform}-${tone} (the section of each post's format), and the angle skill of each post.`,
+    `Follow the skills below: content-matrix, ${platform}-${tone} (the section of each post's format AND its Image section), and the angle skill of each post.`,
     "",
     skills,
   ].join("\n");
 }
 
 export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): string {
-  const blocks = plans.map((p) => `## Post ${p.slot + 1}: ${FORMAT_NAME[p.article ? ARTICLE[platform] : SHORT[platform]]}, angle ${p.angle}\n${p.brief}`);
+  const blocks = plans.map((p) =>
+    [
+      `## Post ${p.slot + 1}: ${FORMAT_NAME[p.article ? ARTICLE[platform] : SHORT[platform]]}, angle ${p.angle}`,
+      p.brief,
+      "",
+      `Charts Post ${p.slot + 1}'s picture can draw (id: what it shows; then the points its arrow can hit, id: value):`,
+      ...p.charts.flatMap((c) => [`- ${c.id}: ${c.label}`, ...c.points.map((pt) => `  - ${pt.id}: ${pt.label}`)]),
+      p.news.length ? `News its picture can cite (index: publisher: headline):\n${p.news.map((n, i) => `- ${i}: ${n}`).join("\n")}` : "News its picture can cite: none (newsLine and news null).",
+    ].join("\n"),
+  );
   const article = plans.find((p) => p.article);
   const macro = plans.find((p) => p.angle === "macro-24h");
   return [
     ...blocks,
     "",
     `Answer with ONE JSON object only, no prose, no code fence, no second attempt: {"posts": [...]} with exactly ${plans.length} items, one per post, each carrying its post number:`,
-    `{"post": <n>, "text": "..."} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>"} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
+    `{"post": <n>, "text": "...", "image": IMAGE} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>", "image": IMAGE} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
+    `IMAGE = every word of that post's picture, written by you as your Image section says: {"chart": "<a chart id listed for that post>", "point": "<a point id listed under that chart>", "style": "breaking" | "pro", "title": "...", "chartLabel": "...", "note": "...", "priceSays": "...", "newsLine": "<text, or null>", "news": <null, or {"index": <a news index listed for that post>, "domain": "<that publisher's web domain>"}>}.`,
     ...(macro ? [`Post ${macro.slot + 1} (macro-24h) also carries "ticker": the symbol of the ONE covered company it ties the headline to (its chart is that company's price vs fair value).`] : []),
   ].join("\n\n");
 }
 
-export type ParsedPost = { title: string | null; subtitle: string | null; text: string; ticker?: string | null };
+export type ParsedPost = { title: string | null; subtitle: string | null; text: string; ticker?: string | null; image: SandboxImage };
+
+/** Reads one post's picture: its chart and point must be listed for that post, every word present. Throws with the reason. */
+export function parseImage(raw: unknown, plan: Pick<SlotPlan, "slot" | "charts" | "news">): SandboxImage {
+  const n = plan.slot + 1;
+  if (!raw || typeof raw !== "object") throw new Error(`post ${n} has no image`);
+  const o = raw as Record<string, unknown>;
+  const str = (v: unknown, name: string) => {
+    if (typeof v !== "string" || !v.trim()) throw new Error(`post ${n} image has no ${name}`);
+    return stripDashes(v.trim());
+  };
+  const chart = plan.charts.find((c) => c.id === o.chart);
+  if (!chart) throw new Error(`post ${n} image draws ${String(o.chart)}, not a chart listed for it`);
+  const point = str(o.point, "point");
+  if (!chart.points.some((p) => p.id === point)) throw new Error(`post ${n} image points at ${point}, not a point of ${chart.id}`);
+  if (o.style !== "breaking" && o.style !== "pro") throw new Error(`post ${n} image style ${String(o.style)} is not breaking or pro`);
+  let news: SandboxImage["news"] = null;
+  if (o.news !== null && o.news !== undefined) {
+    const x = o.news as Record<string, unknown>;
+    if (typeof x.index !== "number" || x.index < 0 || x.index >= plan.news.length) throw new Error(`post ${n} image cites news ${String(x.index)}, not one listed for it`);
+    news = { index: x.index, domain: str(x.domain, "news domain").replace(/^https?:\/\//, "").replace(/\/.*$/, "") };
+  }
+  const newsLine = typeof o.newsLine === "string" && o.newsLine.trim() ? stripDashes(o.newsLine.trim()) : null;
+  if (news && !newsLine) throw new Error(`post ${n} image cites a news item with no newsLine`);
+  return { chart: chart.id, point, style: o.style, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine: news ? newsLine : null, news };
+}
 
 /**
  * Reads the batch answer: the LAST `{"posts": ...}` object of the text (a writer sometimes restarts its answer), one
  * item per post, matched on its `post` number (else its position); the Article must carry a title and a body.
  * Throws with the reason.
  */
-export function parsePosts(text: string, plans: Pick<SlotPlan, "article" | "slot">[]): ParsedPost[] {
+export function parsePosts(text: string, plans: Pick<SlotPlan, "article" | "slot" | "charts" | "news">[]): ParsedPost[] {
   const starts = [...text.matchAll(/\{\s*"posts"/g)].map((m) => m.index!);
   const end = text.lastIndexOf("}");
   if (starts.length === 0 || end <= starts[starts.length - 1]) throw new Error("answer holds no posts object");
   const posts = (JSON.parse(text.slice(starts[starts.length - 1], end + 1)) as { posts?: unknown }).posts;
   if (!Array.isArray(posts) || posts.length !== plans.length) throw new Error(`expected ${plans.length} posts, got ${Array.isArray(posts) ? posts.length : "none"}`);
-  type Item = string | { post?: unknown; text?: unknown; title?: unknown; subtitle?: unknown; body?: unknown; ticker?: unknown };
+  type Item = string | { post?: unknown; text?: unknown; title?: unknown; subtitle?: unknown; body?: unknown; ticker?: unknown; image?: unknown };
   const items = posts as Item[];
   const byNumber = (n: number) => items.find((p) => typeof p === "object" && p !== null && Number(p.post) === n);
   return plans.map((plan, i) => {
     const p = byNumber(plan.slot + 1) ?? items[i];
     const o = typeof p === "string" ? { text: p } : (p ?? {});
     const ticker = typeof o.ticker === "string" && o.ticker.trim() ? o.ticker.trim().replace(/^\$/, "").toUpperCase() : null;
+    const image = parseImage(typeof p === "string" ? null : o.image, plan);
     if (plan.article) {
       if (typeof o.title !== "string" || typeof (o.body ?? o.text) !== "string" || !o.title.trim() || !String(o.body ?? o.text).trim()) throw new Error(`post ${plan.slot + 1} is not an article (title, subtitle, body)`);
-      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(String(o.body ?? o.text).trim()), ticker };
+      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(String(o.body ?? o.text).trim()), ticker, image };
     }
     const body = typeof o.text === "string" ? o.text : typeof o.body === "string" ? o.body : "";
     if (!body.trim()) throw new Error(`post ${plan.slot + 1} is empty`);
-    return { title: null, subtitle: null, text: stripDashes(body.trim()), ticker };
+    return { title: null, subtitle: null, text: stripDashes(body.trim()), ticker, image };
   });
 }
 
-type PostsRequest = { version: string; skillHash: string; model: string; accountId: string; platform: SandboxPlatform; day: string; plans: SlotPlan[]; prompt: string };
+type PostsRequest = { version: string; skillHash: string; model: string; accountId: string; platform: SandboxPlatform; day: string; round: number; plans: SlotPlan[]; prompt: string };
 
-/** One call per account per day: its 5 posts. Subject `<account id>|<day>`. */
+/** One call per account per day and round: its 5 posts and their pictures. Subject `<account id>|<day>|<round>`. */
 export const claudePosts: Source = {
   name: CLAUDE_SOURCE,
   requiredEnv: ["CLAUDE_OAUTH_TOKEN"],
@@ -270,7 +344,8 @@ export const claudePosts: Source = {
     if (!ctx.complete) throw new Error("no LLM in the collector context");
     if (!ctx.db) throw new Error("no database in the collector context");
     const db = ctx.db;
-    const [accountId, day] = subject.split("|");
+    const [accountId, day, r] = subject.split("|");
+    const round = Number(r);
     const [account] = await db.select().from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, accountId));
     if (!account) throw new Error(`sandbox account ${accountId} not found`);
     const plans = await dayPlan(db, account.platform, day, ctx);
@@ -278,7 +353,7 @@ export const claudePosts: Source = {
     const skills = await loadSkills(account.platform, account.tone);
     const prompt = sandboxPrompt(plans, account.platform);
     const { text, model } = await ctx.complete({ system: sandboxSystem(skills.text, account.displayName, account.platform, account.tone), prompt });
-    const request: PostsRequest = { version: SANDBOX_VERSION, skillHash: skills.hash, model, accountId, platform: account.platform, day, plans, prompt };
+    const request: PostsRequest = { version: SANDBOX_VERSION, skillHash: skills.hash, model, accountId, platform: account.platform, day, round, plans, prompt };
     const outcome = { request, httpStatus: null, payloadText: text };
     try {
       parsePosts(text, plans);
@@ -289,17 +364,28 @@ export const claudePosts: Source = {
   },
 };
 
-/** Accounts with no post today, when there are Ideas to write. */
+/**
+ * Accounts with no post today (round 1), and accounts whose latest round today failed its review (skill content-review)
+ * with rounds left: the day is written again with the edited skills (Kevin 2026-11-11: « relancer la génération jusqu'à
+ * ce que ce soit satisfaisant »). A day written before posts carried their picture is written again too.
+ */
 export async function sandboxPostSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
   const day = utcDay(now);
-  const [accounts, done, [anyIdea]] = await Promise.all([
+  const [accounts, written, reviews, [anyIdea]] = await Promise.all([
     db.select({ id: sandbox.sandboxAccounts.id }).from(sandbox.sandboxAccounts),
-    db.selectDistinct({ accountId: sandbox.sandboxPosts.accountId }).from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.day, day)),
+    db.select({ accountId: sandbox.sandboxPosts.accountId, round: sandbox.sandboxPosts.round, hasImage: sql<boolean>`${sandbox.sandboxPosts.image} is not null` }).from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.day, day)),
+    db.select({ accountId: sandbox.sandboxReviews.accountId, round: sandbox.sandboxReviews.round, pass: sandbox.sandboxReviews.pass }).from(sandbox.sandboxReviews).where(eq(sandbox.sandboxReviews.day, day)),
     db.select({ id: content.goldContentIdeas.id }).from(content.goldContentIdeas).limit(1),
   ]);
   if (!anyIdea) return [];
-  const posted = new Set(done.map((d) => d.accountId));
-  return accounts.filter((a) => !posted.has(a.id)).map((a) => `${a.id}|${day}`);
+  return accounts.flatMap((a) => {
+    const mine = written.filter((w) => w.accountId === a.id);
+    if (mine.length === 0) return [`${a.id}|${day}|1`];
+    const round = Math.max(...mine.map((w) => w.round));
+    const pictureless = mine.some((w) => w.round === round && !w.hasImage);
+    const review = reviews.find((r) => r.accountId === a.id && r.round === round);
+    return (pictureless || (review && !review.pass)) && round < MAX_ROUNDS ? [`${a.id}|${day}|${round + 1}`] : [];
+  });
 }
 
 export const sandboxPosts: Dimension = {
@@ -309,21 +395,6 @@ export const sandboxPosts: Dimension = {
   subjects: sandboxPostSubjects,
   promote: promoteSandboxPosts,
 };
-
-/** The Idea's image for a platform: its newest ready visual of the first kind that exists (gold, no bytes). */
-async function visualFor(db: Db, ideaId: string | null, platform: SandboxPlatform): Promise<string | null> {
-  if (!ideaId) return null;
-  const rows = await db
-    .select({ id: content.goldContentVisuals.id, kind: content.goldContentVisuals.kind, mime: content.goldContentVisuals.mime })
-    .from(content.goldContentVisuals)
-    .where(and(eq(content.goldContentVisuals.ideaId, ideaId), eq(content.goldContentVisuals.status, "ok")))
-    .orderBy(desc(content.goldContentVisuals.createdAt));
-  for (const kind of VISUAL_ORDER[platform]) {
-    const v = rows.find((r) => r.kind === kind && r.mime?.startsWith("image/"));
-    if (v) return v.id;
-  }
-  return null;
-}
 
 /** Bronze answer -> one silver post per (account, day, slot), stored once -> gold timeline rows of what this run wrote. */
 export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<PromoteResult> {
@@ -340,6 +411,7 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
           accountId: req.accountId,
           day: req.day,
           slot: plan.slot,
+          round: req.round,
           ideaId: plan.ideaId,
           symbol: plan.symbol ?? post.ticker ?? null,
           format: plan.article ? ARTICLE[req.platform] : SHORT[req.platform],
@@ -349,7 +421,7 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
           text: post.text,
           input: plan.input,
           skillHash: req.skillHash,
-          visualId: await visualFor(db, plan.ideaId, req.platform),
+          image: post.image,
           postAt: new Date(`${req.day}T${String(SLOT_HOURS_UTC[plan.slot]).padStart(2, "0")}:00:00Z`),
           model: req.model,
           sources: [CLAUDE_SOURCE],
@@ -365,9 +437,11 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
   return { silverRowsBySource: { [CLAUDE_SOURCE]: n } };
 }
 
-/** gold.sandbox_posts for one account's day (the only rows a run changes), each text as it would be published. */
+/** gold.sandbox_posts for one account's day (the only rows a run changes), its latest round, each text as it would be published. */
 export async function rebuildGoldPosts(db: Db, accountId: string, day: string) {
-  const posts = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, accountId), eq(sandbox.sandboxPosts.day, day)));
+  const all = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, accountId), eq(sandbox.sandboxPosts.day, day)));
+  const last = Math.max(...all.map((p) => p.round));
+  const posts = all.filter((p) => p.round === last);
   if (posts.length === 0) return;
   await db.delete(sandbox.goldSandboxPosts).where(and(eq(sandbox.goldSandboxPosts.accountId, accountId), eq(sandbox.goldSandboxPosts.day, day)));
   await db.insert(sandbox.goldSandboxPosts).values(

@@ -11,7 +11,7 @@ The sell-side research note: the view and why now first, then the evidence, valu
 - **Length**: one paragraph of 2 to 4 sentences, 200 to 450 characters, no line breaks.
 - **Hook**: the company and the finding. No emoji, no exclamation mark, no CAPS, no alarm word.
 - **Structure**: fact with number and period, what it implies for the valuation, what to watch next.
-- **Visual**: the Idea's chart.
+- **Visual**: see Image below.
 - Example:
 ```
 CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four times the prior year. The share price still discounts most of it as owed to preferred holders. The next dividend decision on the Series A will test that view.
@@ -22,6 +22,12 @@ CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four 
 - **Length**: 1000 to 1500 words.
 - **Title**: descriptive (« CareCloud: Q3 Profit for Common Shareholders Rose Fourfold »). Subtitle: the view in one line.
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence`, `## Valuation` (the fair value given in the inputs and its method), `## Risks`.
-- **Visual**: cover = the Idea's chart.
+- **Visual**: see Image below.
 - Do: every figure with its period and source.
 - Don't: emoji, hype, an unsourced figure.
+
+## Image
+- **style**: `pro`.
+- **chart**: a fundamentals Exhibit over the price whenever one is listed.
+- **note**: the fact with its number, no adjective.
+- **chartLabel**: the exact measure, unit and period.
