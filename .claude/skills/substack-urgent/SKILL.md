@@ -10,7 +10,7 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 ## Note
 - **Length**: under 200 characters when possible (the length that breaks out most: https://eden.so/blog/how-to-grow-on-substack-notes/), 300 at most, no line breaks.
 - **Hook**: `🚨 BREAKING: <short name>` then ONE shock number.
-- **Structure**: shock number, then one line of urgency.
+- **Structure**: shock number, then one line of urgency. ONE idea only: the urgency line adds no second figure (no price, no fair value gap, no half-year number), no "Here is what happened:" filler.
 - **Allowed**: one word in CAPS, one exclamation mark.
 - **Visual**: see Image below.
 - Example:

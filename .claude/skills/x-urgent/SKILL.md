@@ -10,7 +10,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 ## X post
 - **Length**: at most 200 characters.
 - **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
-- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »). `$TICKER` once.
+- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »). `$TICKER` once. ONE measure only: no second figure or claim (gross margin, net cash, fair value gap) that the picture does not show, and no claim without its number.
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
 - **Visual**: see Image below.
 - Example:
@@ -33,5 +33,5 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 - **style**: `breaking` (news card + price card).
 - **title**: the alarm with its shock number, one word in CAPS allowed (« Profit QUADRUPLED in a year »).
 - **newsLine**: when a news item is listed, the fact that triggered the post, with its number.
-- **note**: the shock number itself, on the point that shows it.
+- **note**: the shock number itself, on the point that shows it; the box sits in the empty half of the chart (last point high: box low, last point low: box high) and never covers the line or a bar.
 - **chart**: the series where the move is biggest.

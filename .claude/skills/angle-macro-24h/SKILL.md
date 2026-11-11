@@ -15,7 +15,7 @@ React while the story breaks: add our angle in the first hours, the window close
 ## How to write it
 - Open on the headline's fact (with its source when it is a big name: « per Reuters »).
 - Then the tie: which covered company it moves and how (rates and a leveraged balance sheet, oil and a shipper's costs, yen and an exporter).
-- Always tie it to ONE covered company, the most exposed one: the post's chart is that company's price vs fair value (the writer names its ticker).
+- Always tie it to ONE covered company, the most exposed one (the writer names its ticker), and state the exposure with a listed number (debt, interest cost, share of sales); the chart is the listed chart of that exposure itself (debt, interest cost, cash), never the share price, the note prints that one number with its unit ("Debt $38.2M, up from $1.2M"), and the text leads with that same number; priceSays is the belief about that exposure ("Debt costs will stay low"), never a profit claim. No listed chart for the exposure number: pick another company.
 
 ## Never
 - Invent the tie: name a company only when the narrative or the inputs support the link.

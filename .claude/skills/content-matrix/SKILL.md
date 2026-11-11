@@ -17,7 +17,7 @@ A post = **channel x tone x format x angle**. Each axis has its skill; the write
 One post = the channel x tone skill (its format section) + the angle skill of that post. Balanced = today's house style (skills `x-post`, `daily-content`, `research-note`, `breaking-chart`); the urgent and neutral skills move ONLY the tone and keep every other rule.
 
 ## Rules every post keeps, whatever the tone
-- English. Plain words: subject, verb, object. One idea per sentence.
+- English. Plain words: subject, verb, object. One idea per sentence. Never mention our internal notes or earlier gaps, and no sentence the reader must read twice.
 - Never a figure absent from the inputs. Never a price target, upside % or horizon Claude made up (the fair value is ours and computed: it may be quoted).
 - No em or en dash, no hashtag, no link in an X post (the bio carries it).
 - No contrast template (« X, not Y », « not X but Y »): state the one fact.
@@ -26,15 +26,15 @@ One post = the channel x tone skill (its format section) + the angle skill of th
 
 ## The picture (every post carries one, Kevin 2026-11-11)
 The writer writes the picture with the text, in the same answer (`image`), and each tone skill's **Image** section decides its look. The code only draws. A reader who sees ONLY the picture must get, in five seconds: which company, what is measured, over which period, and the post's conclusion.
-- **chart**: the listed chart that PROVES the post's claim (an Exhibit when the claim is about the business; `price` only when the claim is about the share price).
+- **chart**: the listed chart of the SAME measure and period as the text's lead number, for an Article the one in its title (a title on Q3 profit before loan losses gets the quarterly chart of that measure, never the yearly profit chart); a margin text gets the margin chart, a profit text the profit chart; `price` only when the claim is about the share price itself, never as a stand-in for a rate, margin, debt or profit claim. If no chart is listed for the lead number (net debt, one-off gain), lead the text with a number that has a chart.
 - **point**: the one value that proves it; the arrow hits it.
-- **note** (on the arrow): the proof with its number, which IS the point's value as listed; 3 to 7 words.
-- **chartLabel**: what is measured, its unit and period, in plain words (« Profit per quarter, $ millions »); printed as « Company: chartLabel ».
+- **note** (on the arrow): the proof with its number, which IS the point's value as listed and the number the text leads with; always a figure with its unit ("Sales $44.0M, down 4.3%"): ONE measure, the chart's own, in the axis unit and rounding ("2.9B yen", not "2,947M yen"); 3 to 5 words, so the box stays narrow and covers neither line, bars nor the last value label. A text about a one-off or a mix must show it on the picture (title or note), or lead with the number the picture proves.
+- **chartLabel**: what is measured, its unit and period, in plain words (« Profit per quarter, $ millions »); printed as « Company: chartLabel ». Keep it under 40 characters: only measure and unit, never the period words of a price chart ("last 12 months": the picture adds them, and a repeat gets cut with "..."), no fair value, no % above fair value. The note sits in the empty half of the chart, never over the line or its last value (last point high: note low; last point low: note high; a line crossing the whole chart: note in the corner away from it), and the arrow with the end value is always visible. A label that prints "..." was too long: shorten it.
 - **priceSays**: what the share price still assumes, the belief the point contradicts; printed as « VS price narrative: "…" ».
-- **title**: the post's conclusion in 4 to 9 words. Printed big ONLY in the `breaking` style without a news card; otherwise the note carries the conclusion.
-- **newsLine** + **news**: the news fact in plain words (`breaking` style, when a news item is listed), its most prestigious publisher.
-- **One story**: the picture says the SAME conclusion as the text, with the same main number. No number on the picture that the text contradicts, none that the inputs lack.
-- **Plain words** a retail investor reads at once: no EPS, net income, common shareholders, YoY; say profit, profit per share, shareholders, a year earlier.
+- **title**: the post's conclusion in 4 to 9 words, with its period (« Solera fell 21% in a week »). Printed big ONLY in the `breaking` style without a news card; otherwise the note carries the conclusion.
+- **newsLine** + **news**: the news fact in plain words WITH the figure of the chart's measure (« CareCloud operating margin hits 19.5%, its best quarter ever »), `breaking` style, when a news item is listed, its most prestigious publisher. A superlative or a gain with no figure fails.
+- **One story**: the picture says the SAME conclusion as the text, with the same main number: the figure in the text's first sentence is printed on the picture (title, note or news line). No number on the picture that the text contradicts, none that the inputs lack.
+- **Plain words** a retail investor reads at once, in the text AND on the picture (news card included): no EPS, net income, pre-provision income, price to book, guide, cash floor, net cash floor, common shareholders, YoY, 8-K or other filing form names, 'below estimate' without the estimate's figure; say profit, profit before loan losses, profit per share, shareholders, a year earlier, the company's forecast. Every claim carries its figure ("most profitable quarter ever" needs the profit in $).
 - An Article's picture is its cover: its single strongest proof.
 - Each post has its own picture: never repeat the chart, point and words of another post of the day.
 

@@ -18,7 +18,7 @@ The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). Th
 🚨 CareCloud $CCLD: profit for shareholders jumped 4x in Q3, to $4.7M. Shares still price it as leaking to preferred holders.
 ```
 - Do: one claim, plain words (« profit for shareholders », never « income available to common »).
-- Don't: hedge (« in my view », « it remains to be seen »), a « but » walking the claim back, a link, a hashtag, any emoji but the siren.
+- Don't: hedge (« in my view », « it remains to be seen »), a « but » walking the claim back, a link, a hashtag, any emoji but the siren, a second topic after the claim (a one-off gain, cash, Treasury yields), a claim with no number (« cash is shrinking »).
 
 ## X Article (long-form, Premium)
 X Articles carry a title, a cover image, headers, images and embedded posts (https://ppc.land/x-opens-articles-to-all-premium-users-ending-exclusive-pricing-tier/). The timeline shows only the title and cover, so the title is the hook (https://opentweet.io/how-to/write-an-x-article).

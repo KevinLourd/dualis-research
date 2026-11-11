@@ -13,7 +13,7 @@ Learn from what the best independent research writers publish: borrow the patter
 
 ## How to write it
 - Name the PATTERN for yourself first (a closed-call scoreboard, a « primer » that explains an industry, a teaser with 3 figures, a contrarian question, a field note).
-- Rebuild that pattern with our Idea and its figures.
+- Rebuild that pattern with our Idea and its figures; the text states the same period as the news line (quarter or half year) and, for a one-off gain, what share of the profit it is.
 
 ## Never
 - Copy a sentence, a title or a figure from their post.

@@ -21,8 +21,8 @@ Borrow the shape that works this week; the content stays ours.
 The writer picks the one that fits the Idea best.
 
 ## How to write it
-- Keep the trending post's SHAPE: title pattern, length, structure, hook type.
-- Fill it with OUR Idea, its figures only.
+- Keep the trending post's SHAPE: title pattern, length, structure, hook type. The hook still states OUR claim with its number; never a teaser or question that holds back the fact.
+- Fill it with OUR Idea, its figures only. The text's lead number is the one the chart and note show, over the same period (a quarterly sales figure gets the quarterly chart, a gross margin text the gross margin chart), and the text makes ONE claim.
 
 ## Never
 - Copy a sentence or a figure of the trending post.
