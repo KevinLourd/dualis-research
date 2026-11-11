@@ -1452,7 +1452,7 @@ body:has(.hero) .site-footer {
   color: var(--muted);
 }
 
-/* Framework drawn on the knot (Research), after Citrini's framework on its own logo. */
+/* The winnable games heading (Research). */
 .fw-head {
   text-align: center;
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -1461,83 +1461,6 @@ body:has(.hero) .site-footer {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink);
-}
-.framework {
-  position: relative;
-  max-width: 860px;
-  margin: 40px auto 0;
-}
-.fw-knot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(560px, 90%);
-  height: auto;
-  transform: translate(-50%, -50%);
-  filter: grayscale(1);
-  opacity: 0.11;
-  pointer-events: none;
-}
-.fw-steps {
-  position: relative;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.fw-steps::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  margin-left: -1px;
-  background: linear-gradient(var(--rule), var(--ink) 50%, var(--rule));
-}
-.fw-steps li {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  height: 118px;
-}
-.fw-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  margin: -9px 0 0 -9px;
-  border-radius: 50%;
-  background: var(--ink);
-  box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px var(--ink);
-}
-.fw-steps li:nth-child(3) .fw-dot {
-  background: var(--brand);
-  width: 22px;
-  height: 22px;
-  margin: -11px 0 0 -11px;
-}
-.fw-steps li.left .fw-text {
-  grid-column: 1;
-  text-align: right;
-  padding-right: 44px;
-}
-.fw-steps li.right .fw-text {
-  grid-column: 2;
-  padding-left: 44px;
-}
-.fw-text h3 {
-  font-weight: 400;
-  font-size: clamp(30px, 3.4vw, 44px);
-  line-height: 1.1;
-  color: var(--ink);
-}
-.fw-text p {
-  margin-top: 6px;
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 15px;
-  color: var(--muted);
 }
 
 /* Company: photo hero with the title over it (after Altas). */
@@ -1619,29 +1542,7 @@ body:has(.hero) .site-footer {
   gap: 20px;
   margin-top: 40px;
 }
-.lf-card {
-  background: #fff;
-  border: 1px solid var(--rule);
-  padding: 32px 28px;
-}
-.lf-card svg {
-  width: 30px;
-  height: 30px;
-  color: var(--brand);
-}
-.lf-card h3 {
-  margin-top: 22px;
-  font-weight: 400;
-  font-size: 23px;
-  color: var(--ink);
-}
-.lf-card p {
-  margin-top: 10px;
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--muted);
-}
+
 /* The « Play winnable games » line on Company, unsigned (Thierry 2026-11-09). */
 .founder-quote {
   margin: 0 auto;
@@ -1701,15 +1602,7 @@ body:has(.hero) .site-footer {
   .look-for {
     grid-template-columns: 1fr 1fr;
   }
-  .fw-steps li {
-    height: 96px;
-  }
-  .fw-steps li.left .fw-text {
-    padding-right: 28px;
-  }
-  .fw-steps li.right .fw-text {
-    padding-left: 28px;
-  }
+
   .latest a {
     grid-template-columns: 1fr;
   }
@@ -1779,13 +1672,200 @@ h2 + .lead,
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.88);
 }
-.section.deep.tables .lf-card {
-  border-color: transparent;
-}
-.section.deep.tables .lf-card h3 {
-  color: var(--ink);
-}
+
 /* Two deep sections in a row (Company: the tables, then the track record): one hairline between them. */
 .section.deep + .section.deep {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Playing cards, the site's thread (Kevin 2026-11-11): engraved indigo line art on white, the knot as the suit.
+   Static: no hover, no motion. Used on Research (the hand), Company (What we look for) and before each poker line. */
+.pcard {
+  width: 196px;
+  height: 280px;
+  padding: 9px;
+  background: #fff;
+  border: 1px solid var(--brand);
+  border-radius: 12px;
+  box-shadow: 0 10px 24px -14px rgba(23, 20, 46, 0.35);
+}
+.pc-frame {
+  position: relative;
+  height: 100%;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  outline: 1px solid var(--brand);
+  outline-offset: -5px;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(43, 36, 99, 0.045) 5px 6px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(43, 36, 99, 0.045) 5px 6px);
+}
+.pc-idx {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--brand);
+}
+.pc-idx img {
+  width: 14px;
+}
+.pc-idx.tl {
+  top: 8px;
+  left: 9px;
+}
+.pc-idx.br {
+  bottom: 8px;
+  right: 9px;
+  transform: rotate(180deg);
+}
+.pc-face {
+  position: absolute;
+  inset: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 12px 10px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(43, 36, 99, 0.35);
+}
+.pc-pip {
+  width: 26px;
+  margin-bottom: 10px;
+}
+.pc-face h3 {
+  font-weight: 400;
+  font-size: 21px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.pc-face p {
+  margin-top: 8px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.pcard.ace {
+  background: var(--deep);
+  border-color: var(--deep);
+}
+.pcard.ace .pc-frame {
+  border-color: rgba(255, 255, 255, 0.55);
+  outline-color: rgba(255, 255, 255, 0.55);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255, 255, 255, 0.06) 5px 6px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(255, 255, 255, 0.06) 5px 6px);
+}
+.pcard.ace .pc-face {
+  background: var(--deep);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.pcard.ace .pc-idx,
+.pcard.ace h3 {
+  color: #fff;
+}
+.pcard.ace p {
+  color: rgba(255, 255, 255, 0.75);
+}
+.pcard.ace .pc-pip {
+  width: 40px;
+}
+
+/* The hand (Research): cards fanned around one point below them, the ace on top, the knot faint behind. */
+.hand {
+  position: relative;
+  height: 560px;
+  margin-top: 24px;
+}
+.hand-knot {
+  position: absolute;
+  left: 50%;
+  top: 330px;
+  width: 600px;
+  transform: translate(-50%, -50%);
+  opacity: 0.06;
+}
+.hand-cards .pcard {
+  position: absolute;
+  left: calc(50% - 98px);
+  top: 70px;
+  transform-origin: 50% 300%;
+  transform: rotate(var(--angle));
+}
+.hand-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 480px;
+  text-align: center;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* What we look for (Company): the four games as upright cards, a little larger for their longer lines. */
+.look-for {
+  justify-items: center;
+}
+.look-for .pcard {
+  width: 100%;
+  max-width: 250px;
+  height: 340px;
+}
+.section.deep .pcard:not(.ace) .pc-face h3 {
+  color: var(--ink);
+}
+.look-for .pc-face p {
+  font-size: 13.5px;
+}
+
+/* A small card before each page's poker line. */
+.card-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 20px;
+  margin-right: 10px;
+  vertical-align: -5px;
+  background: #fff;
+  border: 1px solid var(--brand);
+  border-radius: 3px;
+}
+.card-glyph img {
+  width: 8px;
+}
+
+@media (max-width: 900px) {
+  .hand {
+    height: auto;
+  }
+  .hand-knot {
+    display: none;
+  }
+  .hand-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+  }
+  .hand-cards .pcard {
+    position: static;
+    transform: none;
+  }
+  .hand-caption {
+    position: static;
+    margin-top: 24px;
+  }
+}
+@media (max-width: 560px) {
+  .look-for {
+    grid-template-columns: 1fr;
+  }
 }
