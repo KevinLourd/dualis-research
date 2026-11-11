@@ -10,8 +10,9 @@ import {
   BriefcaseIcon,
   NotePencilIcon,
   PaletteIcon,
-  TestTubeIcon,
+  NewspaperIcon,
   TrendUpIcon,
+  XLogoIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -27,12 +28,23 @@ const RESEARCH = [
 const BUSINESS = [
   { href: "/content", label: "Content", icon: NotePencilIcon },
   { href: "/growth", label: "Growth", icon: TrendUpIcon },
-  { href: "/sandbox", label: "Sandbox", icon: TestTubeIcon },
 ] as const;
+
+// One page per fake account (Kevin 2026-11-11: « une SECTION Sandbox, une page par compte »); handles = sandbox-accounts seed.
+const SANDBOX_TONES = [
+  { handle: "sirensmallcaps", tone: "urgent" },
+  { handle: "narrativegap", tone: "balanced" },
+  { handle: "ledgerlens", tone: "neutral" },
+] as const;
+const SANDBOX = [
+  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/x/${handle}`, label: `X ${tone}`, icon: XLogoIcon })),
+  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/substack/${handle}`, label: `Substack ${tone}`, icon: NewspaperIcon })),
+];
 
 const GROUPS = [
   { label: "Research", items: RESEARCH },
   { label: "Business", items: BUSINESS },
+  { label: "Sandbox", items: SANDBOX },
 ] as const;
 
 function isActive(pathname: string, href: string) {
