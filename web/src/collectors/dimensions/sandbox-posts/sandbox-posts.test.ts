@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as content from "@/db/schema/content";
+import * as gold from "@/db/schema/gold";
 import * as sandbox from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
@@ -9,6 +10,9 @@ import { runDimension } from "../../runner";
 import { macroNews, MACRO_QUERIES } from "../macro-news";
 import { SANDBOX_ACCOUNTS, sandboxAccounts } from "../sandbox-accounts";
 import { substackTrending, TRENDING_HOSTS } from "../substack-trending";
+import { CALLOUT_SYSTEM } from "../content-visuals/choose";
+import { contentVisuals, renderSource as visualsRender } from "../content-visuals";
+import { sandboxVisuals } from "../sandbox-visuals";
 import { articleAngle, loadSkills, parsePosts, POSTS_PER_DAY, sandboxPosts } from ".";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -30,9 +34,15 @@ async function addIdea(rank: number, score: number) {
 
 /** Fake Claude: one JSON item per « ## Post », an object for the Article. */
 const complete = vi.fn<Complete>(async ({ system, prompt }) => {
+  // The chart's judge and callout (content-visuals): price chart, arrow on the latest close.
+  if (system === CALLOUT_SYSTEM) {
+    const ids = [...prompt.split("Points (id: value):\n")[1].matchAll(/^- (\S+): .*$/gm)].map((m) => m[1]).filter((id) => /^\d{4}-\d{2}-\d{2}$/.test(id));
+    return { text: JSON.stringify({ point: ids.at(-1), note: "Rates up", priceSays: "Debt is fine", newsLine: null, title: "Rates bite", chartLabel: "Share price", news: null }), model: "fake" };
+  }
+  if (system.startsWith("You judge")) return { text: JSON.stringify({ verdict: "price", probability: 0.8, cited_sentence: null, reason: "r" }), model: "fake" };
   const heads = [...prompt.matchAll(/^## Post \d+: ([^,]+), angle (\S+)/gm)];
   const tone = /in the URGENT tone/.test(system) ? "urgent" : /in the NEUTRAL tone/.test(system) ? "neutral" : "balanced";
-  const posts = heads.map(([, format, angle], i) => (/Article/.test(format) ? { post: i + 1, title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two" } : { post: i + 1, text: `${tone} ${angle} post ${i + 1} — $CCLD` }));
+  const posts = heads.map(([, format, angle], i) => (/Article/.test(format) ? { post: i + 1, title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two" } : { post: i + 1, text: `${tone} ${angle} post ${i + 1} — $CCLD`, ...(angle === "macro-24h" ? { ticker: "$ccld" } : {}) }));
   // Real writers sometimes answer twice ("Correction: ...") and out of order: the last object, matched on post numbers, wins.
   return { text: `${JSON.stringify({ posts: ["placeholder"] })}\n\nCorrection, the full answer:\n\n${JSON.stringify({ posts: posts.reverse() })}`, model: "fake" };
 });
@@ -62,6 +72,8 @@ beforeEach(async () => {
   complete.mockClear();
   ideaIds.length = 0;
   await seedAnalysedTicker(db, "CCLD", { name: "CareCloud" });
+  const days = Array.from({ length: 60 }, (_, i) => new Date(Date.now() - (60 - i) * 86400_000).toISOString().slice(0, 10));
+  await db.insert(gold.priceBars).values(days.map((date, i) => ({ symbol: "CCLD", date, close: 3 - i / 60, sources: ["yahoo"], alternatives: [] })));
   for (const [rank, score] of [[1, 90], [2, 40], [3, 80], [4, 70], [5, 60], [6, 50]] as const) ideaIds.push(await addIdea(rank, score));
   const [v] = await db.insert(content.contentVisuals).values({ ideaId: ideaIds[0], kind: "x-chart", version: "v", status: "ok", mime: "image/png", file: PNG, sizeBytes: PNG.length, sources: ["render"], bronzeIds: [] }).returning();
   await db.insert(content.goldContentVisuals).values({ id: v.id, ideaId: ideaIds[0], kind: "x-chart", status: "ok", mime: "image/png", createdAt: new Date() });
@@ -142,6 +154,30 @@ describe("sandbox-posts", () => {
     await run(sandboxPosts);
     expect(complete).toHaveBeenCalledTimes(6);
   });
+
+  it("every post gets a picture: Idea charts for all its Ideas, the macro post's ticker chart, X Article covers at 5:2", async () => {
+    await run(macroNews);
+    await run(substackTrending);
+    await run(sandboxAccounts);
+    await run(sandboxPosts);
+    await run({ ...contentVisuals, sources: [visualsRender] });
+    const report = await run(sandboxVisuals);
+    expect(report.error ?? report.sources.flatMap((x) => x.errors)).toEqual([]);
+    expect(report.status).toBe("succeeded");
+    const posts = await db.select().from(sandbox.goldSandboxPosts);
+    expect(posts.filter((p) => p.visualId)).toHaveLength(6 * POSTS_PER_DAY);
+    const macro = posts.filter((p) => p.angle === "macro-24h");
+    expect(new Set(macro.map((p) => p.symbol))).toEqual(new Set(["CCLD"]));
+    const own = await db.select({ id: sandbox.sandboxVisuals.id, kind: sandbox.sandboxVisuals.kind, width: sandbox.sandboxVisuals.width, height: sandbox.sandboxVisuals.height }).from(sandbox.sandboxVisuals);
+    const xArticles = posts.filter((p) => p.format === "x-article");
+    expect(xArticles.every((p) => own.find((v) => v.id === p.visualId)?.kind === "x-cover")).toBe(true);
+    expect(own.filter((v) => v.kind === "x-cover").every((v) => v.width! / v.height! === 2.5)).toBe(true);
+    // Substack macro Notes take the Note look, X macro posts the X look.
+    expect(macro.filter((p) => p.accountId.startsWith("substack:")).every((p) => own.find((v) => v.id === p.visualId)?.kind === "chart")).toBe(true);
+    // Nothing left to draw on a rerun.
+    await run(sandboxVisuals);
+    expect((await db.select().from(sandbox.sandboxVisuals)).length).toBe(own.length);
+  }, 60_000);
 
   it("a wrong answer is a failed fetch, retried next run", async () => {
     await run(sandboxAccounts);

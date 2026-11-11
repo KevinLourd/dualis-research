@@ -4,8 +4,10 @@ import * as content from "@/db/schema/content";
 import { VISUAL_KINDS, type VisualKind } from "@/db/schema/content";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
-import { type Callout, chooseChart, writeCallout } from "./choose";
+import type { Complete } from "@/llm/complete";
+import { type Callout, type ChartChoice, chooseChart, writeCallout } from "./choose";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
+import { sandboxIdeaIds } from "../sandbox-posts/ideas";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
@@ -84,6 +86,26 @@ async function banner(input: VisualInput, callout: Callout, fetchImpl: typeof fe
   const n = input.news[callout.news.index];
   if (!callout.newsLine) throw new Error("callout picked a news source but wrote no news line");
   return { headline: callout.newsLine, publisher: n.publisher, logo: await publisherLogo(callout.news.domain, fetchImpl), ago: ago(n.at, new Date()) };
+}
+
+/**
+ * One chart (`chart` = the Note's BREAKING look, `x-chart` = the X professional look) of a VisualInput: its most striking
+ * Exhibit, else price vs fair value; the arrow and note written by Claude. Shared with the Sandbox (sandbox-visuals).
+ * Returns the PNG, or the reason it cannot be drawn.
+ */
+export async function drawChart(input: VisualInput, choice: ChartChoice, kind: "chart" | "x-chart", ctx: { complete?: Complete; fetch: typeof fetch }): Promise<{ file: Buffer; caption: string; callout: Callout } | { error: string }> {
+  if (choice.kind !== "exhibit" && input.bars.length < MIN_BARS) return { error: `only ${input.bars.length} closes for ${input.symbol} in the last 12 months (a chart needs ${MIN_BARS})` };
+  const callout = await writeCallout(input, choice, ctx.complete);
+  const r = await renderModule();
+  const annotation = { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, tone: r.toneOf(input, choice.kind === "exhibit" ? choice.exhibit : null), banner: kind === "x-chart" ? null : await banner(input, callout, ctx.fetch, r.timeAgo), style: kind === "x-chart" ? ("pro" as const) : ("breaking" as const) };
+  if (choice.kind === "exhibit") return { file: r.png(r.exhibitSvg(input, choice.exhibit, annotation)), caption: `Exhibit: ${choice.exhibit.title}`, callout };
+  return { file: r.png(r.chartSvg(input, undefined, annotation)), caption: `Prices: ${input.priceSources.join(", ")}`, callout };
+}
+
+/** The whole chart at X's 5:2 Article cover ratio (never cropped). */
+export async function coverPng(chartPng: Buffer, chartW?: number, chartH?: number): Promise<{ file: Buffer; width: number; height: number }> {
+  const r = await renderModule();
+  return { file: r.png(r.coverSvg(chartPng, chartW, chartH)), width: r.COVER_W, height: r.COVER_H };
 }
 
 /** Chart, card and video, drawn from gold (the chart's news strip fetches its publisher's logo). */
@@ -199,7 +221,10 @@ export const captureSource: Source = {
 export async function pickVisualSubjects(db: Db): Promise<string[]> {
   rendered.clear();
   const drafted = await db.selectDistinct({ ideaId: content.contentDrafts.ideaId }).from(content.contentDrafts).where(isNotNull(content.contentDrafts.ideaId));
-  const ideaIds = drafted.map((d) => d.ideaId!);
+  // The Sandbox's Ideas (today's top ones and those its posts used since yesterday) get their two charts too (Kevin 2026-11-11).
+  const draftedIds = new Set(drafted.map((d) => d.ideaId!));
+  const sandboxIds = (await sandboxIdeaIds(db)).filter((id) => !draftedIds.has(id));
+  const ideaIds = [...draftedIds, ...sandboxIds];
   if (ideaIds.length === 0) return [];
   const done = new Set(
     (
@@ -226,7 +251,7 @@ export async function pickVisualSubjects(db: Db): Promise<string[]> {
     .where(inArray(content.contentIdeas.id, ideaIds));
   const out: string[] = [];
   for (const i of ideas) {
-    const kinds: VisualKind[] = ["montage", "video", "chart", "x-chart", ...(i.refs.some((r) => r.kind === "evidence") ? (["capture"] as const) : [])];
+    const kinds: VisualKind[] = !draftedIds.has(i.id) ? ["chart", "x-chart"] : ["montage", "video", "chart", "x-chart", ...(i.refs.some((r) => r.kind === "evidence") ? (["capture"] as const) : [])];
     for (const k of kinds) if (!done.has(subjectOf(i.id, k))) out.push(subjectOf(i.id, k));
   }
   return out;

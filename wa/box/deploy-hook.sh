@@ -21,6 +21,12 @@ if [ -f .deployed ] && [ "$(cat .deployed)" = "$hash" ] && [ "$(docker inspect -
 fi
 rm -rf src && mv incoming src
 nice -n 10 docker compose -p dualis-wa -f src/wa/docker-compose.yml build
+# `.hold` = another instance of the same WhatsApp session is live elsewhere (two clients kick each other off: 440
+# conflict). Build only; `rm .hold` once the other one is stopped, then the next deploy (or `up -d`) starts this one.
+if [ -f "$ROOT/.hold" ]; then
+  echo "built, NOT started: $ROOT/.hold is set ($(cat "$ROOT/.hold"))"
+  exit 0
+fi
 docker compose -p dualis-wa -f src/wa/docker-compose.yml up -d
 echo "$hash" > .deployed
 sleep 5

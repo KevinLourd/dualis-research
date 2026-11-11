@@ -540,6 +540,18 @@ export function montageSvg(input: VisualInput, frame: Frame = FULL): string {
   return withMark(svg, 64, H - 40 - 36, 36);
 }
 
+/**
+ * An X Article cover (Kevin 2026-11-11): X shows Article covers at 5:2, so the whole 16:9 chart (title included) sits
+ * centred on the chart's own ground at that ratio, never cropped.
+ */
+export const COVER_W = 2000;
+export const COVER_H = 800;
+export function coverSvg(chartPng: Buffer, chartW = W, chartH = H): string {
+  const h = COVER_H;
+  const w = Math.round((h * chartW) / chartH);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${COVER_W}" height="${COVER_H}" viewBox="0 0 ${COVER_W} ${COVER_H}"><rect width="${COVER_W}" height="${COVER_H}" fill="${NOTE.bg}"/><image x="${(COVER_W - w) / 2}" y="0" width="${w}" height="${h}" xlink:href="data:image/png;base64,${chartPng.toString("base64")}"/></svg>`;
+}
+
 export function png(svg: string): Buffer {
   const out = new Resvg(svg, { font: { loadSystemFonts: false, fontFiles: FONTS, defaultFontFamily: FONT } }).render().asPng();
   return Buffer.from(out);

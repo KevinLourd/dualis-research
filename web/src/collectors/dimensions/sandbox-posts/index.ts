@@ -16,6 +16,9 @@ import { draftPrompt, stripDashes, withDisclaimer } from "../content-drafts/form
 import { REFERENCE_PUBLICATIONS } from "../content-posts";
 import { topMacroHeadline } from "../macro-news";
 import { topTrending } from "../substack-trending";
+import { type IdeaPick, topIdeas } from "./ideas";
+
+export { topIdeas } from "./ideas";
 
 /**
  * Sandbox posts (Kevin 2026-11-11, skill content-matrix): every day each fake account writes 5 posts, 4 short (X post or
@@ -61,21 +64,6 @@ export async function loadSkills(platform: SandboxPlatform, tone: string): Promi
 }
 
 // ------------------------------------------------------------------------------------------------ the day's plan
-
-type IdeaPick = { id: string; symbol: string | null; title: string; score: number };
-
-/** The day's top Ideas (the latest day that has some), best score on the two daily formats first. */
-export async function topIdeas(db: Db, n = 4): Promise<IdeaPick[]> {
-  const [latest] = await db.select({ day: content.goldContentIdeas.day }).from(content.goldContentIdeas).orderBy(desc(content.goldContentIdeas.day)).limit(1);
-  if (!latest) return [];
-  const ideas = await db.select().from(content.goldContentIdeas).where(eq(content.goldContentIdeas.day, latest.day));
-  const best = (i: content.GoldContentIdea) => Math.max(-1, ...i.scores.filter((s) => s.format === "x-post" || s.format === "substack-note").map((s) => s.score));
-  return ideas
-    .map((i) => ({ i, score: best(i) }))
-    .sort((a, b) => b.score - a.score || a.i.rank - b.i.rank)
-    .slice(0, n)
-    .map(({ i, score }) => ({ id: i.id, symbol: i.symbol, title: i.title, score }));
-}
 
 /** One slot of the day, shared by every account of a channel. `brief` = what the writer reads for it. */
 export type SlotPlan = { slot: number; angle: SandboxAngle; article: boolean; ideaId: string | null; symbol: string | null; input: SandboxInput; brief: string };
@@ -230,15 +218,17 @@ export function sandboxSystem(skills: string, accountName: string, platform: San
 export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): string {
   const blocks = plans.map((p) => `## Post ${p.slot + 1}: ${FORMAT_NAME[p.article ? ARTICLE[platform] : SHORT[platform]]}, angle ${p.angle}\n${p.brief}`);
   const article = plans.find((p) => p.article);
+  const macro = plans.find((p) => p.angle === "macro-24h");
   return [
     ...blocks,
     "",
     `Answer with ONE JSON object only, no prose, no code fence, no second attempt: {"posts": [...]} with exactly ${plans.length} items, one per post, each carrying its post number:`,
     `{"post": <n>, "text": "..."} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>"} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
+    ...(macro ? [`Post ${macro.slot + 1} (macro-24h) also carries "ticker": the symbol of the ONE covered company it ties the headline to (its chart is that company's price vs fair value).`] : []),
   ].join("\n\n");
 }
 
-export type ParsedPost = { title: string | null; subtitle: string | null; text: string };
+export type ParsedPost = { title: string | null; subtitle: string | null; text: string; ticker?: string | null };
 
 /**
  * Reads the batch answer: the LAST `{"posts": ...}` object of the text (a writer sometimes restarts its answer), one
@@ -251,19 +241,20 @@ export function parsePosts(text: string, plans: Pick<SlotPlan, "article" | "slot
   if (starts.length === 0 || end <= starts[starts.length - 1]) throw new Error("answer holds no posts object");
   const posts = (JSON.parse(text.slice(starts[starts.length - 1], end + 1)) as { posts?: unknown }).posts;
   if (!Array.isArray(posts) || posts.length !== plans.length) throw new Error(`expected ${plans.length} posts, got ${Array.isArray(posts) ? posts.length : "none"}`);
-  type Item = string | { post?: unknown; text?: unknown; title?: unknown; subtitle?: unknown; body?: unknown };
+  type Item = string | { post?: unknown; text?: unknown; title?: unknown; subtitle?: unknown; body?: unknown; ticker?: unknown };
   const items = posts as Item[];
   const byNumber = (n: number) => items.find((p) => typeof p === "object" && p !== null && Number(p.post) === n);
   return plans.map((plan, i) => {
     const p = byNumber(plan.slot + 1) ?? items[i];
     const o = typeof p === "string" ? { text: p } : (p ?? {});
+    const ticker = typeof o.ticker === "string" && o.ticker.trim() ? o.ticker.trim().replace(/^\$/, "").toUpperCase() : null;
     if (plan.article) {
       if (typeof o.title !== "string" || typeof (o.body ?? o.text) !== "string" || !o.title.trim() || !String(o.body ?? o.text).trim()) throw new Error(`post ${plan.slot + 1} is not an article (title, subtitle, body)`);
-      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(String(o.body ?? o.text).trim()) };
+      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(String(o.body ?? o.text).trim()), ticker };
     }
     const body = typeof o.text === "string" ? o.text : typeof o.body === "string" ? o.body : "";
     if (!body.trim()) throw new Error(`post ${plan.slot + 1} is empty`);
-    return { title: null, subtitle: null, text: stripDashes(body.trim()) };
+    return { title: null, subtitle: null, text: stripDashes(body.trim()), ticker };
   });
 }
 
@@ -350,7 +341,7 @@ export async function promoteSandboxPosts(db: Db, rows: BronzeFetch[]): Promise<
           day: req.day,
           slot: plan.slot,
           ideaId: plan.ideaId,
-          symbol: plan.symbol,
+          symbol: plan.symbol ?? post.ticker ?? null,
           format: plan.article ? ARTICLE[req.platform] : SHORT[req.platform],
           angle: plan.angle,
           title: post.title,
