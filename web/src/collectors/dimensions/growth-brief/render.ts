@@ -28,15 +28,10 @@ export function briefChartSvg(b: GrowthBrief): string {
     textStyle: { fontFamily: FONT },
     title: [
       { text: "Analysis Paralysis subscribers", left: 64, top: 52, textStyle: { color: GREY, fontSize: 26, fontWeight: 400, fontFamily: FONT } },
+      // The count only: the caption carries the pace (Kevin 2026-11-11: no stats line under it).
       { text: fmt(b.current), left: 64, top: 92, textStyle: { color: "#fff", fontSize: 88, fontWeight: 600, fontFamily: FONT } },
-      {
-        text: `${b.gained >= 0 ? "+" : ""}${fmt(b.gained)} since ${dayLabel(GOAL.startDate)}   ·   goal ${fmt(GOAL.target)} by ${dayLabel(GOAL.endDate)}   ·   ${fmt(b.perDayNeeded)} a day needed`,
-        left: 64,
-        top: 204,
-        textStyle: { color: GREY, fontSize: 24, fontWeight: 400, fontFamily: FONT },
-      },
     ],
-    grid: { left: 110, right: 160, top: 280, bottom: 70 },
+    grid: { left: 110, right: 160, top: 230, bottom: 70 },
     xAxis: {
       type: "time",
       min: ts(GOAL.startDate),
