@@ -239,6 +239,7 @@ describe("sandbox-posts", () => {
     expect(() => parsePosts(`{"posts": [{"text": "a"}]}`, plans.slice(0, 1))).toThrow(/has no image/);
     expect(() => parsePosts(`{"posts": [{"text": "a", "image": ${img.replace('"price"', '"exhibit-x"')}}]}`, plans.slice(0, 1))).toThrow(/not a chart listed/);
     expect(() => parsePosts(`{"posts": [{"text": "a", "image": ${img.replace("2026-11-01", "2020-01-01")}}]}`, plans.slice(0, 1))).toThrow(/not a point/);
+    expect(parsePosts(`{"posts": [{"text": "a", "image": ${img.replace("2026-11-01", "latest")}}]}`, plans.slice(0, 1))[0].image.point).toBe("latest");
   });
 
   it("review: a failed round edits the writer's skill and the day is written, drawn and reviewed again; a pass stops it", async () => {
