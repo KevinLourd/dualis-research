@@ -7,18 +7,21 @@ const step = (from: string, to: string) => {
   return { fromSignal, fromStrength, toSignal, toStrength };
 };
 
-describe("isUpgrade (Kevin 2026-11-09: alert only when the signal gets better)", () => {
+describe("isUpgrade (Thierry 2026-11-11: alert only on a really strong signal)", () => {
   it.each([
-    ["none noise", "BUY weak"],
     ["none noise", "SELL strong"],
+    ["none noise", "BUY strong"],
     ["BUY weak", "BUY strong"],
     ["SELL weak", "SELL strong"],
     ["BUY strong", "SELL strong"],
-    ["SELL strong", "BUY weak"],
-    ["BUY weak", "SELL weak"],
+    ["SELL weak", "BUY strong"],
   ])("%s -> %s alerts", (from, to) => expect(isUpgrade(step(from, to))).toBe(true));
 
   it.each([
+    ["none noise", "BUY weak"],
+    ["SELL strong", "BUY weak"],
+    ["BUY weak", "SELL weak"],
+    ["BUY strong", "BUY strong"],
     ["BUY strong", "BUY weak"],
     ["SELL weak", "none noise"],
     ["BUY strong", "none noise"],

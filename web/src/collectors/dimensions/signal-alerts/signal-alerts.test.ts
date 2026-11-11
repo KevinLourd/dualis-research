@@ -36,13 +36,14 @@ beforeEach(async () => {
 afterEach(async () => close());
 
 describe("signal-alerts", () => {
-  it("sends an upgrade to Kevin and Thierry with its picture, once; a downgrade, a stale one and an old text alert send nothing", async () => {
-    const up = change("CCLD", ["none", "noise"], ["BUY", "weak"]);
+  it("sends a new strong signal to Kevin and Thierry with its picture, once; a weak one, a downgrade, a stale one and an old text alert send nothing", async () => {
+    const up = change("CCLD", ["none", "noise"], ["BUY", "strong"]);
+    const weak = change("CCLD", ["none", "noise"], ["SELL", "weak"]);
     const down = change("CCLD", ["BUY", "strong"], ["BUY", "weak"]);
     const gone = change("CCLD", ["BUY", "weak"], ["none", "noise"]);
     const stale = change("CCLD", ["none", "noise"], ["BUY", "strong"], 30);
-    const oldText = change("CCLD", ["BUY", "weak"], ["BUY", "strong"]);
-    await db.insert(signalChanges).values([up, down, gone, stale, oldText]);
+    const oldText = change("CCLD", ["SELL", "weak"], ["SELL", "strong"]);
+    await db.insert(signalChanges).values([up, weak, down, gone, stale, oldText]);
     // The old text-only alert already went to Thierry for this one (content-dispatch, before the switch).
     await db.insert(content.contentMessages).values({ outboxId: crypto.randomUUID(), bronzeId: crypto.randomUUID(), purpose: "alert", transitionId: oldText.id, recipient: THIERRY, scheduledAt: new Date(), sources: ["content"] });
     await run();
@@ -53,25 +54,25 @@ describe("signal-alerts", () => {
       expect(o.requestedBy).toBe("signal-alerts");
       expect(o.imageMime).toBe("image/png");
       expect(o.image?.length).toBeGreaterThan(10_000);
-      expect(o.text).toContain("*CCLD* (CareCloud): BUY (weak inflection), was no signal.");
+      expect(o.text).toContain("*CCLD* (CareCloud): BUY (strong inflection), was no signal.");
       expect(o.text).toContain("CCLD note.");
     }
     const msgs = await db.select().from(content.contentMessages);
     expect(msgs.filter((m) => m.transitionId === up.id).map((m) => m.purpose)).toEqual(["alert", "alert"]);
   });
 
-  it("a signal that flickers off and back on within a day is one alert; a stronger reading still alerts", async () => {
-    const first = change("CCLD", ["none", "noise"], ["SELL", "weak"], 3);
+  it("a strong signal that flickers off and back on within a day is one alert; a side flip still alerts", async () => {
+    const first = change("CCLD", ["none", "noise"], ["SELL", "strong"], 3);
     await db.insert(signalChanges).values(first);
     await run();
-    await db.insert(signalChanges).values([change("CCLD", ["SELL", "weak"], ["none", "noise"], 2), change("CCLD", ["none", "noise"], ["SELL", "weak"], 1)]);
+    await db.insert(signalChanges).values([change("CCLD", ["SELL", "strong"], ["none", "noise"], 2), change("CCLD", ["none", "noise"], ["SELL", "strong"], 1)]);
     await run();
     expect(await db.select().from(whatsappOutbox)).toHaveLength(2);
-    await db.insert(signalChanges).values(change("CCLD", ["SELL", "weak"], ["SELL", "strong"]));
+    await db.insert(signalChanges).values(change("CCLD", ["SELL", "strong"], ["BUY", "strong"]));
     await run();
     const out = await db.select().from(whatsappOutbox);
     expect(out).toHaveLength(4);
-    expect(out.filter((o) => o.text?.includes("SELL (strong crack)"))).toHaveLength(2);
+    expect(out.filter((o) => o.text?.includes("BUY (strong inflection), was SELL (strong crack)"))).toHaveLength(2);
   });
 
   it("queues nothing while the WhatsApp device is not linked", async () => {
