@@ -1,6 +1,6 @@
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, sql } from "drizzle-orm";
 import { narratives } from "@/db/schema/analysis";
-import type { BronzeFetch } from "@/db/schema/bronze";
+import { type BronzeFetch, fetches } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
 import type { DraftInputs, VisualKind } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
@@ -111,6 +111,15 @@ async function coverage(db: Db): Promise<string> {
 /** The day's plan (memoized per run): the same inputs for every account. A missing input falls back to a signal Idea. */
 export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ctx: SourceContext): Promise<SlotPlan[]> {
   return memo(ctx, `sandbox-plan:${platform}:${day}`, async () => {
+    // An account retried later the same day writes the SAME inputs as its channel's first answer (only the tone differs).
+    const [first] = await db
+      .select({ request: fetches.request })
+      .from(fetches)
+      .where(and(eq(fetches.dimension, SANDBOX_POSTS_DIMENSION), like(fetches.subject, `${platform}:%|${day}`), sql`${fetches.request}->>'version' = ${SANDBOX_VERSION}`))
+      .orderBy(asc(fetches.fetchedAt))
+      .limit(1);
+    const earlier = (first?.request as { plans?: SlotPlan[] } | undefined)?.plans;
+    if (earlier?.length) return earlier;
     const ideas = await memo(ctx, "sandbox-ideas", () => topIdeas(db));
     if (ideas.length === 0) return [];
     const ideaAt = (i: number) => ideas[i % ideas.length];
@@ -220,31 +229,41 @@ export function sandboxSystem(skills: string, accountName: string, platform: San
 
 export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): string {
   const blocks = plans.map((p) => `## Post ${p.slot + 1}: ${FORMAT_NAME[p.article ? ARTICLE[platform] : SHORT[platform]]}, angle ${p.angle}\n${p.brief}`);
+  const article = plans.find((p) => p.article);
   return [
     ...blocks,
     "",
-    `Write the ${plans.length} posts in this order. Answer with JSON only, no prose, no code fence: {"posts": [...]} with exactly ${plans.length} items:`,
-    `a string for each ${FORMAT_NAME[SHORT[platform]]}, and {"title": "...", "subtitle": "...", "body": "<markdown with ## headings>"} for the ${FORMAT_NAME[ARTICLE[platform]]}.`,
+    `Answer with ONE JSON object only, no prose, no code fence, no second attempt: {"posts": [...]} with exactly ${plans.length} items, one per post, each carrying its post number:`,
+    `{"post": <n>, "text": "..."} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>"} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
   ].join("\n\n");
 }
 
 export type ParsedPost = { title: string | null; subtitle: string | null; text: string };
 
-/** Reads the batch answer: one item per slot, the Article as an object. Throws with the reason. */
-export function parsePosts(text: string, plans: Pick<SlotPlan, "article">[]): ParsedPost[] {
-  const start = text.indexOf("{");
+/**
+ * Reads the batch answer: the LAST `{"posts": ...}` object of the text (a writer sometimes restarts its answer), one
+ * item per post, matched on its `post` number (else its position); the Article must carry a title and a body.
+ * Throws with the reason.
+ */
+export function parsePosts(text: string, plans: Pick<SlotPlan, "article" | "slot">[]): ParsedPost[] {
+  const starts = [...text.matchAll(/\{\s*"posts"/g)].map((m) => m.index!);
   const end = text.lastIndexOf("}");
-  if (start === -1 || end <= start) throw new Error("answer holds no JSON object");
-  const posts = (JSON.parse(text.slice(start, end + 1)) as { posts?: unknown }).posts;
+  if (starts.length === 0 || end <= starts[starts.length - 1]) throw new Error("answer holds no posts object");
+  const posts = (JSON.parse(text.slice(starts[starts.length - 1], end + 1)) as { posts?: unknown }).posts;
   if (!Array.isArray(posts) || posts.length !== plans.length) throw new Error(`expected ${plans.length} posts, got ${Array.isArray(posts) ? posts.length : "none"}`);
-  return posts.map((p, i) => {
-    if (plans[i].article) {
-      const o = p as { title?: unknown; subtitle?: unknown; body?: unknown };
-      if (typeof o?.title !== "string" || typeof o.body !== "string" || !o.title.trim() || !o.body.trim()) throw new Error(`post ${i + 1} is not an article (title, subtitle, body)`);
-      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(o.body.trim()) };
+  type Item = string | { post?: unknown; text?: unknown; title?: unknown; subtitle?: unknown; body?: unknown };
+  const items = posts as Item[];
+  const byNumber = (n: number) => items.find((p) => typeof p === "object" && p !== null && Number(p.post) === n);
+  return plans.map((plan, i) => {
+    const p = byNumber(plan.slot + 1) ?? items[i];
+    const o = typeof p === "string" ? { text: p } : (p ?? {});
+    if (plan.article) {
+      if (typeof o.title !== "string" || typeof (o.body ?? o.text) !== "string" || !o.title.trim() || !String(o.body ?? o.text).trim()) throw new Error(`post ${plan.slot + 1} is not an article (title, subtitle, body)`);
+      return { title: stripDashes(o.title.trim()), subtitle: typeof o.subtitle === "string" && o.subtitle.trim() ? stripDashes(o.subtitle.trim()) : null, text: stripDashes(String(o.body ?? o.text).trim()) };
     }
-    if (typeof p !== "string" || !p.trim()) throw new Error(`post ${i + 1} is empty`);
-    return { title: null, subtitle: null, text: stripDashes(p.trim()) };
+    const body = typeof o.text === "string" ? o.text : typeof o.body === "string" ? o.body : "";
+    if (!body.trim()) throw new Error(`post ${plan.slot + 1} is empty`);
+    return { title: null, subtitle: null, text: stripDashes(body.trim()) };
   });
 }
 
