@@ -598,7 +598,7 @@ body:has(.hero) .site-footer {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* The reports on black: covers in black and white, the one under the pointer grows and turns to colour (Thierry 2026-11-06). */
+/* The reports on black: covers in black and white, the one under the pointer grows well bigger (x1.45, Kevin 2026-11-11: « plus grand ») and turns to colour (Thierry 2026-11-06). */
 .cover-band {
   background: #0c0b12;
   color: #fff;
@@ -625,8 +625,9 @@ body:has(.hero) .site-footer {
 }
 .cover-strip {
   list-style: none;
-  margin: 24px 0 0;
-  padding: 40px 12px 36px;
+  margin: 0 -56px;
+  /* Room for the grown cover: the scroll box clips anything past its padding. */
+  padding: 80px 56px;
   display: flex;
   gap: 20px;
   overflow-x: auto;
@@ -648,7 +649,7 @@ body:has(.hero) .site-footer {
 }
 .cs-item:hover,
 .cs-item:focus-visible {
-  transform: scale(1.12);
+  transform: scale(1.45);
   z-index: 2;
 }
 .cs-item:hover .cover,
