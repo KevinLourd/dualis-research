@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { figuresText } from "../analysis/facts";
 import { evidence, exhibits, fairValues, NARRATIVE_TAGS, narrativeDrivers, narratives, parseTag, PRICED_IN, type EvidenceVerdict, type GoldMarketReaction, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import * as silver from "@/db/schema/silver";
@@ -24,8 +25,10 @@ export const EVIDENCE_SUBJECT_KIND = "evidence";
  * v3 (Kevin 2026-11-06): every item judged against EACH driver, five tags (reversal / continuation strong or weak, noise).
  * v4 (Kevin 2026-11-09): per thesis side, with the fair value (base, low, high) and what the price did around the item;
  * the judge also says how much of the item's effect the price already moved (priced in).
+ * v5 (Kevin 2026-11-11, Water Oasis): the judge reads the company's reported figures (years, quarters, half years,
+ * revenue by stream): a results filing came as a title only and was judged « no revenue data ».
  */
-export const EVIDENCE_QUESTION = "evidence@v4";
+export const EVIDENCE_QUESTION = "evidence@v5";
 const PARALLEL = 6;
 
 export const evidenceKey = (driversVersion: string) => `${EVIDENCE_QUESTION}:${driversVersion}`;
@@ -126,7 +129,7 @@ const EVIDENCE_SYSTEM = [
 ].join(" ");
 
 /** One call: every item of the batch against every driver of ONE thesis, each item with what the price did around it. */
-export function batchPrompt(symbol: string, d: Drivers, items: EvidenceItem[], reactions: Map<string, GoldMarketReaction> = new Map()): string {
+export function batchPrompt(symbol: string, d: Drivers, items: EvidenceItem[], reactions: Map<string, GoldMarketReaction> = new Map(), figures: string | null = null): string {
   const side = SIDE[d.side];
   return [
     `${symbol}, ${side.label.toLowerCase()}: ${side.story}.`,
@@ -135,6 +138,7 @@ export function batchPrompt(symbol: string, d: Drivers, items: EvidenceItem[], r
     "The reasons the market holds it (Narrative Drivers):",
     ...d.drivers.map((x) => `${x.rank}. [${x.category}] ${x.title}. ${x.text}`),
     "",
+    ...(figures ? [figures, ""] : []),
     "For EACH item below and EACH driver, judged on its own: what does the item do to THAT reason?",
     `reversal = it contradicts the reason: ${side.reversal}. continuation = it confirms the reason: ${side.continuation}. noise = it does not bear on this reason (routine filings, meeting notices, small holdings reports, unrelated news).`,
     "strong = a concrete, company-specific fact (results, guidance, a contract, a deal, insider or capital action); weak = indirect or loose (industry read-through, opinion, a recap).",
@@ -184,7 +188,7 @@ export const evidenceSource: Source = {
     const items = wanted.map((w) => all.find((x) => x.kind === w.kind && x.id === w.id)).filter((x): x is EvidenceItem => !!x);
     if (!d || items.length === 0) return { request: { symbol, side, items: wanted.length }, httpStatus: null, error: "no drivers or no item for this batch any more" };
     const ranks = d.drivers.map((x) => x.rank);
-    const r = await ctx.complete({ system: EVIDENCE_SYSTEM, prompt: batchPrompt(symbol, d, items, await reactionsOf(ctx.db, symbol)) });
+    const r = await ctx.complete({ system: EVIDENCE_SYSTEM, prompt: batchPrompt(symbol, d, items, await reactionsOf(ctx.db, symbol), await figuresText(ctx.db, symbol)) });
     const verdicts = parseBatch(r.text, items.length, ranks);
     const questionKey = evidenceKey(d.version);
     const rows = items.flatMap((it, i) =>

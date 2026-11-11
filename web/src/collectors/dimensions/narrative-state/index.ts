@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { figuresText } from "../analysis/facts";
 import { quoteStamp } from "../intraday-price";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import { evidence, fairValueHistory, NARRATIVE_TAGS, narratives, narrativeStates, parseTag, PRICED_IN, type GoldEvidence, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
@@ -121,7 +122,8 @@ export const narrativeStateSource: Source = {
     if (!d) return { request: { symbol, side }, httpStatus: null, error: "no narrative or no driver for this thesis yet" };
     const [rows, reactions] = await Promise.all([ctx.db.select().from(evidence).where(eq(evidence.symbol, symbol)), reactionsOf(ctx.db, symbol)]);
     const w = SIDE[side];
-    const head = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`];
+    // The reported figures: a reason about the numbers is judged on the numbers too, never on headlines alone.
+    const head = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`, "", await figuresText(ctx.db, symbol)];
 
     const drivers: StateVerdict[] = [];
     for (const driver of d.drivers) {

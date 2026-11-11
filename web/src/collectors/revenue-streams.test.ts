@@ -6,7 +6,9 @@ import type { GoldRevenueStream } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { testDb } from "@/test/db";
-import { streamsText } from "./dimensions/analysis/facts";
+import { figuresText, streamsText } from "./dimensions/analysis/facts";
+import { batchPrompt } from "./dimensions/evidence";
+import { revenueStreams } from "@/db/schema/financials";
 import { seriesCatalog } from "./dimensions/analysis/series";
 import { goldFinancialLines } from "@/db/schema/financials";
 import { latestReports, inlineXbrlFacts, pdfExtract, PDF_EXTRACT_VERSION, pickPages, segmentsFromFilings } from "./dimensions/financials/sources";
@@ -166,6 +168,20 @@ describe("Hong Kong reports", () => {
     const out = await pdfExtract.fetch("1161.HK", ctx);
     expect(out.error).toBeUndefined();
     expect((out.request as { reused: string[] }).reused).toEqual(["https://h/ar25.pdf", "https://h/ir26.pdf"]);
+  });
+
+  it("hands every judge of the story the reported figures: half years and revenue by stream", async () => {
+    const row = (periodType: "year" | "half", periodEnd: string, line: string, value: number) => ({ symbol: "1161.HK", periodType, periodEnd, line, statement: line.startsWith("segment:") ? ("segment" as const) : ("income" as const), value, currency: "HKD", label: line, consolidated: true, sources: ["pdf-extract"], alternatives: [] });
+    const lines = WATER_OASIS.map((x) => row(x.periodType as "year" | "half", x.periodEnd, x.line, x.value));
+    await db.insert(goldFinancialLines).values(lines);
+    await db.insert(revenueStreams).values(deriveRevenueStreams("1161.HK", WATER_OASIS));
+    const figures = await figuresText(db, "1161.HK");
+    expect(figures).toContain("Revenue (half-yearly) [hline:revenue] | 492.2M | 515.8M");
+    expect(figures).toContain("6 months to 2026-03 473.6M (+9.6%, 92% of total)");
+    const d = { side: "long" as const, version: "v", narrative: "The market sees a flat chain.", gapPct: null, market: null, drivers: [{ rank: 1, category: "Business economics", title: "Revenue has stopped growing", text: "Flat for two years." }] };
+    const prompt = batchPrompt("1161.HK", d as never, [{ kind: "filing", id: "f", title: "Interim Results Announcement", publisher: null, summary: null, url: null, at: new Date("2026-05-26"), sources: ["hkex"] }], new Map(), figures);
+    expect(prompt.indexOf("6 months to 2026-03 473.6M")).toBeGreaterThan(prompt.indexOf("Revenue has stopped growing"));
+    expect(prompt.indexOf("6 months to 2026-03 473.6M")).toBeLessThan(prompt.indexOf("Interim Results Announcement"));
   });
 
   it("charts half years apart from quarters", async () => {
