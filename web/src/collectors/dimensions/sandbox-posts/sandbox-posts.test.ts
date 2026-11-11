@@ -32,8 +32,9 @@ async function addIdea(rank: number, score: number) {
 const complete = vi.fn<Complete>(async ({ system, prompt }) => {
   const heads = [...prompt.matchAll(/^## Post \d+: ([^,]+), angle (\S+)/gm)];
   const tone = /in the URGENT tone/.test(system) ? "urgent" : /in the NEUTRAL tone/.test(system) ? "neutral" : "balanced";
-  const posts = heads.map(([, format, angle], i) => (/Article/.test(format) ? { title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two" } : `${tone} ${angle} post ${i + 1} — $CCLD`));
-  return { text: JSON.stringify({ posts }), model: "fake" };
+  const posts = heads.map(([, format, angle], i) => (/Article/.test(format) ? { post: i + 1, title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two" } : { post: i + 1, text: `${tone} ${angle} post ${i + 1} — $CCLD` }));
+  // Real writers sometimes answer twice ("Correction: ...") and out of order: the last object, matched on post numbers, wins.
+  return { text: `${JSON.stringify({ posts: ["placeholder"] })}\n\nCorrection, the full answer:\n\n${JSON.stringify({ posts: posts.reverse() })}`, model: "fake" };
 });
 const rss = (items: { title: string; link: string; hours: number }[]) =>
   `<rss><channel>${items.map((i) => `<item><title>${i.title} - Reuters</title><link>${i.link}</link><pubDate>${hoursAgo(i.hours).toUTCString()}</pubDate><source>Reuters</source></item>`).join("")}</channel></rss>`;
@@ -148,11 +149,18 @@ describe("sandbox-posts", () => {
     await run(sandboxPosts);
     expect(await db.select().from(sandbox.sandboxPosts)).toHaveLength(5 * POSTS_PER_DAY);
     await run(sandboxPosts);
-    expect(await db.select().from(sandbox.sandboxPosts)).toHaveLength(6 * POSTS_PER_DAY);
+    const posts = await db.select().from(sandbox.sandboxPosts);
+    expect(posts).toHaveLength(6 * POSTS_PER_DAY);
+    // The retried account wrote its channel's same inputs (the first answer's plan).
+    for (const platform of ["x", "substack"]) {
+      const mine = posts.filter((p) => p.accountId.startsWith(`${platform}:`));
+      expect(new Set(mine.map((p) => `${p.slot}:${p.angle}:${p.input.label}`)).size).toBe(POSTS_PER_DAY);
+    }
   });
 
   it("skills: each channel x tone file exists; an Article must be an object", async () => {
     for (const p of ["x", "substack"] as const) for (const t of ["urgent", "balanced", "neutral"]) expect((await loadSkills(p, t)).text).toMatch(/angle: competitor/i);
-    expect(() => parsePosts('{"posts": ["a", "b"]}', [{ article: false }, { article: true }])).toThrow(/not an article/);
+    expect(() => parsePosts('{"posts": ["a", "b"]}', [{ article: false, slot: 0 }, { article: true, slot: 1 }])).toThrow(/not an article/);
+    expect(parsePosts('{"posts": [{"post": 2, "title": "T", "body": "B"}, {"post": 1, "text": "short"}]}', [{ article: false, slot: 0 }, { article: true, slot: 1 }]).map((p) => p.title ?? p.text)).toEqual(["short", "T"]);
   });
 });
