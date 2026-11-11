@@ -2,15 +2,11 @@ import Link from "next/link";
 import { WINNABLE } from "@/lib/winnable";
 
 /**
- * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 31 s loop of FRONTIER
- * technology only, the newest generation of each (Kevin 2026-11-09: « l'avion et la fusée font passé, les tous derniers
- * modèles les plus avancés »; old industries removed): Artemis II SLS launch, 2026 (NASA, public domain, Commons
- * "Artemis II Launch from OSB II Balcony - Slo Mo"), SpaceX Starship launch (Anne Toal, CC BY 3.0, Commons "SpaceX
- * Starship integrated flight test -5"), the YFQ-42A AI combat drone (U.S. Air Force, DVIDS 975160, public domain), a
- * humanoid robot at work (newscreators, CC BY 3.0, Commons "Robot package handling"), the NIF fusion target chamber
- * (LLNL, public domain), an AI data center (Mixkit), the B-21 Raider (U.S. Air Force, DVIDS 937050, public domain),
- * Artemis II climbing (NASA, public domain). CC BY credits live in the terms (`lib/legal.ts`). Never a caption in the
- * footage (cropped out). Muted; reduced motion = poster.
+ * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 27 s loop of the industries
+ * Thierry invests in (Thierry 2026-11-09: « I really like the manufacturing, the data center. I don't like the planes
+ * and the rockets »): robotic arms, semiconductors, data centers, power, the grid, oil and gas, ports, mining,
+ * agriculture (Mixkit free licence). No plane, rocket, space or defense clip. Never a caption in the footage. Muted;
+ * reduced motion = poster.
  */
 export default function Home() {
   return (
@@ -22,9 +18,9 @@ export default function Home() {
       <div className="wrap hero-inner">
         {/* Thierry 2026-11-06: buy-side, on the investor's side, unlike sell-side analysts paid by the companies. */}
         <h1>
-          Independent research
+          Independent Research
           <br />
-          for buy-side opportunities
+          for Buy-Side Opportunities
         </h1>
         <p className="hero-sub">Long and short ideas in small and mid caps.</p>
         <p className="band-thread">{WINNABLE.home}</p>

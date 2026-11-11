@@ -46,7 +46,7 @@ export default async function Contact() {
               </div>
             </div>
             <div className="contact-main">
-              <p className="lead">Write to Thierry directly, wherever you read us.</p>
+              <p className="lead">Write to us directly, wherever you read us.</p>
               <ul className="channels">
                 <li>
                   <span>Substack</span>
@@ -58,7 +58,7 @@ export default async function Contact() {
                 </li>
                 <li>
                   <span>LinkedIn</span>
-                  <a target="_blank" rel="noopener noreferrer" href={LINKEDIN_URL}>Message Thierry Matin</a>
+                  <a target="_blank" rel="noopener noreferrer" href={LINKEDIN_URL}>Send a message on LinkedIn</a>
                 </li>
               </ul>
             </div>

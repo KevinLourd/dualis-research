@@ -14,7 +14,7 @@ export function SubscribeButton({
   const cls = `btn btn-${variant}`;
   if (!href) {
     return (
-      <span className={cls} aria-disabled="true" title="Opens once Thierry's Substack is set (console: Content > Channels)">
+      <span className={cls} aria-disabled="true" title="Opens once the Substack is set (console: Content > Channels)">
         {label}
       </span>
     );

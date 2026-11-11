@@ -36,6 +36,22 @@ describe("site copy and colours", () => {
     },
   );
 
+  // Thierry 2026-11-09: « remove my name from the website almost entirely… keep it in one place, the about page ».
+  // The legal pages name him as the publisher (Kevin 2026-11-11).
+  it("names Thierry on About and the legal pages only", () => {
+    const allowed = [join("app", "about", "page.tsx"), join("app", "disclaimer", "page.tsx"), join("lib", "legal.ts")];
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    const named = files.filter((f) => !allowed.some((a) => f.path.endsWith(a)) && /Thierry|Matin/.test(strip(f.text)));
+    expect(named.map((f) => f.path)).toEqual([]);
+  });
+
+  // Thierry 2026-11-09: no Portfolio page, no track record or list of calls on Company.
+  it("has no Portfolio page or link, and Company shows no calls", () => {
+    expect(files.filter((f) => f.text.includes('"/portfolio"')).map((f) => f.path)).toEqual([]);
+    const company = files.find((f) => f.path.endsWith(join("app", "company", "page.tsx")));
+    expect(company?.text).not.toMatch(/CallsBoard|Track record|Every published call/);
+  });
+
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.
   it.each(["#eceaf5", "#f5f4f9", "#b9b2ea", "#8c82d8", "#e3e1ec"])("never paints the light purple %s", (hex) => {
     expect(files.filter((f) => f.text.toLowerCase().includes(hex)).map((f) => f.path)).toEqual([]);

@@ -34,7 +34,7 @@ export const TRACK_RECORD = {
   benchmarkPct: 11.5,
   asOf: "2026-10-16",
   sourceUrl: "https://analysisparalysis888.substack.com/p/up-45-ytd-vs-115-for-the-s-and-p500",
-  note: "Portfolio return year to date as of October 16, 2026, as published by Thierry Matin. Gross of fees, not audited. Past performance does not guarantee future results.",
+  note: "Portfolio return year to date as of October 16, 2026, as published on Substack. Gross of fees, not audited. Past performance does not guarantee future results.",
 } as const;
 
 /** Markets the coverage universe spans (the console collects filings and prices for each). */

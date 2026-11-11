@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Career, Portrait } from "@/components/blocks";
+import { Career } from "@/components/blocks";
 import { Cover } from "@/components/cover";
 import { PageBand } from "@/components/page-band";
 import { LINKEDIN_URL, X_HANDLE, X_URL } from "@/lib/model";
@@ -7,11 +7,19 @@ import { getPublications } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "About" };
 
+/** His name and photo live on this page only (Thierry 2026-11-09). Thierry's photo (LinkedIn portrait, extended to 4:5). */
+function Portrait() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="portrait-img" src="/img/thierry.jpg" alt="Thierry Matin" width={1200} height={1489} />
+  );
+}
+
 export default async function About() {
   const posts = (await getPublications()).slice(0, 3);
   return (
     <div className="about-page">
-      <PageBand label="About" line="The analyst behind the research." thread="about" />
+      <PageBand label="About" thread="about" />
       <section className="wrap">
         <article className="person">
           <div className="person-photo">
@@ -33,7 +41,7 @@ export default async function About() {
       </section>
       {posts.length > 0 && (
         <section className="wrap recent">
-          <h2>Recently from Thierry</h2>
+          <h2>Recently published</h2>
           <div className="recent-grid">
             {posts.map((p) => (
               <a target="_blank" rel="noopener noreferrer" key={p.id} href={p.url} className="recent-card">
