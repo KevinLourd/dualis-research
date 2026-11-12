@@ -39,7 +39,7 @@ The writer writes the picture with the text, in the same answer (`image`), and e
 - Each post has its own picture: never repeat the chart, point and words of another post of the day.
 
 ## The Sandbox (Business > Sandbox in the console, never published)
-6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post). Skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
+6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post). Skill `image-correction` looks at each drawn picture and corrects its spec until clean (3 passes); skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
 
 ### Daily mix per account (5 posts)
 | Slot (Astana) | Angle | Input |

@@ -5,6 +5,7 @@ import type { SandboxPostReview, SandboxSkillEdit } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
 import { FORMAT_NAME, MAX_ROUNDS, readSkill, shortHash, skillFile, stripFrontmatter, writingSkills } from "../sandbox-posts";
+import { pictureRounds } from "../sandbox-image-fix";
 import { postKey } from "../sandbox-visuals";
 
 /**
@@ -25,23 +26,13 @@ export const REVIEW_VERSION = "review-v1";
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
 const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().slice(0, 10);
 
-/** Rounds whose every post has a picture drawn or failed, not reviewed yet (today and yesterday). */
+/** Rounds whose pictures are settled (drawn, then corrected by skill image-correction until clean or 3 passes), not reviewed yet. */
 export async function reviewSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
-  const posts = await db.select({ id: sandbox.sandboxPosts.id, accountId: sandbox.sandboxPosts.accountId, day: sandbox.sandboxPosts.day, round: sandbox.sandboxPosts.round, image: sandbox.sandboxPosts.image, visualId: sandbox.sandboxPosts.visualId }).from(sandbox.sandboxPosts).where(gte(sandbox.sandboxPosts.day, since(now)));
-  const withImage = posts.filter((p) => p.image);
-  if (withImage.length === 0) return [];
-  const [reviews, failed] = await Promise.all([
-    db.select({ accountId: sandbox.sandboxReviews.accountId, day: sandbox.sandboxReviews.day, round: sandbox.sandboxReviews.round }).from(sandbox.sandboxReviews).where(gte(sandbox.sandboxReviews.day, since(now))),
-    db.select({ key: sandbox.sandboxVisuals.key }).from(sandbox.sandboxVisuals).where(and(inArray(sandbox.sandboxVisuals.key, withImage.map((p) => postKey(p.id))), eq(sandbox.sandboxVisuals.status, "failed"))),
-  ]);
+  const rounds = await pictureRounds(db, now);
+  if (rounds.length === 0) return [];
+  const reviews = await db.select({ accountId: sandbox.sandboxReviews.accountId, day: sandbox.sandboxReviews.day, round: sandbox.sandboxReviews.round }).from(sandbox.sandboxReviews).where(gte(sandbox.sandboxReviews.day, since(now)));
   const done = new Set(reviews.map((r) => `${r.accountId}|${r.day}|${r.round}`));
-  const failedKeys = new Set(failed.map((f) => f.key));
-  const rounds = new Map<string, typeof withImage>();
-  for (const p of withImage) {
-    const k = `${p.accountId}|${p.day}|${p.round}`;
-    rounds.set(k, [...(rounds.get(k) ?? []), p]);
-  }
-  return [...rounds.entries()].filter(([k, ps]) => !done.has(k) && ps.every((p) => p.visualId || failedKeys.has(postKey(p.id)))).map(([k]) => k);
+  return rounds.filter((r) => r.settled && !done.has(r.key)).map((r) => r.key);
 }
 
 export function reviewSystem(reviewSkill: string): string {
@@ -68,8 +59,9 @@ export function parseReview(text: string, postCount: number, skills: string[]): 
     if (typeof e.old !== "string" || !e.old || typeof e.new !== "string" || typeof e.why !== "string") throw new Error(`edit ${i + 1} needs old, new and why`);
     return { skill: e.skill, old: e.old, new: e.new, why: e.why };
   });
-  const pass = posts.every((p) => p.imageAlone && p.aligned && p.clear);
-  if (!pass && edits.length === 0) throw new Error("a post fails and the review edits no skill");
+  // A failure the writer caused needs a skill edit; a drawing defect (« Drawing: ... ») has none to make.
+  const writerFails = posts.some((p) => !(p.imageAlone && p.aligned && p.clear) && !/^Drawing:/i.test(p.why));
+  if (writerFails && edits.length === 0) throw new Error("a post fails on its writing and the review edits no skill");
   return { posts, edits };
 }
 
@@ -87,12 +79,12 @@ export const claudeReview: Source = {
     const [account] = await db.select().from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, accountId));
     if (!account) throw new Error(`sandbox account ${accountId} not found`);
     const posts = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, accountId), eq(sandbox.sandboxPosts.day, day), eq(sandbox.sandboxPosts.round, round))).orderBy(asc(sandbox.sandboxPosts.slot));
-    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id))));
+    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id, p.imageVersion))));
     const skills = writingSkills(account.platform, account.tone);
     const [reviewSkill, ...writing] = await Promise.all([readSkill(REVIEW_SKILL), ...skills.map(readSkill)]);
     const images: { mime: string; data: Buffer }[] = [];
     const blocks = posts.map((p, i) => {
-      const v = visuals.find((x) => x.key === postKey(p.id));
+      const v = visuals.find((x) => x.key === postKey(p.id, p.imageVersion));
       let picture: string;
       if (v?.status === "ok" && v.file) {
         images.push({ mime: v.mime ?? "image/png", data: v.file });
@@ -142,6 +134,15 @@ export async function promoteReviews(db: Db, rows: BronzeFetch[]): Promise<Promo
     const pass = posts.every((p) => p.imageAlone && p.aligned && p.clear);
     const applied: SandboxSkillEdit[] = [];
     if (!pass) for (const e of edits) applied.push(await applyEdit(e));
+    // Drawing defects are code to fix: said loud in the run log and the GitHub run summary.
+    for (const p of posts.filter((x) => /^Drawing:/i.test(x.why))) {
+      const line = `${req.accountId} ${req.day} round ${req.round}, post ${p.post}: ${p.why}`;
+      console.warn(`[sandbox-review] drawing defect: ${line}`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        const { appendFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `- Drawing defect: ${line}\n`);
+      }
+    }
     for (const e of applied) console.log(`[sandbox-review] ${req.accountId} ${req.day} round ${req.round}: ${e.skill} ${e.applied ? "edited" : `not edited (${e.reason})`}: ${e.why}`);
     const inserted = await db
       .insert(sandbox.sandboxReviews)

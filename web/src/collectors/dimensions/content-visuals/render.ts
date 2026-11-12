@@ -673,7 +673,8 @@ export function signalCardSvg(input: VisualInput): string {
     backgroundColor: "#fff",
     animation: false,
     textStyle: { fontFamily: FONT },
-    title: { text: `${input.companyName ?? input.symbol}: share price vs fair value`, left: 16, top: 12, textStyle: { color: "#333", fontSize: 15, fontWeight: 600, fontFamily: FONT } },
+    // A long company name would run off the card: the ticker stands in for it (Kevin 2026-11-12: words are never cut).
+    title: { text: `${(input.companyName ?? input.symbol).length > 22 ? input.symbol : (input.companyName ?? input.symbol)}: share price vs fair value`, left: 16, top: 12, textStyle: { color: "#333", fontSize: 15, fontWeight: 600, fontFamily: FONT } },
     grid: { left: 16, right: 196, top: 44, bottom: 46 },
     xAxis: { type: "time", min: x0, max: x1, show: false },
     yAxis: { type: "value", min: Math.max(0, min - pad), max: max + pad, show: false },
@@ -696,14 +697,17 @@ export function signalCardSvg(input: VisualInput): string {
   const pillW = CARD_W - pillX - 14;
   const head = 14;
   const dir = fy < py ? -1 : 1;
-  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value);
+  // No signal: the gap in two words (« 27% below »), the card already says « vs fair value »; the font shrinks until the
+  // label fits its pill (Kevin 2026-11-12: « % below fair val » cut on both sides, the number lost).
+  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value).replace(/ fair value$/, "");
+  const pillFont = Math.min(18, Math.floor((pillW - 16) / (label.length * 0.58)));
   chart.setOption({
     graphic: [
       { type: "circle", shape: { cx: px, cy: py, r: 6 }, style: { fill: INDIGO }, z: 10 },
       { type: "line", shape: { x1: ax, y1: py, x2: ax, y2: fy - dir * head }, style: { stroke: colour, lineWidth: 6 }, z: 10 },
       { type: "polygon", shape: { points: [[ax, fy], [ax - 12, fy - dir * head], [ax + 12, fy - dir * head]] }, style: { fill: colour }, z: 10 },
       { type: "rect", shape: { x: pillX, y: (py + fy) / 2 - 20, width: pillW, height: 40, r: 6 }, style: { fill: colour }, z: 10 },
-      { type: "text", style: { text: label, x: pillX + pillW / 2, y: (py + fy) / 2, fill: "#fff", fontSize: 18, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 11 },
+      { type: "text", style: { text: label, x: pillX + pillW / 2, y: (py + fy) / 2, fill: "#fff", fontSize: pillFont, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 11 },
       { type: "text", style: { text: "Fair value", x: 22, y: fy - 12, fill: colour, fontSize: 13, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
       // The gap to fair value as the opportunity (Kevin 2026-11-09: « Fair value X - X: NON, +N% opportunity en vert »).
       { type: "text", style: { text: opportunity(last.close, lo, hi, up), x: CARD_W - 16, y: CARD_H - 22, fill: colour, fontSize: 22, fontWeight: 600, fontFamily: FONT, align: "right", verticalAlign: "middle" }, z: 11 },
