@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
@@ -26,8 +26,13 @@ type Rendered = { file: Buffer; mime: string; width: number; height: number; cap
 const rendered = new Map<string, Rendered>();
 
 const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().slice(0, 10);
-/** A post's picture key: `post:<id>`, then `post:<id>:v<n>` once skill image-correction corrected it n-1 times. */
-export const postKey = (postId: string, version = 1) => (version > 1 ? `post:${postId}:v${version}` : `post:${postId}`);
+/**
+ * Bump when the drawing code changes what a picture looks like: the pictures of today and yesterday are drawn again
+ * (render only, no Claude call). 2 = 2026-11-12, the defects image-correction found (ring on the end value, note boxes).
+ */
+export const DRAW_VERSION = 2;
+/** A post's picture key: `post:<id>[:v<n> once corrected n-1 times]:d<drawing code version>`. */
+export const postKey = (postId: string, version = 1) => `post:${postId}${version > 1 ? `:v${version}` : ""}:d${DRAW_VERSION}`;
 
 /** The covered company a post names: `$SYM`, `(SYM)`, the symbol, or the first word of its name; first in the text wins. */
 export function tickerIn(text: string, companies: { symbol: string; name: string | null }[]): string | null {
@@ -43,12 +48,15 @@ export function tickerIn(text: string, companies: { symbol: string; name: string
   return best?.symbol ?? null;
 }
 
-/** Recent posts that specified a picture and have none yet. */
+/** Recent posts that specified a picture and have none at their current spec and drawing code version. */
 async function postsToDraw(db: Db, now: Date) {
-  return db
+  const posts = await db
     .select()
     .from(sandbox.sandboxPosts)
-    .where(and(gte(sandbox.sandboxPosts.day, since(now)), isNotNull(sandbox.sandboxPosts.image), isNull(sandbox.sandboxPosts.visualId)));
+    .where(and(gte(sandbox.sandboxPosts.day, since(now)), isNotNull(sandbox.sandboxPosts.image)));
+  const linked = posts.flatMap((p) => (p.visualId ? [p.visualId] : []));
+  const keys = new Map(linked.length ? (await db.select({ id: sandbox.sandboxVisuals.id, key: sandbox.sandboxVisuals.key }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.id, linked))).map((v) => [v.id, v.key]) : []);
+  return posts.filter((p) => !p.visualId || keys.get(p.visualId) !== postKey(p.id, p.imageVersion));
 }
 
 async function existingKeys(db: Db, keys: string[]) {
