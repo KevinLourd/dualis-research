@@ -6,6 +6,7 @@ import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
 import type { Complete } from "@/llm/complete";
 import { type Callout, type ChartChoice, chooseChart, writeCallout } from "./choose";
+import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
 import { type OpportunityStory, opportunityStory } from "./opportunity";
 
@@ -111,25 +112,26 @@ export async function drawCallout(input: VisualInput, choice: ChartChoice, style
  * The opportunity picture of a story (opportunity.ts): one panel per reversing driver, its chart drawn full size with the
  * arrow on its latest value and a note (`notes[i]` from the writer, else the judge's headline of the driver's state).
  */
-export async function drawOpportunity(story: OpportunityStory, notes: (string | null)[] = []): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
+export async function drawOpportunity(story: OpportunityStory): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
   const r = await renderModule();
   const { input } = story;
   const last = input.bars.at(-1)!;
   const fair = input.fair!;
   const up = last.close < fair.value;
-  const panels = story.drivers.map((d, i) => {
+  const panels = story.drivers.map((d) => {
     const lead = d.exhibit.series[0];
     const point = [...d.exhibit.points].reverse().find((p) => typeof p.values[lead.key] === "number")!;
-    const note = notes[i] ?? d.headline ?? `${point.period.slice(0, 7)}: ${d.exhibit.title}`;
-    const a = { point: point.period, note, priceSays: "", title: "", chartLabel: d.exhibit.title, tone: story.side, banner: null, style: "panel" as const };
-    return { title: d.title, tag: d.tag, png: r.png(r.exhibitSvg(input, d.exhibit, a)) };
+    // The arrow names the latest value only: the reality line above already says what it means.
+    const note = `${periodLabel(point.period, seriesPeriod(lead.key))}: ${formatUnit(point.values[lead.key] as number, lead.unit, lead.currency)}`;
+    // The compared periods (the earlier one and the latest) are boxed, the arrow goes from one to the other.
+    const a = { point: point.period, note, priceSays: "", title: "", chartLabel: d.exhibit.title, tone: story.side, banner: null, style: "panel" as const, highlight: [...(d.base ? [d.base] : []), point.period], compareFrom: d.base ?? undefined };
+    return { narrative: d.title, reality: d.headline ?? d.exhibit.takeaway, tag: d.tag, png: r.png(r.exhibitSvg(input, d.exhibit, a)) };
   });
   const cur = fair.currency ?? "";
   const priceLine = `Share price ${r.fmt(last.close)} ${cur} · fair value ${r.fmt(fair.value)} ${cur} · ${r.opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up)}`.replace(/ {2,}/g, " ");
-  const n = story.drivers.length;
-  const turning = `Carried by ${n === 1 ? "this driver" : `these ${n} drivers`}, now ${story.side === "long" ? "turning up" : "cracking"}:`;
+  const intro = up ? "Why the price sits below its fair value, and what is changing now:" : "Why the price sits above its fair value, and what is breaking now:";
   const sources = `Source: ${[...new Set(story.drivers.flatMap((d) => d.exhibit.sources))].join(", ")}, Dualis Research`;
-  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, narrative: story.narrative, turning, panels, sources });
+  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, intro, panels, sources });
   return { file: r.png(svg), width, height, caption: `Opportunity: ${story.drivers.map((d) => d.title).join(", ")}` };
 }
 
@@ -152,7 +154,7 @@ export const renderSource: Source = {
     // `x-chart` = the same chart in the professional style of X posts (skill x-post): no news card, no price card.
     const charted = kind === "chart" || kind === "x-chart";
     // The same frame as the Sandbox (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
-    const story = charted && input.symbol ? await opportunityStory(ctx.db, input.symbol) : null;
+    const story = charted && input.symbol ? await opportunityStory(ctx.db, input.symbol, ctx.complete) : null;
     if (story) {
       const pic = await drawOpportunity(story);
       rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, sourceUrl: null, caption: pic.caption });

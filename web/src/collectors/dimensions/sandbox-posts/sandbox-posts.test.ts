@@ -44,6 +44,11 @@ const fixPlan: { fixFirst: string | null } = { fixFirst: null };
 
 /** Fake Claude: one JSON item per « ## Post » (an object for the Article), each with its picture; the reviewer passes or fails. */
 const complete = vi.fn<Complete>(async ({ system, prompt }) => {
+  // The judge of which earlier period a reality line compares to: the period before the latest.
+  if (system.startsWith("You judge")) {
+    const ids = [...prompt.matchAll(/^(\d{4}-\d{2}-\d{2}) \(/gm)].map((m) => m[1]);
+    return { text: JSON.stringify({ verdict: ids.at(-2) ?? "none", probability: 0.9, cited_sentence: null, reason: "r" }), model: "fake" };
+  }
   if (system.startsWith("You correct the pictures")) {
     const blocks = prompt.split(/^(?=## Post \d+:)/m).filter((b) => b.startsWith("## Post"));
     const fix = !!fixPlan.fixFirst && prompt.includes(`« ${fixPlan.fixFirst}`) && /correction pass 1 of/.test(prompt);
@@ -316,6 +321,9 @@ describe("sandbox-posts", () => {
     await db.insert(fairValues).values({ symbol: "CCLD", value: 6, currency: "USD", low: 5, high: 7, author: "claude", inputs: [] });
     const story = await opportunityStory(db, "CCLD");
     expect(story?.drivers.map((d) => [d.title, d.tag, d.headline])).toEqual([["Client loss", "STRONG INFLECTION", "Revenue up 7% in Q3"]]);
+    // With a judge, the line's compared period is the one before the latest (boxed with it, the arrow between them).
+    const judged = await opportunityStory(db, "CCLD", complete);
+    expect(judged?.drivers[0].base).toBe(day(6));
     await run(macroNews);
     await run(sandboxAccounts);
     await run(sandboxPosts);
@@ -324,8 +332,9 @@ describe("sandbox-posts", () => {
     const own = await db.select({ caption: sandbox.sandboxVisuals.caption, kind: sandbox.sandboxVisuals.kind }).from(sandbox.sandboxVisuals);
     expect(own).toHaveLength(6 * POSTS_PER_DAY);
     expect(own.every((v) => v.caption === "Opportunity: Client loss")).toBe(true);
-    // No writer call drew it: the frame comes from the analysis.
-    expect(complete.mock.calls.filter(([req]) => /CALLOUT|You judge/.test(req.system))).toHaveLength(0);
+    // The frame comes from the analysis: no chart callout asked, and the compared period judged ONCE for 30 pictures.
+    expect(complete.mock.calls.filter(([req]) => /CALLOUT/.test(req.system))).toHaveLength(0);
+    expect(complete.mock.calls.filter(([req]) => req.system.startsWith("You judge"))).toHaveLength(1);
   }, 60_000);
 
   it("image correction: a defective picture gets a corrected spec and is drawn again; the review waits for clean pictures", async () => {
