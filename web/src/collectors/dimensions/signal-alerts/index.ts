@@ -28,10 +28,11 @@ export const ALERT_ROLES: readonly ("client" | "test")[] = ["test", "client"];
 /** A change older than this is never sent (a run missed it: stale news). */
 const MAX_AGE_HOURS = 24;
 /**
- * The same reading (ticker x signal x strength) is sent at most once per this window (Kevin 2026-11-09, his pick « A »):
- * a signal that flickers off and back on (Miraial: no signal -> SELL weak 3 times on Nov 9) is one alert, not three.
+ * The same reading (ticker x signal x strength) is sent at most once per this window, rolling 30 days (Kevin 2026-11-12:
+ * « ne pas renvoyer 2x le même dans le même mois », his pick A; was 24 h since 2026-11-09): a signal that flickers off and
+ * back on (Miraial: no signal -> SELL weak 3 times on Nov 9) is one alert a month; a side flip is a new reading and sends.
  */
-const REPEAT_HOURS = 24;
+const REPEAT_HOURS = 30 * 24;
 
 type Planned = { changeId: string; recipient: string; text: string; input: AlertInput };
 const planned = new Map<string, Planned>();

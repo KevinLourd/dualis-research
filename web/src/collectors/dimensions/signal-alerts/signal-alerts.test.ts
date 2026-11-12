@@ -61,7 +61,7 @@ describe("signal-alerts", () => {
     expect(msgs.filter((m) => m.transitionId === up.id).map((m) => m.purpose)).toEqual(["alert", "alert"]);
   });
 
-  it("a strong signal that flickers off and back on within a day is one alert; a side flip still alerts", async () => {
+  it("a strong signal that flickers off and back on is one alert; a side flip still alerts", async () => {
     const first = change("CCLD", ["none", "noise"], ["SELL", "strong"], 3);
     await db.insert(signalChanges).values(first);
     await run();
@@ -73,6 +73,20 @@ describe("signal-alerts", () => {
     const out = await db.select().from(whatsappOutbox);
     expect(out).toHaveLength(4);
     expect(out.filter((o) => o.text?.includes("BUY (strong inflection), was SELL (strong crack)"))).toHaveLength(2);
+  });
+
+  it("the same strong signal is sent once in 30 days: blocked 10 days later, sent again after 31", async () => {
+    await db.insert(signalChanges).values(change("CCLD", ["none", "noise"], ["SELL", "strong"]));
+    await run();
+    expect(await db.select().from(whatsappOutbox)).toHaveLength(2);
+    await db.update(content.contentMessages).set({ createdAt: new Date(Date.now() - 10 * 86400_000) });
+    await db.insert(signalChanges).values(change("CCLD", ["none", "noise"], ["SELL", "strong"]));
+    await run();
+    expect(await db.select().from(whatsappOutbox)).toHaveLength(2);
+    await db.update(content.contentMessages).set({ createdAt: new Date(Date.now() - 31 * 86400_000) });
+    await db.insert(signalChanges).values(change("CCLD", ["none", "noise"], ["SELL", "strong"]));
+    await run();
+    expect(await db.select().from(whatsappOutbox)).toHaveLength(4);
   });
 
   it("queues nothing while the WhatsApp device is not linked", async () => {
