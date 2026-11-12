@@ -1,0 +1,10 @@
+{
+  "name": "dualis-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  // Starts collect.yml on time (GitHub's own schedule runs hours late or never). Keep in sync with src/plan.ts (a test checks).
+  "triggers": { "crons": ["15 5 * * *", "15 1,9,13,17,21 * * *", "0 2 * * *"] },
+  "observability": { "enabled": true }
+  // Runtime secret (set by .github/workflows/deploy-cron.yml): DISPATCH_TOKEN = the DRAFT_DISPATCH_TOKEN repo secret.
+}
