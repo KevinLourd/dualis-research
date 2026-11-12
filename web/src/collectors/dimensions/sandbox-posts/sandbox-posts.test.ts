@@ -16,7 +16,7 @@ import { SANDBOX_ACCOUNTS, sandboxAccounts } from "../sandbox-accounts";
 import { substackTrending, TRENDING_HOSTS } from "../substack-trending";
 import { sandboxImageFix } from "../sandbox-image-fix";
 import { sandboxReview } from "../sandbox-review";
-import { sandboxVisuals } from "../sandbox-visuals";
+import { postKey, sandboxVisuals } from "../sandbox-visuals";
 import { articleAngle, loadSkills, parsePosts, POSTS_PER_DAY, sandboxPostSubjects, sandboxPosts } from ".";
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000);
@@ -222,6 +222,13 @@ describe("sandbox-posts", () => {
     // Nothing left to draw on a rerun.
     await run(sandboxVisuals);
     expect((await db.select().from(sandbox.sandboxVisuals)).length).toBe(own.length);
+    // A picture drawn by an older drawing code (its key lacks this version) is drawn again, with no Claude call.
+    const calls = complete.mock.calls.length;
+    await db.update(sandbox.sandboxVisuals).set({ key: "post:old-drawing" }).where(eq(sandbox.sandboxVisuals.id, posts[0].visualId!));
+    await run(sandboxVisuals);
+    const [again] = await db.select().from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.id, posts[0].id));
+    expect(again.visualId).not.toBe(posts[0].visualId);
+    expect(complete.mock.calls.length).toBe(calls);
   }, 60_000);
 
   it("a wrong answer is a failed fetch, retried next run", async () => {
@@ -320,7 +327,7 @@ describe("sandbox-posts", () => {
     // Drawn again under a new key, looked at again (clean), then reviewed.
     await run(sandboxVisuals);
     const [redrawn] = await db.select().from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.id, fixed.id));
-    expect((await db.select().from(sandbox.sandboxVisuals).where(eq(sandbox.sandboxVisuals.id, redrawn.visualId!)))[0].key).toBe(`post:${fixed.id}:v2`);
+    expect((await db.select().from(sandbox.sandboxVisuals).where(eq(sandbox.sandboxVisuals.id, redrawn.visualId!)))[0].key).toBe(postKey(fixed.id, 2));
     await run(sandboxImageFix);
     const checks = await db.select().from(sandbox.sandboxImageChecks).where(eq(sandbox.sandboxImageChecks.accountId, "x:ledgerlens"));
     expect(checks.map((c) => [c.pass, c.allOk])).toEqual(expect.arrayContaining([[1, false], [2, true]]));
