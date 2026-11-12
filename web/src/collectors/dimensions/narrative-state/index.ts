@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
 import { figuresText } from "../analysis/facts";
 import { quoteStamp } from "../intraday-price";
 import type { BronzeFetch } from "@/db/schema/bronze";
@@ -25,20 +25,34 @@ import { analysedSymbols } from "../watchlist";
  * 2) the THESIS: from its drivers, today's price vs the fair value (base, low, high) and the price path, the LLM says
  *    where the story stands AND whether it signals now (a long can give a BUY, a short a SELL), since when, and why.
  * No rule decides the signal: the judge does, with every number in its context. One judgment per input.
+ * Stability (Kevin 2026-11-12, « on est sur du fondamental »): the key holds the facts (news verdicts, figures, the
+ * thesis) and the price and fair value in 5% buckets only, never today's date or the 5-minute price, so a price tick
+ * never re-asks; and every judge reads its own last reading (tag, signal, why, when), outside the key.
  */
 
 export const NARRATIVE_STATE_DIMENSION = "narrative-state";
-/** v3 (2026-11-09): + a 4-5 word headline with its number (Kevin: « YTD margin 30% vs 2023 »). */
-export const DRIVER_STATE_QUESTION = "driver-state@v3";
-/** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. */
-export const THESIS_STATE_QUESTION = "thesis-state@v1";
+/** v3 (2026-11-09): + a 4-5 word headline with its number (Kevin: « YTD margin 30% vs 2023 »). v4 (2026-11-12): + its last reading, key on facts + 5% buckets. */
+export const DRIVER_STATE_QUESTION = "driver-state@v4";
+/** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. */
+export const THESIS_STATE_QUESTION = "thesis-state@v2";
+
+/** Price and fair value enter a judgment key in 5% buckets (Kevin 2026-11-12): a tick never re-asks, a real move does. */
+const STEP = Math.log(1.05);
+const bucket = (x: number | null) => (x !== null && x > 0 ? Math.round(Math.log(x) / STEP) : "none");
+export function marketKey(m: { price: number; fv: { value: number; low: number | null; high: number | null } } | null): string {
+  return m ? `price:${bucket(m.price)} fv:${bucket(m.fv.value)} low:${bucket(m.fv.low)} high:${bucket(m.fv.high)}` : "none";
+}
 
 type StateVerdict = { id: string; driverId: string | null; verdict: string; probability: number; reason: string | null; judgmentId: string; evidenceIds: string[]; headline: string | null; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; at: string };
 export type NarrativeStatePayload = { side: ThesisSide; drivers: StateVerdict[]; thesis: StateVerdict };
 
 type Answer = { tag: string; p: number; headline: string | null; since: string | null; pricedIn: PricedIn | null; signal: Strength | null; why: string | null };
 
-const SYSTEM = "You judge where an equity story stands for a small-cap long/short analyst. Every number you need is in the text. Answer with JSON only, no prose, no code fence. Plain English, no em dash.";
+const SYSTEM = [
+  "You judge where an equity story stands for a small-cap long/short analyst. Every number you need is in the text.",
+  "Read it as a fundamental investor does: what the market believes about a business moves with facts about the business, over weeks and months.",
+  "Answer with JSON only, no prose, no code fence. Plain English, no em dash.",
+].join(" ");
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export function parseAnswer(text: string, withSignal: boolean): Answer {
@@ -74,8 +88,22 @@ async function judgeOnce(db: Db, complete: Complete, req: { subjectKind: string;
 }
 const rawOf = (j: typeof judgments.$inferSelect) => j.raw as { headline?: string | null; since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null };
 
+/** The judge's own last reading of this subject (any version of the question), as one line for its prompt, or null. */
+export async function lastReading(db: Db, subjectKind: string, subjectId: string, question: string): Promise<string | null> {
+  const [j] = await db
+    .select({ verdict: judgments.verdict, reason: judgments.reason, raw: judgments.raw, createdAt: judgments.createdAt })
+    .from(judgments)
+    .where(and(eq(judgments.subjectKind, subjectKind), eq(judgments.subjectId, subjectId), like(judgments.questionKey, `${question.split("@")[0]}@%`)))
+    .orderBy(desc(judgments.createdAt))
+    .limit(1);
+  if (!j) return null;
+  const r = j.raw as { since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null } | null;
+  const signal = r?.signal === undefined ? "" : `, signal ${r.signal === null || r.signal === "noise" ? "none" : r.signal}`;
+  return `Your last reading, on ${j.createdAt.toISOString().slice(0, 10)}: ${j.verdict}${signal}${r?.since ? ` since ${r.since}` : ""}${r?.pricedIn ? `, priced in: ${r.pricedIn}` : ""}. ${j.reason ?? ""}`.trim();
+}
+
 /** One driver's judged news, newest first, each with its tag, how much is priced in, and what the price did since. */
-export function driverNewsLines(rows: GoldEvidence[], driverId: string, reactions: Map<string, Parameters<typeof reactionLine>[0]> = new Map()): { lines: string[]; ids: string[] } {
+export function driverNewsLines(rows: GoldEvidence[], driverId: string, reactions: Map<string, Parameters<typeof reactionLine>[0]> = new Map()): { lines: string[]; ids: string[]; key: string } {
   const hits = rows
     .map((e) => ({ e, v: e.verdicts.find((x) => x.driverId === driverId) }))
     .filter((x): x is { e: GoldEvidence; v: NonNullable<typeof x.v> } => !!x.v && x.v.effect !== "noise")
@@ -83,6 +111,8 @@ export function driverNewsLines(rows: GoldEvidence[], driverId: string, reaction
   return {
     lines: hits.map(({ e, v }) => `${e.eventDay} [${v.effect}:${v.strength}${v.pricedIn ? `, priced in: ${v.pricedIn}` : ""}] ${e.headline}${v.why ? `. ${v.why}` : ""}\n    ${reactionLine(reactions.get(e.id))}`),
     ids: hits.map(({ e }) => e.id),
+    // The facts behind the lines (each item's verdict), never the price-now part of its reaction line.
+    key: hits.map(({ e, v }) => `${e.id}:${v.judgmentId}`).join(","),
   };
 }
 
@@ -123,12 +153,16 @@ export const narrativeStateSource: Source = {
     const [rows, reactions] = await Promise.all([ctx.db.select().from(evidence).where(eq(evidence.symbol, symbol)), reactionsOf(ctx.db, symbol)]);
     const w = SIDE[side];
     // The reported figures: a reason about the numbers is judged on the numbers too, never on headlines alone.
-    const head = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`, "", await figuresText(ctx.db, symbol)];
+    const figures = await figuresText(ctx.db, symbol);
+    const head = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`, "", figures];
+    // What the key holds: the thesis, the figures, the price and fair value in 5% buckets.
+    const base = `${d.version}|${fnv(figures)}|${marketKey(d.market)}`;
 
     const drivers: StateVerdict[] = [];
     for (const driver of d.drivers) {
-      const { lines, ids } = driverNewsLines(rows, driver.id, reactions);
+      const { lines, ids, key } = driverNewsLines(rows, driver.id, reactions);
       const input = lines.length ? lines.join("\n") : "No news or filing of the last 12 months bears on this reason.";
+      const last = await lastReading(ctx.db, "driver-state", driver.id, DRIVER_STATE_QUESTION);
       const question = [
         ...head,
         `ONE of the reasons the market holds it (${driver.category}): ${driver.title}. ${driver.text}`,
@@ -138,11 +172,12 @@ export const narrativeStateSource: Source = {
         "Weigh them with their dates: recent beats old, several weak reversals in a row can make a strong one, one strong continuation after a reversal can cancel it.",
         "since = the day of the first news of the CURRENT state (null for noise). pricedIn = how much of that state the price has already moved (none, partly, fully), read from the price lines.",
         "headline = the current state in 4 to 5 words with its key number, like a chart label (e.g. \"YTD margin 30% vs 2023\", \"Sales growth slows to 4%\"); null for noise.",
+        ...(last ? ["", last] : []),
       ].join("\n");
       const j = await judgeOnce(ctx.db, ctx.complete, {
         subjectKind: "driver-state",
         subjectId: driver.id,
-        questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${question}\n${input}`)}`,
+        questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${base}|${driver.category}|${driver.title}|${driver.text}|${key}`)}`,
         question: `${DRIVER_STATE_QUESTION}: ${driver.title}`,
         prompt: `${question}\n\nNews:\n${input}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "why": "<one short sentence for a reader who has not seen the news>"}`,
         withSignal: false,
@@ -153,6 +188,7 @@ export const narrativeStateSource: Source = {
 
     const input = d.drivers.map((x, i) => `${x.rank}. ${x.title} (${x.category}): ${drivers[i].verdict}${drivers[i].since ? ` since ${drivers[i].since}` : ""}${drivers[i].pricedIn ? `, priced in: ${drivers[i].pricedIn}` : ""}. ${drivers[i].reason ?? ""}`).join("\n");
     const path = await pathLines(ctx.db, symbol);
+    const last = await lastReading(ctx.db, "thesis-state", thesisId(symbol, side), THESIS_STATE_QUESTION);
     const question = [
       ...head,
       "",
@@ -165,11 +201,12 @@ export const narrativeStateSource: Source = {
       `1) tag: where does the WHOLE story stand? reversal = it is turning (${w.reversal}); continuation = it holds and gets stronger; noise = nothing moves it. Weigh the drivers by importance: the first one matters most.`,
       `2) signal: does this thesis give a ${w.signal} NOW? Only a turning story can, and only while the price has not yet made the move: weigh where the price sits vs the fair value base and its range ends, how much of the turn the price already moved since the news, and how recent the turn is. A turn the price has already fully priced in (the price reached the fair value) is no signal. strong = a clear, recent turn with most of the move still ahead; weak = an early or partial turn, or half priced in; none = no signal.`,
       "since = the day the current tag started (null for noise). pricedIn = how much of the turn the price has already moved.",
+      ...(last ? ["", last] : []),
     ].join("\n");
     const t = await judgeOnce(ctx.db, ctx.complete, {
       subjectKind: "thesis-state",
       subjectId: thesisId(symbol, side),
-      questionKey: `${THESIS_STATE_QUESTION}:${d.version}:${fnv(question)}`,
+      questionKey: `${THESIS_STATE_QUESTION}:${d.version}:${fnv(`${base}|${drivers.map((x) => x.judgmentId).join(",")}`)}`,
       question: `${THESIS_STATE_QUESTION}: ${symbol} ${side}`,
       prompt: `${question}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "signal": <strong | weak | none>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "why": "<one or two short sentences: where the story stands and why it signals or not, with the price vs the fair value>"}`,
       withSignal: true,
