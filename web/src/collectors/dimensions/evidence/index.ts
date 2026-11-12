@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { figuresText } from "../analysis/facts";
+import { figuresText, fnv } from "../analysis/facts";
 import { evidence, exhibits, fairValues, NARRATIVE_TAGS, narrativeDrivers, narratives, parseTag, PRICED_IN, type EvidenceVerdict, type GoldMarketReaction, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import * as silver from "@/db/schema/silver";
@@ -31,7 +31,15 @@ export const EVIDENCE_SUBJECT_KIND = "evidence";
 export const EVIDENCE_QUESTION = "evidence@v5";
 const PARALLEL = 6;
 
+/** Old key (before 2026-11-12): one per thesis version, so a rewritten narrative re-judged every item. Read for the current version only. */
 export const evidenceKey = (driversVersion: string) => `${EVIDENCE_QUESTION}:${driversVersion}`;
+/** Key per DRIVER (Kevin 2026-11-12): an item is judged again only when the reason it is judged against changes. */
+export const driverKey = (driver: { category: string; title: string; text: string }) => `${EVIDENCE_QUESTION}:d:${fnv(`${driver.category}|${driver.title}|${driver.text}`)}`;
+type DriverText = { rank: number; category: string; title: string; text: string };
+/** The stored verdict of one item x driver: under the driver's own key, else under the thesis version it was judged in. */
+const verdictKeys = (version: string, driver: DriverText) => [driverKey(driver), evidenceKey(version)];
+const driverTexts = async (db: Db, symbol: string, side: ThesisSide): Promise<DriverText[]> =>
+  (await db.select({ rank: narrativeDrivers.rank, category: narrativeDrivers.category, title: narrativeDrivers.title, text: narrativeDrivers.text }).from(narrativeDrivers).where(and(eq(narrativeDrivers.symbol, symbol), eq(narrativeDrivers.side, side)))).sort((a, b) => a.rank - b.rank);
 
 type Drivers = {
   side: ThesisSide;
@@ -105,9 +113,10 @@ async function pendingSubjects(db: Db): Promise<string[]> {
   for (const t of theses) {
     // Too old items are never asked: before the month the thesis' story took hold (or the cap, until it is judged).
     const since = sinces.get(t.id)?.since ?? sinceCap();
-    const ranks = (await db.select({ rank: narrativeDrivers.rank }).from(narrativeDrivers).where(and(eq(narrativeDrivers.symbol, t.symbol), eq(narrativeDrivers.side, t.side)))).map((r) => r.rank);
+    const drivers = await driverTexts(db, t.symbol, t.side);
     if (!items.has(t.symbol)) items.set(t.symbol, await itemsOf(db, t.symbol));
-    const pending = items.get(t.symbol)!.filter((item) => item.at >= since && ranks.some((rank) => !done.has(`${evidenceSubject(t.symbol, item.kind, item.id, t.side, rank)}\u0000${evidenceKey(t.version)}`)));
+    const judged = (item: EvidenceItem, d: DriverText) => verdictKeys(t.version, d).some((k) => done.has(`${evidenceSubject(t.symbol, item.kind, item.id, t.side, d.rank)}\u0000${k}`));
+    const pending = items.get(t.symbol)!.filter((item) => item.at >= since && drivers.some((d) => !judged(item, d)));
     for (let i = 0; i < pending.length; i += BATCH_ITEMS) out.push(batchSubject(t.symbol, t.side, pending.slice(i, i + BATCH_ITEMS)));
   }
   return out;
@@ -190,21 +199,28 @@ export const evidenceSource: Source = {
     const ranks = d.drivers.map((x) => x.rank);
     const r = await ctx.complete({ system: EVIDENCE_SYSTEM, prompt: batchPrompt(symbol, d, items, await reactionsOf(ctx.db, symbol), await figuresText(ctx.db, symbol)) });
     const verdicts = parseBatch(r.text, items.length, ranks);
-    const questionKey = evidenceKey(d.version);
+    // Only the pairs not judged yet are stored: a verdict on a driver that did not change stays as it was.
+    const subjects = items.flatMap((it) => ranks.map((rank) => evidenceSubject(symbol, it.kind, it.id, side, rank)));
+    const keysOf = new Map(d.drivers.map((x) => [x.rank, verdictKeys(d.version, x)]));
+    const stored = new Set(
+      (await ctx.db.select({ subjectId: silver.judgments.subjectId, questionKey: silver.judgments.questionKey }).from(silver.judgments).where(and(eq(silver.judgments.subjectKind, EVIDENCE_SUBJECT_KIND), inArray(silver.judgments.subjectId, subjects)))).map((j) => `${j.subjectId}\u0000${j.questionKey}`),
+    );
     const rows = items.flatMap((it, i) =>
-      ranks.map((rank) => {
-        const v = verdicts.get(`${i + 1}#${rank}`)!;
-        return { subjectKind: EVIDENCE_SUBJECT_KIND, subjectId: evidenceSubject(symbol, it.kind, it.id, side, rank), questionKey, question: `${EVIDENCE_QUESTION} batch: item vs ${side} driver ${rank}`, verdict: v.tag, probability: v.p, citedSentence: v.cited, reason: v.why, model: r.model, raw: { batch: subject.length, pricedIn: v.pricedIn } };
+      d.drivers.flatMap((x) => {
+        const subjectId = evidenceSubject(symbol, it.kind, it.id, side, x.rank);
+        if (keysOf.get(x.rank)!.some((k) => stored.has(`${subjectId}\u0000${k}`))) return [];
+        const v = verdicts.get(`${i + 1}#${x.rank}`)!;
+        return [{ subjectKind: EVIDENCE_SUBJECT_KIND, subjectId, questionKey: driverKey(x), question: `${EVIDENCE_QUESTION} batch: item vs ${side} driver ${x.rank}`, verdict: v.tag, probability: v.p, citedSentence: v.cited, reason: v.why, model: r.model, raw: { batch: subject.length, pricedIn: v.pricedIn } }];
       }),
     );
-    await ctx.db.insert(silver.judgments).values(rows).onConflictDoNothing();
-    return { request: { symbol, side, items: items.length, drivers: ranks.length, questionKey }, httpStatus: null, payload: { judged: rows.length, model: r.model } };
+    if (rows.length) await ctx.db.insert(silver.judgments).values(rows).onConflictDoNothing();
+    return { request: { symbol, side, items: items.length, drivers: ranks.length }, httpStatus: null, payload: { judged: rows.length, model: r.model } };
   },
 };
 
 export const evidenceDim: Dimension = {
   name: EVIDENCE_DIMENSION,
-  description: "Every news item and filing of the last 12 months, judged against EACH Narrative Driver of each thesis with the fair value and what the price did around it: reversal / continuation (strong or weak) or noise, why, how much the price already moved, and the Exhibit that shows it. Once per thesis version.",
+  description: "Every news item and filing of the last 12 months, judged against EACH Narrative Driver of each thesis with the fair value and what the price did around it: reversal / continuation (strong or weak) or noise, why, how much the price already moved, and the Exhibit that shows it. Once per driver: an item is judged again only when the reason changes.",
   sources: [evidenceSource],
   subjects: pendingSubjects,
   promote: async (db): Promise<PromoteResult> => ({ silverRowsBySource: { claude: await rebuildEvidence(db) } }),
@@ -247,8 +263,10 @@ export function tooOldRow(symbol: string, item: EvidenceItem, since: Date, judgm
 export async function rebuildEvidence(db: Db): Promise<number> {
   const symbols = new Set(await analysedSymbols(db));
   const theses = (await db.select({ id: narratives.id, symbol: narratives.symbol, side: narratives.side, version: narratives.version }).from(narratives)).filter((n) => symbols.has(n.symbol));
-  // Egress: only the current thesis versions' judgments and only the columns read here (never `question`).
-  const keys = [...new Set(theses.map((t) => evidenceKey(t.version)))];
+  // Egress: only the current drivers' (and thesis versions') judgments and only the columns read here (never `question`).
+  const driversBy = new Map<string, DriverText[]>();
+  for (const t of theses) driversBy.set(t.id, await driverTexts(db, t.symbol, t.side));
+  const keys = [...new Set(theses.flatMap((t) => (driversBy.get(t.id) ?? []).flatMap((x) => verdictKeys(t.version, x))))];
   const j = silver.judgments;
   const js = keys.length
     ? await db
@@ -264,8 +282,6 @@ export async function rebuildEvidence(db: Db): Promise<number> {
   const sinces = await narrativeSinceOf(db, tickers);
   for (const symbol of tickers) {
     const mine = theses.filter((t) => t.symbol === symbol);
-    const ranksBySide = new Map<ThesisSide, number[]>();
-    for (const t of mine) ranksBySide.set(t.side, (await db.select({ rank: narrativeDrivers.rank }).from(narrativeDrivers).where(and(eq(narrativeDrivers.symbol, symbol), eq(narrativeDrivers.side, t.side)))).map((r) => r.rank).sort((a, b) => a - b));
     for (const item of await itemsOf(db, symbol)) {
       // A thesis judges the item only from the month its story took hold (Too old before: already in the price).
       const open = mine.filter((t) => item.at >= (sinces.get(t.id)?.since ?? sinceCap()));
@@ -278,10 +294,12 @@ export async function rebuildEvidence(db: Db): Promise<number> {
       const verdicts: EvidenceVerdict[] = [];
       let expected = 0;
       for (const t of open) {
-        const ranks = ranksBySide.get(t.side) ?? [];
-        expected += ranks.length;
-        for (const rank of ranks) {
-          const jv = byKey.get(`${evidenceSubject(symbol, item.kind, item.id, t.side, rank)}\u0000${evidenceKey(t.version)}`);
+        const ds = driversBy.get(t.id) ?? [];
+        expected += ds.length;
+        for (const x of ds) {
+          const rank = x.rank;
+          const subjectId = evidenceSubject(symbol, item.kind, item.id, t.side, rank);
+          const jv = verdictKeys(t.version, x).map((k) => byKey.get(`${subjectId}\u0000${k}`)).find((j) => j !== undefined);
           if (!jv) continue;
           const tag = parseTag(jv.verdict);
           const pricedIn = (jv.raw as { pricedIn?: PricedIn | null } | null)?.pricedIn ?? null;

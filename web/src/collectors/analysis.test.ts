@@ -221,6 +221,41 @@ describe("analysis dimension", () => {
     expect(calls).toEqual([]);
   });
 
+  it("is stable: a small price tick never re-asks the state judges, a real move does with their last reading; an item is judged again only for the driver that changed", async () => {
+    await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
+    await db.insert(gold.filings).values({ id: "6f1d1a52-4444-4a3b-9c1d-000000000001", symbol: SYMBOL, registry: "dart", filingKey: "s1", form: null, title: "Share buyback trust", filedAt: new Date(), url: null, language: "ko", sources: ["dart"] });
+    await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
+    await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
+    expect(lastThesisPrompt).not.toContain("Your last reading");
+
+    // +1%: same 5% bucket, nothing asked.
+    await db.update(gold.quotes).set({ close: 30300 }).where(eq(gold.quotes.symbol, SYMBOL));
+    calls = [];
+    await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual([]);
+
+    // +12%: asked again, each judge reading its own last reading.
+    await db.update(gold.quotes).set({ close: 33600 }).where(eq(gold.quotes.symbol, SYMBOL));
+    calls = [];
+    await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual(["driver-state", "driver-state", "thesis-state"]);
+    expect(lastThesisPrompt).toContain(`Your last reading, on ${new Date().toISOString().slice(0, 10)}: reversal:weak, signal weak since 2026-11-02`);
+    expect(lastThesisPrompt).toContain("One of two reasons turns");
+
+    // Driver 1 reworded: the item is judged again for driver 1 only; driver 2 keeps its verdict.
+    const before = (await db.select().from(evidence))[0].verdicts.find((v) => v.rank === 2)!.judgmentId;
+    await db.update(narrativeDrivers).set({ text: "Revenue fell 5% in 2025 as memory makers cut capex." }).where(eq(narrativeDrivers.id, `${SYMBOL}:long:1`));
+    calls = [];
+    await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual(["evidence"]);
+    const [e] = await db.select().from(evidence);
+    expect(e.verdicts.find((v) => v.rank === 2)!.judgmentId).toBe(before);
+    expect(e.verdicts).toHaveLength(2);
+    calls = [];
+    await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
+    expect(calls).toEqual([]);
+  });
+
   it("asks for drivers that SUPPORT the narrative, never one against it", () => {
     const p = analysisPrompt("facts", "long");
     expect(p).toContain("Every driver SUPPORTS the narrative");
