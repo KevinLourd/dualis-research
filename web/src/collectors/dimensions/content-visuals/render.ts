@@ -677,57 +677,85 @@ function wrapWords(text: string, max: number): string[] {
 }
 
 export const OPP_W = 1600;
+/** The 6 looks of the opportunity picture (Kevin 2026-11-12): tone x channel, from the most alarmist to the most sober. */
+export type OpportunityLook = { tone: "urgent" | "balanced" | "neutral"; channel: "x" | "substack" };
+const LOOK_WORDS = {
+  urgent: { a: "THE MARKET THINKS", b: "THE NUMBERS SAY" },
+  balanced: { a: "NARRATIVE", b: "REALITY" },
+  neutral: { a: "Market view", b: "Latest data" },
+} as const;
+
 /**
- * The opportunity picture, the same frame on every account whatever its tone (Kevin 2026-11-12): the price against its
- * fair value and the opportunity, then ONE block per driver reversing now (1 to 3, a collage: one row, or 2 + 1), each
- * « Narrative: A » (what the market believes) against « Reality: not A » (what is happening), its tag and its chart.
- * No narrative paragraph (Kevin: « la phrase de narrative n'est pas compréhensible »).
+ * The opportunity picture (Kevin 2026-11-12): the price against its fair value and the opportunity, then ONE block per
+ * driver reversing now (1 to 3), each « Narrative: A » against « Reality: not A », its tag and its chart. Six looks:
+ * urgent (red BREAKING band, the opportunity in a big pill), balanced (the house look), neutral (a research exhibit: no
+ * filled pill, sober labels); X = landscape, panels side by side; Substack = portrait, panels stacked, bigger words.
  */
-export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; intro: string; panels: OpportunityPanel[]; sources: string }): { svg: string; width: number; height: number } {
+export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; intro: string; panels: OpportunityPanel[]; sources: string; look: OpportunityLook }): { svg: string; width: number; height: number } {
+  const { tone, channel } = o.look;
   const accent = o.up ? COLOR.long.dark : COLOR.short.dark;
+  const red = COLOR.breaking.dark;
+  const words = LOOK_WORDS[tone];
+  const width = channel === "x" ? OPP_W : 1200;
   const n = o.panels.length;
-  const perRow = n === 1 ? 1 : 2;
+  const perRow = channel === "substack" || n === 1 ? 1 : 2;
   const gap = 40;
-  const pw = (OPP_W - 80 - gap * (perRow - 1)) / perRow;
+  const pw = (width - 80 - gap * (perRow - 1)) / perRow;
   const ph = (pw * 720) / 1280;
+  const big = channel === "substack" ? 1.15 : 1;
+  const sa = Math.round(26 * big);
+  const sb = Math.round((tone === "urgent" ? 34 : 30) * big);
   const chars = (size: number) => Math.floor((pw - 24) / (size * 0.55));
-  const blocks = o.panels.map((p) => ({ a: wrapWords(p.narrative, chars(26)).slice(0, 2), b: wrapWords(p.reality, chars(30)).slice(0, 2) }));
-  const textH = Math.max(...blocks.map((b) => 34 + b.a.length * 34 + 22 + 34 + b.b.length * 38)) + 14;
-  const top = 56;
-  const introTop = top + 132;
+  const blocks = o.panels.map((p) => ({ a: wrapWords(p.narrative, chars(sa)).slice(0, 2), b: wrapWords(p.reality, chars(sb)).slice(0, 2) }));
+  const textH = Math.max(...blocks.map((b) => 34 + b.a.length * (sa + 8) + 22 + 34 + b.b.length * (sb + 8))) + 14;
+  const band = tone === "urgent" ? 72 : 0;
+  const top = band + 48;
+  const introTop = top + (tone === "urgent" ? 150 : 132);
   const panelsTop = introTop + 40;
   const rows = Math.ceil(n / perRow);
   const panelH = textH + ph;
   const height = Math.round(panelsTop + rows * panelH + (rows - 1) * gap + 70);
-  const parts: string[] = [
-    `<rect width="${OPP_W}" height="${height}" fill="${NOTE.bg}"/>`,
-    `<text x="40" y="${top + 34}" font-size="40" font-weight="600" fill="#fff">${esc(o.company)}</text>`,
-    `<text x="40" y="${top + 82}" font-size="28" font-weight="600" fill="${accent}">${esc(o.priceLine)}</text>`,
-    `<text x="40" y="${introTop + 4}" font-size="24" fill="${NOTE.muted}">${esc(o.intro)}</text>`,
-  ];
+  const parts: string[] = [`<rect width="${width}" height="${height}" fill="${NOTE.bg}"/>`];
+  if (tone === "urgent") {
+    parts.push(`<rect width="${width}" height="${band}" fill="${red}"/>`, `<text x="40" y="${band / 2 + 12}" font-size="34" font-weight="600" letter-spacing="3" fill="#fff">BREAKING</text>`);
+  }
+  parts.push(`<text x="40" y="${top + 36}" font-size="${tone === "neutral" ? 36 : 42}" font-weight="600" fill="#fff">${esc(o.company)}</text>`);
+  if (tone === "urgent") {
+    const pillW = Math.min(width - 80, o.priceLine.length * 18 + 40);
+    parts.push(`<rect x="40" y="${top + 58}" width="${pillW}" height="56" rx="10" fill="${accent}"/><text x="60" y="${top + 96}" font-size="30" font-weight="600" fill="#fff">${esc(o.priceLine)}</text>`);
+  } else parts.push(`<text x="40" y="${top + 84}" font-size="28" font-weight="600" fill="${tone === "neutral" ? "#fff" : accent}">${esc(o.priceLine)}</text>`);
+  parts.push(`<text x="40" y="${introTop + 4}" font-size="${tone === "urgent" ? 28 : 24}" font-weight="${tone === "urgent" ? 600 : 400}" fill="${tone === "urgent" ? "#fff" : NOTE.muted}">${esc(o.intro)}</text>`);
   o.panels.forEach((p, i) => {
     const row = Math.floor(i / perRow);
     const inRow = Math.min(perRow, n - row * perRow);
     const rowW = inRow * pw + (inRow - 1) * gap;
-    const x = (OPP_W - rowW) / 2 + (i % perRow) * (pw + gap);
+    const x = (width - rowW) / 2 + (i % perRow) * (pw + gap);
     let y = panelsTop + row * (panelH + gap);
     const { a, b } = blocks[i];
     const tagW = p.tag.length * 13 + 28;
-    parts.push(`<rect x="${x}" y="${y}" width="${pw}" height="${panelH}" rx="12" fill="rgba(255,255,255,0.04)"/>`);
-    // Narrative: A, plain (Kevin 2026-11-12: never strike a text through unless another is written beside it).
-    parts.push(`<text x="${x + 20}" y="${y + 30}" font-size="16" font-weight="600" letter-spacing="2" fill="${NOTE.muted}">NARRATIVE</text>`);
-    parts.push(`<rect x="${x + pw - tagW - 16}" y="${y + 10}" width="${tagW}" height="34" rx="6" fill="${accent}"/><text x="${x + pw - 16 - tagW / 2}" y="${y + 34}" font-size="19" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`);
+    parts.push(
+      tone === "neutral"
+        ? `<rect x="${x}" y="${y}" width="${pw}" height="${panelH}" rx="8" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>`
+        : `<rect x="${x}" y="${y}" width="${pw}" height="${panelH}" rx="12" fill="rgba(255,255,255,0.04)"${tone === "urgent" ? ` stroke="${accent}" stroke-width="3"` : ""}/>`,
+    );
+    const label = tone === "neutral" ? `font-size="18" font-weight="600"` : `font-size="16" font-weight="600" letter-spacing="2"`;
+    parts.push(`<text x="${x + 20}" y="${y + 30}" ${label} fill="${NOTE.muted}">${words.a}</text>`);
+    parts.push(
+      tone === "neutral"
+        ? `<rect x="${x + pw - tagW - 16}" y="${y + 10}" width="${tagW}" height="34" rx="6" fill="none" stroke="${accent}" stroke-width="2"/><text x="${x + pw - 16 - tagW / 2}" y="${y + 34}" font-size="19" font-weight="600" fill="${accent}" text-anchor="middle">${esc(p.tag)}</text>`
+        : `<rect x="${x + pw - tagW - 16}" y="${y + 10}" width="${tagW}" height="34" rx="6" fill="${accent}"/><text x="${x + pw - 16 - tagW / 2}" y="${y + 34}" font-size="19" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`,
+    );
     y += 34;
-    a.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 28 + k * 34}" font-size="26" fill="#fff">${esc(l)}</text>`));
-    y += a.length * 34 + 22;
-    parts.push(`<text x="${x + 20}" y="${y + 26}" font-size="16" font-weight="600" letter-spacing="2" fill="${accent}">REALITY</text>`);
+    a.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + sa + k * (sa + 8)}" font-size="${sa}" fill="#fff">${esc(l)}</text>`));
+    y += a.length * (sa + 8) + 22;
+    parts.push(`<text x="${x + 20}" y="${y + 26}" ${label} fill="${accent}">${words.b}</text>`);
     y += 34;
-    b.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 30 + k * 38}" font-size="30" font-weight="600" fill="#fff">${esc(l)}</text>`));
+    b.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + sb + k * (sb + 8)}" font-size="${sb}" font-weight="600" fill="${tone === "urgent" ? accent : "#fff"}">${esc(l)}</text>`));
     parts.push(`<image x="${x}" y="${panelsTop + row * (panelH + gap) + textH}" width="${pw}" height="${ph}" xlink:href="data:image/png;base64,${p.png.toString("base64")}"/>`);
   });
   parts.push(`<text x="40" y="${height - 28}" font-size="18" fill="${NOTE.muted}">${esc(o.sources)}</text>`);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${OPP_W}" height="${height}" viewBox="0 0 ${OPP_W} ${height}" font-family="${FONT}">${parts.join("")}</svg>`;
-  return { svg: withMark(svg, OPP_W - 40 - 48, height - 66, 48), width: OPP_W, height };
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}">${parts.join("")}</svg>`;
+  return { svg: withMark(svg, width - 40 - 48, height - 66, 48), width, height };
 }
 
 export function png(svg: string): Buffer {
