@@ -1,7 +1,7 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as content from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
@@ -14,6 +14,7 @@ import { runDimension } from "../../runner";
 import { macroNews, MACRO_QUERIES } from "../macro-news";
 import { SANDBOX_ACCOUNTS, sandboxAccounts } from "../sandbox-accounts";
 import { substackTrending, TRENDING_HOSTS } from "../substack-trending";
+import { sandboxImageFix } from "../sandbox-image-fix";
 import { sandboxReview } from "../sandbox-review";
 import { sandboxVisuals } from "../sandbox-visuals";
 import { articleAngle, loadSkills, parsePosts, POSTS_PER_DAY, sandboxPostSubjects, sandboxPosts } from ".";
@@ -36,9 +37,21 @@ async function addIdea(rank: number, score: number) {
 
 /** The review the fake reviewer gives: the account whose prompt line starts « <fail> fails its first round with this edit. */
 const reviewPlan: { fail: string | null; edit: { skill: string; old: string; new: string } | null } = { fail: null, edit: null };
+/** The fake picture corrector: `fixFirst` = on its first pass it corrects post 1 of the account whose prompt names it. */
+const fixPlan: { fixFirst: string | null } = { fixFirst: null };
 
 /** Fake Claude: one JSON item per « ## Post » (an object for the Article), each with its picture; the reviewer passes or fails. */
 const complete = vi.fn<Complete>(async ({ system, prompt }) => {
+  if (system.startsWith("You correct the pictures")) {
+    const blocks = prompt.split(/^(?=## Post \d+:)/m).filter((b) => b.startsWith("## Post"));
+    const fix = !!fixPlan.fixFirst && prompt.includes(`« ${fixPlan.fixFirst}`) && /correction pass 1 of/.test(prompt);
+    const posts = blocks.map((b, i) => {
+      if (!(fix && i === 0)) return { post: i + 1, ok: true, defects: [] };
+      const spec = JSON.parse(/^Its picture's spec now: (.*)$/m.exec(b)![1]);
+      return { post: i + 1, ok: false, defects: ["The label is cut."], image: { ...spec, chartLabel: "Share price, $, last 12 months" } };
+    });
+    return { text: JSON.stringify({ posts }), model: "fake" };
+  }
   if (system.startsWith("You review the Sandbox")) {
     const n = [...prompt.matchAll(/^## Post \d+:/gm)].length;
     const fail = !!reviewPlan.fail && prompt.includes(`« ${reviewPlan.fail}`) && /round 1 of/.test(prompt);
@@ -88,6 +101,7 @@ beforeEach(async () => {
   complete.mockClear();
   reviewPlan.fail = null;
   reviewPlan.edit = null;
+  fixPlan.fixFirst = null;
   // The reviewer edits skill files: tests work on a copy.
   skillsDir = await mkdtemp(join(tmpdir(), "dualis-skills-"));
   await cp(new URL("../../../../../.claude/skills/", import.meta.url), skillsDir, { recursive: true });
@@ -253,6 +267,7 @@ describe("sandbox-posts", () => {
     reviewPlan.edit = { skill: "x-urgent", old: "- **test line**: the note says the number.", new: "- **test line**: the number AND what it measures." };
     await run(sandboxPosts);
     await run(sandboxVisuals);
+    await run(sandboxImageFix);
     const r1 = await run(sandboxReview);
     expect(r1.error ?? r1.sources.flatMap((x) => x.errors)).toEqual([]);
     // The reviewer saw each post's picture.
@@ -268,6 +283,7 @@ describe("sandbox-posts", () => {
     await run(sandboxPosts);
     expect(complete.mock.calls.at(-1)![0].system).toMatch(/AND what it measures/);
     await run(sandboxVisuals);
+    await run(sandboxImageFix);
     await run(sandboxReview);
     const gold = await db.select().from(sandbox.goldSandboxPosts).where(eq(sandbox.goldSandboxPosts.accountId, "x:sirensmallcaps"));
     const round2 = await db.select({ id: sandbox.sandboxPosts.id }).from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.round, 2));
@@ -284,6 +300,34 @@ describe("sandbox-posts", () => {
     expect(await sandboxPostSubjects(db)).toEqual([`x:narrativegap|${new Date().toISOString().slice(0, 10)}|2`]);
   });
 
+  it("image correction: a defective picture gets a corrected spec and is drawn again; the review waits for clean pictures", async () => {
+    await run(macroNews);
+    await run(sandboxAccounts);
+    fixPlan.fixFirst = "Ledger and Lens », X,";
+    await run(sandboxPosts);
+    await run(sandboxVisuals);
+    const fix1 = await run(sandboxImageFix);
+    expect(fix1.error ?? fix1.sources.flatMap((x) => x.errors)).toEqual([]);
+    // The corrector saw the 5 pictures; post 1 of @ledgerlens is corrected, waits for its new picture.
+    const fixCalls = complete.mock.calls.filter(([req]) => req.system.startsWith("You correct the pictures"));
+    expect(fixCalls).toHaveLength(6);
+    expect(fixCalls.every(([req]) => req.images?.length === POSTS_PER_DAY)).toBe(true);
+    const [fixed] = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, "x:ledgerlens"), eq(sandbox.sandboxPosts.slot, 0)));
+    expect(fixed).toMatchObject({ imageVersion: 2, visualId: null });
+    expect(fixed.image?.chartLabel).toBe("Share price, $, last 12 months");
+    await run(sandboxReview);
+    expect((await db.select().from(sandbox.sandboxReviews)).map((r) => r.accountId)).not.toContain("x:ledgerlens");
+    // Drawn again under a new key, looked at again (clean), then reviewed.
+    await run(sandboxVisuals);
+    const [redrawn] = await db.select().from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.id, fixed.id));
+    expect((await db.select().from(sandbox.sandboxVisuals).where(eq(sandbox.sandboxVisuals.id, redrawn.visualId!)))[0].key).toBe(`post:${fixed.id}:v2`);
+    await run(sandboxImageFix);
+    const checks = await db.select().from(sandbox.sandboxImageChecks).where(eq(sandbox.sandboxImageChecks.accountId, "x:ledgerlens"));
+    expect(checks.map((c) => [c.pass, c.allOk])).toEqual(expect.arrayContaining([[1, false], [2, true]]));
+    await run(sandboxReview);
+    expect((await db.select().from(sandbox.sandboxReviews)).map((r) => r.accountId)).toContain("x:ledgerlens");
+  }, 60_000);
+
   it("review: a drawing defect fails the post with no skill edit to make", async () => {
     const { parseReview } = await import("../sandbox-review");
     const drawing = JSON.stringify({ posts: [{ post: 1, imageAlone: false, aligned: true, clear: true, why: "Drawing: the price card pill reads % below fair val." }], edits: [] });
@@ -298,6 +342,7 @@ describe("sandbox-posts", () => {
     reviewPlan.edit = { skill: "x-urgent", old: "a line that is nowhere", new: "x" };
     await run(sandboxPosts);
     await run(sandboxVisuals);
+    await run(sandboxImageFix);
     await run(sandboxReview);
     const [r] = (await db.select().from(sandbox.sandboxReviews)).filter((x) => !x.pass);
     expect(r.edits).toMatchObject([{ applied: false, reason: expect.stringMatching(/not found/) }]);

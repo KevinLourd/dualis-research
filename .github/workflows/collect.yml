@@ -71,14 +71,16 @@ jobs:
       - run: echo "FFMPEG_PATH=$HOME/ffmpeg/bin/ffmpeg" >> "$GITHUB_ENV" && ~/ffmpeg/bin/ffmpeg -version | head -1
       - run: pnpm db:migrate
       - run: pnpm collect ${{ github.event.inputs.dimension || (github.event.schedule == '15 5 * * *' && 'all') || (github.event.schedule == '0 2 * * *' && 'growth-outreach,substack-network,growth-brief') || 'core' }}
-      # The Sandbox loop (Kevin 2026-11-11): a failed review edited the writing skills, the day is written, drawn and
-      # reviewed again with them, up to round 3 (rounds with nothing to do are no-ops).
-      - name: Sandbox rounds 2 and 3
+      # The Sandbox loop (Kevin 2026-11-11/12): each pass draws the pictures, corrects them (skill image-correction, 3
+      # passes), reviews the round (skill content-review, which edits the writing skills) and writes a failed day again,
+      # 3 rounds max. A pass with nothing to do is a few queries; a failed pass never stops the next one.
+      - name: Sandbox loop (pictures, corrections, review, rounds)
         # always(): one account failing its round (a Claude limit) never stops the others' rounds.
         if: always() && (github.event.schedule == '15 5 * * *' || github.event.inputs.dimension == 'all' || contains(github.event.inputs.dimension, 'sandbox'))
         run: |
-          pnpm collect sandbox-posts,sandbox-visuals,sandbox-review
-          pnpm collect sandbox-posts,sandbox-visuals,sandbox-review
+          failed=0
+          for i in $(seq 14); do pnpm collect sandbox-posts,sandbox-visuals,sandbox-image-fix,sandbox-review || failed=1; done
+          exit $failed
       - name: Commit the skills the review edited
         if: always()
         working-directory: .

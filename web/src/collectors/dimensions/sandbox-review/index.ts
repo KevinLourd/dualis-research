@@ -5,6 +5,7 @@ import type { SandboxPostReview, SandboxSkillEdit } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
 import { FORMAT_NAME, MAX_ROUNDS, readSkill, shortHash, skillFile, stripFrontmatter, writingSkills } from "../sandbox-posts";
+import { pictureRounds } from "../sandbox-image-fix";
 import { postKey } from "../sandbox-visuals";
 
 /**
@@ -25,23 +26,13 @@ export const REVIEW_VERSION = "review-v1";
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
 const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().slice(0, 10);
 
-/** Rounds whose every post has a picture drawn or failed, not reviewed yet (today and yesterday). */
+/** Rounds whose pictures are settled (drawn, then corrected by skill image-correction until clean or 3 passes), not reviewed yet. */
 export async function reviewSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
-  const posts = await db.select({ id: sandbox.sandboxPosts.id, accountId: sandbox.sandboxPosts.accountId, day: sandbox.sandboxPosts.day, round: sandbox.sandboxPosts.round, image: sandbox.sandboxPosts.image, visualId: sandbox.sandboxPosts.visualId }).from(sandbox.sandboxPosts).where(gte(sandbox.sandboxPosts.day, since(now)));
-  const withImage = posts.filter((p) => p.image);
-  if (withImage.length === 0) return [];
-  const [reviews, failed] = await Promise.all([
-    db.select({ accountId: sandbox.sandboxReviews.accountId, day: sandbox.sandboxReviews.day, round: sandbox.sandboxReviews.round }).from(sandbox.sandboxReviews).where(gte(sandbox.sandboxReviews.day, since(now))),
-    db.select({ key: sandbox.sandboxVisuals.key }).from(sandbox.sandboxVisuals).where(and(inArray(sandbox.sandboxVisuals.key, withImage.map((p) => postKey(p.id))), eq(sandbox.sandboxVisuals.status, "failed"))),
-  ]);
+  const rounds = await pictureRounds(db, now);
+  if (rounds.length === 0) return [];
+  const reviews = await db.select({ accountId: sandbox.sandboxReviews.accountId, day: sandbox.sandboxReviews.day, round: sandbox.sandboxReviews.round }).from(sandbox.sandboxReviews).where(gte(sandbox.sandboxReviews.day, since(now)));
   const done = new Set(reviews.map((r) => `${r.accountId}|${r.day}|${r.round}`));
-  const failedKeys = new Set(failed.map((f) => f.key));
-  const rounds = new Map<string, typeof withImage>();
-  for (const p of withImage) {
-    const k = `${p.accountId}|${p.day}|${p.round}`;
-    rounds.set(k, [...(rounds.get(k) ?? []), p]);
-  }
-  return [...rounds.entries()].filter(([k, ps]) => !done.has(k) && ps.every((p) => p.visualId || failedKeys.has(postKey(p.id)))).map(([k]) => k);
+  return rounds.filter((r) => r.settled && !done.has(r.key)).map((r) => r.key);
 }
 
 export function reviewSystem(reviewSkill: string): string {
@@ -88,12 +79,12 @@ export const claudeReview: Source = {
     const [account] = await db.select().from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, accountId));
     if (!account) throw new Error(`sandbox account ${accountId} not found`);
     const posts = await db.select().from(sandbox.sandboxPosts).where(and(eq(sandbox.sandboxPosts.accountId, accountId), eq(sandbox.sandboxPosts.day, day), eq(sandbox.sandboxPosts.round, round))).orderBy(asc(sandbox.sandboxPosts.slot));
-    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id))));
+    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id, p.imageVersion))));
     const skills = writingSkills(account.platform, account.tone);
     const [reviewSkill, ...writing] = await Promise.all([readSkill(REVIEW_SKILL), ...skills.map(readSkill)]);
     const images: { mime: string; data: Buffer }[] = [];
     const blocks = posts.map((p, i) => {
-      const v = visuals.find((x) => x.key === postKey(p.id));
+      const v = visuals.find((x) => x.key === postKey(p.id, p.imageVersion));
       let picture: string;
       if (v?.status === "ok" && v.file) {
         images.push({ mime: v.mime ?? "image/png", data: v.file });
