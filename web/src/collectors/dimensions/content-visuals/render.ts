@@ -714,11 +714,11 @@ export function opportunitySvg(o: { company: string; priceLine: string; up: bool
     const { a, b } = blocks[i];
     const tagW = p.tag.length * 13 + 28;
     parts.push(`<rect x="${x}" y="${y}" width="${pw}" height="${panelH}" rx="12" fill="rgba(255,255,255,0.04)"/>`);
-    // Narrative: A, struck through as the belief the reality contradicts.
+    // Narrative: A, plain (Kevin 2026-11-12: never strike a text through unless another is written beside it).
     parts.push(`<text x="${x + 20}" y="${y + 30}" font-size="16" font-weight="600" letter-spacing="2" fill="${NOTE.muted}">NARRATIVE</text>`);
     parts.push(`<rect x="${x + pw - tagW - 16}" y="${y + 10}" width="${tagW}" height="34" rx="6" fill="${accent}"/><text x="${x + pw - 16 - tagW / 2}" y="${y + 34}" font-size="19" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`);
     y += 34;
-    a.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 28 + k * 34}" font-size="26" fill="${NOTE.muted}" text-decoration="line-through">${esc(l)}</text>`));
+    a.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 28 + k * 34}" font-size="26" fill="#fff">${esc(l)}</text>`));
     y += a.length * 34 + 22;
     parts.push(`<text x="${x + 20}" y="${y + 26}" font-size="16" font-weight="600" letter-spacing="2" fill="${accent}">REALITY</text>`);
     y += 34;
