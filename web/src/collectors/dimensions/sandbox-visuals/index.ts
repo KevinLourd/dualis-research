@@ -26,7 +26,8 @@ type Rendered = { file: Buffer; mime: string; width: number; height: number; cap
 const rendered = new Map<string, Rendered>();
 
 const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().slice(0, 10);
-export const postKey = (postId: string) => `post:${postId}`;
+/** A post's picture key: `post:<id>`, then `post:<id>:v<n>` once skill image-correction corrected it n-1 times. */
+export const postKey = (postId: string, version = 1) => (version > 1 ? `post:${postId}:v${version}` : `post:${postId}`);
 
 /** The covered company a post names: `$SYM`, `(SYM)`, the symbol, or the first word of its name; first in the text wins. */
 export function tickerIn(text: string, companies: { symbol: string; name: string | null }[]): string | null {
@@ -59,7 +60,7 @@ const usable = (r: { status: string; createdAt: Date } | undefined) => !!r && (r
 
 export async function sandboxVisualSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
   rendered.clear();
-  const keys = (await postsToDraw(db, now)).map((p) => postKey(p.id));
+  const keys = (await postsToDraw(db, now)).map((p) => postKey(p.id, p.imageVersion));
   const have = await existingKeys(db, keys);
   return keys.filter((k) => !usable(have.get(k)));
 }
@@ -90,7 +91,7 @@ export const renderSource: Source = {
   async fetch(subject, ctx) {
     if (!ctx.db) throw new Error("no database in the collector context");
     const db = ctx.db;
-    const [post] = await db.select().from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.id, subject.slice("post:".length)));
+    const [post] = await db.select().from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.id, subject.split(":")[1]));
     if (!post?.image) return { request: { subject }, httpStatus: null, error: "post not found, or it specified no picture" };
     const image = post.image;
     const request = { subject, image };
@@ -157,10 +158,10 @@ export async function promoteSandboxVisuals(db: Db, rows: BronzeFetch[], _ctx?: 
 /** Every recent post without a picture -> its drawn picture; gold rebuilt where one moved. */
 export async function linkPosts(db: Db, now = new Date()) {
   const posts = await postsToDraw(db, now);
-  const have = await existingKeys(db, posts.map((p) => postKey(p.id)));
+  const have = await existingKeys(db, posts.map((p) => postKey(p.id, p.imageVersion)));
   const touched = new Set<string>();
   for (const p of posts) {
-    const hit = have.get(postKey(p.id));
+    const hit = have.get(postKey(p.id, p.imageVersion));
     if (hit?.status !== "ok") continue;
     await db.update(sandbox.sandboxPosts).set({ visualId: hit.id }).where(eq(sandbox.sandboxPosts.id, p.id));
     touched.add(`${p.accountId}|${p.day}`);

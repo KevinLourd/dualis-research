@@ -114,6 +114,8 @@ export const sandboxPosts = silver.table(
     skillHash: text("skill_hash").notNull(),
     /** The picture the writer specified (null on posts written before 2026-11-11). */
     image: jsonb("image").$type<SandboxImage>(),
+    /** 1 = the writer's picture; each correction by skill image-correction bumps it and the picture is drawn again. */
+    imageVersion: integer("image_version").notNull().default(1),
     /** The post's own picture (silver sandbox_visuals id), once drawn. */
     visualId: uuid("visual_id"),
     /** Display time on the fake timeline. */
@@ -151,6 +153,32 @@ export const sandboxReviews = silver.table(
   (t) => [uniqueIndex("sandbox_reviews_key").on(t.accountId, t.day, t.round)],
 );
 export type SilverSandboxReview = typeof sandboxReviews.$inferSelect;
+
+/** One picture's reading by skill image-correction: ok, or its defects and whether a corrected spec was drawn again. */
+export type SandboxImageCheck = { post: number; postId: string; ok: boolean; defects: string[]; corrected: boolean };
+
+/**
+ * One pass of skill image-correction over a round's pictures (dimension `sandbox-image-fix`): each drawn PNG looked at,
+ * its defects listed, its spec corrected and drawn again. Natural key: (account, day, round, pass). Append-only.
+ */
+export const sandboxImageChecks = silver.table(
+  "sandbox_image_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: text("account_id").notNull(),
+    day: text("day").notNull(),
+    round: integer("round").notNull(),
+    pass: integer("pass").notNull(),
+    allOk: boolean("all_ok").notNull(),
+    posts: jsonb("posts").$type<SandboxImageCheck[]>().notNull(),
+    skillHash: text("skill_hash").notNull(),
+    model: text("model").notNull(),
+    sources: text("sources").array().notNull(),
+    bronzeIds: uuid("bronze_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("sandbox_image_checks_key").on(t.accountId, t.day, t.round, t.pass)],
+);
 
 /** The timeline each Sandbox page reads. Same id as silver. */
 export const goldSandboxPosts = gold.table(
