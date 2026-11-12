@@ -107,7 +107,7 @@ export const claudeImageFix: Source = {
     const [writerFetch] = await db.select({ request: fetches.request }).from(fetches).where(eq(fetches.id, posts[0].bronzeIds[0]));
     const plans = ((writerFetch?.request as { plans?: SlotPlan[] } | undefined)?.plans ?? []).filter((pl) => posts.some((p) => p.slot === pl.slot));
     if (plans.length !== posts.length) throw new Error(`the writer's plan for ${subject} is missing`);
-    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id, p.imageVersion))));
+    const visuals = await db.select({ key: sandbox.sandboxVisuals.key, status: sandbox.sandboxVisuals.status, error: sandbox.sandboxVisuals.error, file: sandbox.sandboxVisuals.file, mime: sandbox.sandboxVisuals.mime, caption: sandbox.sandboxVisuals.caption }).from(sandbox.sandboxVisuals).where(inArray(sandbox.sandboxVisuals.key, posts.map((p) => postKey(p.id, p.imageVersion))));
     const [skill, matrix, tone] = await Promise.all([readSkill(IMAGE_SKILL), readSkill("content-matrix"), readSkill(`${account.platform}-${account.tone}`)]);
     const passes = await db.select({ pass: sandbox.sandboxImageChecks.pass }).from(sandbox.sandboxImageChecks).where(and(eq(sandbox.sandboxImageChecks.accountId, accountId), eq(sandbox.sandboxImageChecks.day, day), eq(sandbox.sandboxImageChecks.round, round)));
     const pass = passes.length + 1;
@@ -117,7 +117,8 @@ export const claudeImageFix: Source = {
       let picture: string;
       if (v?.status === "ok" && v.file) {
         images.push({ mime: v.mime ?? "image/png", data: v.file });
-        picture = `its picture is image ${images.length} above`;
+        // The opportunity frame is drawn from the analysis, never from the spec: only its drawing can be wrong.
+        picture = v.caption?.startsWith("Opportunity:") ? `its picture is image ${images.length} above, the opportunity frame drawn from the analysis (the spec below is NOT used): report only « Drawing: » defects, image null` : `its picture is image ${images.length} above`;
       } else picture = `its picture could not be drawn (${v?.error ?? "no picture"}): correct the spec so it can be`;
       const plan = plans.find((pl) => pl.slot === p.slot)!;
       return [

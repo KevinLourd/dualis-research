@@ -40,7 +40,7 @@ const asset = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 const FONTS = [asset("../growth-brief/fonts/IBMPlexSans-Regular.ttf"), asset("../growth-brief/fonts/IBMPlexSans-SemiBold.ttf")];
 const MARK = readFileSync(asset("../growth-brief/mark-white.svg")).toString("base64");
 
-const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 });
+export const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 });
 const ts = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** « Sep-25 », like the driver charts' periods (Kevin 2026-11-09: the time axis printed « Sept 26 » three times). */
@@ -187,7 +187,7 @@ export type Annotation = {
    * `breaking` (Substack Notes, skill breaking-chart): news card + pasted price card. `pro` (X posts, skill x-post, Kevin
    * 2026-11-10): the same chart, point, arrow and note, no news card, no price card, a factual title.
    */
-  style?: "breaking" | "pro";
+  style?: "breaking" | "pro" | "panel";
 };
 
 const BANNER_H = 112;
@@ -200,6 +200,8 @@ function heading(a: Annotation, company: string): { title: string; sub: string |
   const label = `${company}: ${a.chartLabel}`;
   // The professional chart heads with what it shows, never the alarm (that lives in the X post's text).
   if (a.style === "pro") return { title: label, sub: null };
+  // A panel of the opportunity picture: the header above it names the company, the chart says what it measures.
+  if (a.style === "panel") return { title: a.chartLabel, sub: null };
   return a.banner ? { title: label, sub: null } : { title: a.title, sub: label };
 }
 const toneColour = (t: Annotation["tone"]) => (t === "long" ? COLOR.long.dark : t === "short" ? COLOR.short.dark : COLOR.accent.dark);
@@ -254,10 +256,7 @@ function bannerGraphics(b: NonNullable<Annotation["banner"]>, box: { x: number; 
 type Rect = { x: number; y: number; w: number; h: number };
 function calloutGraphics(px: number, py: number, a: Annotation, colour: string, plot: { left: number; top: number; right: number; bottom: number }, ring = true, obstacles: Rect[] = []) {
   // Two lines: the fact, what the price said (Kevin 2026-11-09, the driver line removed).
-  const lines = [
-    { text: a.note, size: 24 },
-    { text: `VS price narrative: "${a.priceSays}"`, size: 18 },
-  ];
+  const lines = [{ text: a.note, size: 24 }, ...(a.priceSays ? [{ text: `VS price narrative: "${a.priceSays}"`, size: 18 }] : [])];
   const boxW = Math.min(620, Math.round(Math.max(...lines.map((l) => l.text.length * l.size * 0.56)) + 40));
   // A line longer than the box wraps (never cut with « … »: the reviewer read cut notes as pictures that do not stand alone).
   const rows = lines.map((l) => Math.max(1, Math.ceil((l.text.length * l.size * 0.5) / (boxW - 40))));
@@ -454,9 +453,11 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const note = sourceNote([...e.sources, "dualis"]) ?? "Source: Dualis Research.";
   // With a news inset the news takes the top of the image, big, where the headline was (Kevin 2026-11-09: « mets la
   // news prendre plus de place sur le trou laissé »); the chart label stays small above the chart.
-  const pro = a?.style === "pro";
+  const pro = a?.style === "pro" || a?.style === "panel";
   const news = !!a?.banner && !pro;
   const off = 0;
+  // A panel of the opportunity picture: its header, source and mark live on the whole picture.
+  const panel = a?.style === "panel";
   const hit = a ? e.points.findIndex((p) => p.period === a.point) : -1;
   if (a && hit === -1) throw new Error(`annotation point ${a.point} is not a period of exhibit ${e.id}`);
   const accent = a ? toneColour(a.tone) : NOTE.main;
@@ -472,15 +473,15 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const titleExtra = (titleLines - 1) * 42;
   const subTop = 40 + off + (titleLines - 1) * 42 + 48;
   const labelTop = newsBox.y + newsBox.h + 26;
-  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 + (legend ? 30 : 0) : card ? Math.max(cardY + CARD_H + 30, subTop + 60) + (legend ? 30 : 0) : (legend ? 200 : 190) + off + titleExtra, bottom: 92 };
+  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 + (legend ? 30 : 0) : card ? Math.max(cardY + CARD_H + 30, subTop + 60) + (legend ? 30 : 0) : (panel ? 110 : legend ? 200 : 190) + off + titleExtra, bottom: panel ? 56 : 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
       { text: news ? "" : head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: "break" } },
-      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : pro ? proSubtitle(input) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off + titleExtra, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
-      { text: note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
+      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : a?.style === "panel" ? "" : pro ? proSubtitle(input) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off + titleExtra, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
+      { text: panel ? "" : note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
       ? // Legend on top, left aligned (design tokens chart rule).
@@ -560,7 +561,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   let svg = chart.renderToSVGString();
   chart.dispose();
   // The top right belongs to the price card when there is news: the mark moves to the bottom right.
-  svg = news || pro ? withMark(svg, W - 56 - 40, H - 62, 40) : off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
+  svg = panel ? svg : news || pro ? withMark(svg, W - 56 - 40, H - 62, 40) : off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
   return card ? withCard(svg, signalCardSvg(input), W - 40 - CARD_W, cardY) : svg;
 }
 
@@ -611,6 +612,72 @@ export function coverSvg(chartPng: Buffer, chartW = W, chartH = H): string {
   const h = COVER_H;
   const w = Math.round((h * chartW) / chartH);
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${COVER_W}" height="${COVER_H}" viewBox="0 0 ${COVER_W} ${COVER_H}"><rect width="${COVER_W}" height="${COVER_H}" fill="${NOTE.bg}"/><image x="${(COVER_W - w) / 2}" y="0" width="${w}" height="${h}" xlink:href="data:image/png;base64,${chartPng.toString("base64")}"/></svg>`;
+}
+
+/** One panel of the opportunity picture: a reversing driver, its strength, its chart drawn full size (PNG 1280x720). */
+export type OpportunityPanel = { title: string; tag: string; png: Buffer };
+
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** Words cut into lines of at most `max` characters (resvg does not wrap). */
+function wrapWords(text: string, max: number): string[] {
+  const out: string[] = [];
+  for (const w of text.split(/\s+/)) {
+    const last = out.at(-1);
+    if (last !== undefined && (last + " " + w).length <= max) out[out.length - 1] = `${last} ${w}`;
+    else out.push(w);
+  }
+  return out;
+}
+
+export const OPP_W = 1600;
+/**
+ * The opportunity picture (Kevin 2026-11-12: « Voici la narrative qui explique pourquoi le prix est sous sa fair value. La
+ * narrative est portée par ces 1-3 drivers. Or ces drivers ont un reversal weak | strong maintenant »), the same frame on
+ * every account whatever its tone: the price against its fair value and the opportunity, the narrative in one sentence,
+ * then ONE full chart per reversing driver (1 to 3, a collage: one row, or 2 + 1).
+ */
+export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; narrative: string; turning: string; panels: OpportunityPanel[]; sources: string }): { svg: string; width: number; height: number } {
+  const accent = o.up ? COLOR.long.dark : COLOR.short.dark;
+  const n = o.panels.length;
+  const perRow = n === 1 ? 1 : 2;
+  const gap = 32;
+  const pw = (OPP_W - 80 - gap * (perRow - 1)) / perRow;
+  const ph = (pw * 720) / 1280;
+  const story = wrapWords(`“${o.narrative}”`, 78).slice(0, 3);
+  const top = 56;
+  const storyTop = top + 132;
+  const turnTop = storyTop + story.length * 44 + 26;
+  const panelsTop = turnTop + 52;
+  const rows = Math.ceil(n / perRow);
+  const panelH = 54 + ph;
+  const height = Math.round(panelsTop + rows * panelH + (rows - 1) * gap + 70);
+  const parts: string[] = [
+    `<rect width="${OPP_W}" height="${height}" fill="${NOTE.bg}"/>`,
+    `<text x="40" y="${top + 34}" font-size="40" font-weight="600" fill="#fff">${esc(o.company)}</text>`,
+    `<text x="40" y="${top + 82}" font-size="28" font-weight="600" fill="${accent}">${esc(o.priceLine)}</text>`,
+    `<text x="40" y="${storyTop + 4}" font-size="20" fill="${NOTE.muted}">The market believes</text>`,
+    ...story.map((l, i) => `<text x="40" y="${storyTop + 40 + i * 44}" font-size="32" font-weight="600" fill="#fff">${esc(l)}</text>`),
+    `<text x="40" y="${turnTop + 26}" font-size="24" fill="${NOTE.muted}">${esc(o.turning)}</text>`,
+  ];
+  o.panels.forEach((p, i) => {
+    const row = Math.floor(i / perRow);
+    const inRow = Math.min(perRow, n - row * perRow);
+    const rowW = inRow * pw + (inRow - 1) * gap;
+    const x = (OPP_W - rowW) / 2 + (i % perRow) * (pw + gap);
+    const y = panelsTop + row * (panelH + gap);
+    const tagW = p.tag.length * 13 + 28;
+    const titleMax = Math.floor((pw - tagW - 70) / 13.5);
+    const title = p.title.length > titleMax ? wrapWords(p.title, titleMax)[0] : p.title;
+    parts.push(
+      `<circle cx="${x + 16}" cy="${y + 20}" r="16" fill="${accent}"/><text x="${x + 16}" y="${y + 27}" font-size="20" font-weight="600" fill="#fff" text-anchor="middle">${i + 1}</text>`,
+      `<text x="${x + 44}" y="${y + 28}" font-size="24" font-weight="600" fill="#fff">${esc(title)}</text>`,
+      `<rect x="${x + pw - tagW}" y="${y + 2}" width="${tagW}" height="36" rx="6" fill="${accent}"/><text x="${x + pw - tagW / 2}" y="${y + 27}" font-size="20" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`,
+      `<image x="${x}" y="${y + 54}" width="${pw}" height="${ph}" xlink:href="data:image/png;base64,${p.png.toString("base64")}"/>`,
+    );
+  });
+  parts.push(`<text x="40" y="${height - 28}" font-size="18" fill="${NOTE.muted}">${esc(o.sources)}</text>`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${OPP_W}" height="${height}" viewBox="0 0 ${OPP_W} ${height}" font-family="${FONT}">${parts.join("")}</svg>`;
+  return { svg: withMark(svg, OPP_W - 40 - 48, height - 66, 48), width: OPP_W, height };
 }
 
 export function png(svg: string): Buffer {

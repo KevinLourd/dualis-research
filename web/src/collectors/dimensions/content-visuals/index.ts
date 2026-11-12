@@ -7,6 +7,7 @@ import type { Dimension, PromoteResult, Source } from "../../types";
 import type { Complete } from "@/llm/complete";
 import { type Callout, type ChartChoice, chooseChart, writeCallout } from "./choose";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
+import { type OpportunityStory, opportunityStory } from "./opportunity";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
@@ -106,6 +107,32 @@ export async function drawCallout(input: VisualInput, choice: ChartChoice, style
   return { file: r.png(r.chartSvg(input, undefined, annotation)), caption: `Prices: ${input.priceSources.join(", ")}` };
 }
 
+/**
+ * The opportunity picture of a story (opportunity.ts): one panel per reversing driver, its chart drawn full size with the
+ * arrow on its latest value and a note (`notes[i]` from the writer, else the judge's headline of the driver's state).
+ */
+export async function drawOpportunity(story: OpportunityStory, notes: (string | null)[] = []): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
+  const r = await renderModule();
+  const { input } = story;
+  const last = input.bars.at(-1)!;
+  const fair = input.fair!;
+  const up = last.close < fair.value;
+  const panels = story.drivers.map((d, i) => {
+    const lead = d.exhibit.series[0];
+    const point = [...d.exhibit.points].reverse().find((p) => typeof p.values[lead.key] === "number")!;
+    const note = notes[i] ?? d.headline ?? `${point.period.slice(0, 7)}: ${d.exhibit.title}`;
+    const a = { point: point.period, note, priceSays: "", title: "", chartLabel: d.exhibit.title, tone: story.side, banner: null, style: "panel" as const };
+    return { title: d.title, tag: d.tag, png: r.png(r.exhibitSvg(input, d.exhibit, a)) };
+  });
+  const cur = fair.currency ?? "";
+  const priceLine = `Share price ${r.fmt(last.close)} ${cur} · fair value ${r.fmt(fair.value)} ${cur} · ${r.opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up)}`.replace(/ {2,}/g, " ");
+  const n = story.drivers.length;
+  const turning = `Carried by ${n === 1 ? "this driver" : `these ${n} drivers`}, now ${story.side === "long" ? "turning up" : "cracking"}:`;
+  const sources = `Source: ${[...new Set(story.drivers.flatMap((d) => d.exhibit.sources))].join(", ")}, Dualis Research`;
+  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, narrative: story.narrative, turning, panels, sources });
+  return { file: r.png(svg), width, height, caption: `Opportunity: ${story.drivers.map((d) => d.title).join(", ")}` };
+}
+
 /** The whole chart at X's 5:2 Article cover ratio (never cropped). */
 export async function coverPng(chartPng: Buffer, chartW?: number, chartH?: number): Promise<{ file: Buffer; width: number; height: number }> {
   const r = await renderModule();
@@ -124,6 +151,13 @@ export const renderSource: Source = {
     // The chart draws the driver the Idea cites (its most striking Exhibit), the price only when the Idea is about price.
     // `x-chart` = the same chart in the professional style of X posts (skill x-post): no news card, no price card.
     const charted = kind === "chart" || kind === "x-chart";
+    // The same frame as the Sandbox (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
+    const story = charted && input.symbol ? await opportunityStory(ctx.db, input.symbol) : null;
+    if (story) {
+      const pic = await drawOpportunity(story);
+      rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, sourceUrl: null, caption: pic.caption });
+      return { request: { version: VISUALS_VERSION, ideaId, kind, input: summary(input), opportunity: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { mime: "image/png", width: pic.width, height: pic.height, sizeBytes: pic.file.length } };
+    }
     const choice = charted ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
     const callout = choice && (choice.kind === "exhibit" || input.bars.length >= MIN_BARS) ? await writeCallout(input, choice, ctx.complete) : null;
     const request = {

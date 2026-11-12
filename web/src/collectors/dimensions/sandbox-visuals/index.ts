@@ -5,7 +5,8 @@ import * as gold from "@/db/schema/gold";
 import * as sandbox from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
-import { coverPng, drawCallout } from "../content-visuals";
+import { coverPng, drawCallout, drawOpportunity } from "../content-visuals";
+import { opportunityStory } from "../content-visuals/opportunity";
 import type { ChartChoice } from "../content-visuals/choose";
 import { visualInput, type VisualInput } from "../content-visuals/data";
 import { rebuildGoldPosts } from "../sandbox-posts";
@@ -30,7 +31,7 @@ const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().s
  * Bump when the drawing code changes what a picture looks like: the pictures of today and yesterday are drawn again
  * (render only, no Claude call). 2 = 2026-11-12, the defects image-correction found (ring on the end value, note boxes).
  */
-export const DRAW_VERSION = 2;
+export const DRAW_VERSION = 3;
 /** A post's picture key: `post:<id>[:v<n> once corrected n-1 times]:d<drawing code version>`. */
 export const postKey = (postId: string, version = 1) => `post:${postId}${version > 1 ? `:v${version}` : ""}:d${DRAW_VERSION}`;
 
@@ -104,6 +105,17 @@ export const renderSource: Source = {
     const image = post.image;
     const request = { subject, image };
     const { input, symbol } = await inputOf(db, post);
+    // The frame of every account (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
+    // Only when no driver of the ticker reverses does the writer's own chart stand in.
+    const story = await opportunityStory(db, symbol);
+    if (story) {
+      const pic = await drawOpportunity(story);
+      if (post.format === "x-article") {
+        const cover = await coverPng(pic.file, pic.width, pic.height);
+        rendered.set(subject, { file: cover.file, mime: "image/png", width: cover.width, height: cover.height, caption: pic.caption, kindOf: "x-cover", symbol });
+      } else rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, caption: pic.caption, kindOf: "chart", symbol });
+      return { request: { ...request, opportunity: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { sizeBytes: rendered.get(subject)!.file.length, symbol } };
+    }
     let choice: ChartChoice;
     if (image.chart === "price") choice = { kind: "price", reason: null };
     else {
