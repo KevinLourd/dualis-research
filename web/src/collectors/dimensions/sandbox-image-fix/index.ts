@@ -58,9 +58,11 @@ export async function pictureRounds(db: Db, now = new Date()) {
   });
 }
 
-/** Rounds whose pictures are all drawn and still to look at: never looked at, or the last pass corrected some. */
+/** Today's rounds whose pictures are all drawn and still to look at: never looked at, or the last pass corrected some. */
 export async function imageFixSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
-  return (await pictureRounds(db, now)).filter((r) => r.drawn && !r.settled && r.passes < MAX_IMAGE_PASSES).map((r) => r.key);
+  // Today only: yesterday's pictures are already published on the timeline (its first run looked at 18 of them for nothing).
+  const today = now.toISOString().slice(0, 10);
+  return (await pictureRounds(db, now)).filter((r) => r.key.split("|")[1] === today && r.drawn && !r.settled && r.passes < MAX_IMAGE_PASSES).map((r) => r.key);
 }
 
 type FixRequest = { version: string; skillHash: string; model: string; accountId: string; day: string; round: number; pass: number; posts: { id: string; slot: number; plan: Pick<SlotPlan, "slot" | "charts" | "news"> }[]; prompt: string };

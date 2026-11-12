@@ -86,7 +86,8 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
       data: shown.map((b) => [ts(b.date), b.close]),
       symbol: "none",
       lineStyle: { color: "#fff", width: onCard ? 4 : 3 },
-      endLabel: { show: true, formatter: fmt(last.close), color: "#fff", fontSize: 22, fontWeight: 600, fontFamily: FONT },
+      // Clear of the ring on the last point (image-correction 2026-11-12: « the circle hides the first digit »).
+      endLabel: { show: true, distance: 24, formatter: fmt(last.close), color: "#fff", fontSize: 22, fontWeight: 600, fontFamily: FONT },
       z: 3,
     },
   ];
@@ -106,6 +107,8 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
         : {}),
       endLabel: {
         show: true,
+        // Close to the price's end value, the two labels would overlap: the fair value's steps away from it.
+        offset: [0, nearEnd(input, f.value) ? (last.close > f.value ? 26 : -26) : 0],
         formatter: `Fair value ${fmt(f.value)}`,
         color: onCard ? LAVENDER : NOTE.muted,
         fontSize: 20,
@@ -116,6 +119,12 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
     });
   }
   return out;
+}
+
+/** Whether a level sits within 10% of the chart's height of the last close (their end labels would overlap). */
+function nearEnd(input: VisualInput, level: number): boolean {
+  const { min, max } = yRange(input);
+  return Math.abs((input.bars.at(-1)?.close ?? level) - level) < (max - min) * 0.1;
 }
 
 function yRange(input: VisualInput) {
@@ -276,7 +285,10 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
     const dist = (c: { x: number; y: number }) => Math.hypot(c.x + boxW / 2 - px, c.y + boxH / 2 - py) + (c.y + boxH > py ? 2000 : 0);
     candidates.push(...scan.sort((a, b) => dist(a) - dist(b)));
   }
-  const box = candidates.find(fits) ?? candidates[0];
+  // No spot is wholly free (two lines filling the plot): the spot inside the plot that covers the fewest obstacles.
+  const inside = (c: { x: number; y: number }) => c.x >= plot.left && c.x + boxW <= plot.right && c.y >= plot.top && c.y + boxH <= plot.bottom;
+  const hits = (c: { x: number; y: number }) => obstacles.filter((o) => !(c.x + boxW < o.x || o.x + o.w < c.x || c.y + boxH < o.y || o.y + o.h < c.y)).length;
+  const box = candidates.find(fits) ?? [...candidates.filter(inside)].sort((p, q) => hits(p) - hits(q))[0] ?? candidates[0];
   // The arrow leaves the box edge nearest the point and stops short of it.
   const sx = Math.min(Math.max(px, box.x), box.x + boxW);
   const sy = Math.min(Math.max(py, box.y), box.y + boxH);
@@ -408,11 +420,16 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     });
     // The value printed at the line's end is an obstacle too.
     const [lx, ly] = chart.convertToPixel({ seriesIndex: 0 }, [ts(last.date), last.close]) as number[];
-    obstacles.push({ x: lx - 6, y: ly - 18, w: 140, h: 36 });
+    obstacles.push({ x: lx - 6, y: ly - 18, w: 160, h: 36 });
+    // The fair value line and its label are part of the claim: the note never covers them.
+    if (input.fair) {
+      const [, fy] = chart.convertToPixel({ seriesIndex: 0 }, [ts(last.date), input.fair.value]) as number[];
+      obstacles.push({ x: grid.left, y: fy - 14, w: W - grid.left, h: 28 });
+    }
     chart.setOption({
       graphic: [
         ...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []),
-        ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, true, obstacles),
+        ...calloutGraphics(px, py, a, toneColour(a.tone), { left: grid.left, top: grid.top, right: W - 40, bottom: H - grid.bottom }, true, obstacles),
       ],
     });
   }
@@ -455,7 +472,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const titleExtra = (titleLines - 1) * 42;
   const subTop = 40 + off + (titleLines - 1) * 42 + 48;
   const labelTop = newsBox.y + newsBox.h + 26;
-  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 : card ? Math.max(cardY + CARD_H + 30, subTop + 60) : (legend ? 200 : 190) + off + titleExtra, bottom: 92 };
+  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 + (legend ? 30 : 0) : card ? Math.max(cardY + CARD_H + 30, subTop + 60) + (legend ? 30 : 0) : (legend ? 200 : 190) + off + titleExtra, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
@@ -467,7 +484,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     ],
     legend: legend
       ? // Legend on top, left aligned (design tokens chart rule).
-        { show: true, left: 56, top: 140 + off + titleExtra, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+        { show: true, left: 56, top: news ? labelTop + 34 : card ? grid.top - 34 : 140 + off + titleExtra, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
       : { show: false },
     grid,
     xAxis: {
@@ -482,6 +499,8 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
       scale: !bars,
       // Room above the bars for the note (Kevin 2026-11-09): the tallest bar stops at about 60% of the plot.
       ...(a && bars ? { max: (v: { max: number }) => v.max * 1.7 } : {}),
+      // Lines too: free room above them for the note, which never covers a line (image-correction 2026-11-12).
+      ...(a && !bars ? { max: (v: { max: number; min: number }) => v.max + (v.max - v.min) * 0.7 } : {}),
       splitNumber: 4,
       axisLabel: { ...label, formatter: (v: number) => fmtV(v) },
       splitLine: { lineStyle: { color: NOTE.grid } },
@@ -512,7 +531,7 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
             connectNulls: true,
             lineStyle: { color: colour, width: i === 0 ? 4 : 3 },
             itemStyle: { color: colour },
-            endLabel: { show: i === 0, color: "#fff", fontSize: 20, fontWeight: 600, fontFamily: FONT, formatter: (p: { value: number }) => fmtV(p.value) },
+            endLabel: { show: i === 0, distance: 24, color: "#fff", fontSize: 20, fontWeight: 600, fontFamily: FONT, formatter: (p: { value: number }) => fmtV(p.value) },
             z: 3 - Math.min(i, 2),
           };
     }),
@@ -530,12 +549,13 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     const obstacles: Rect[] = bars
       ? e.points.flatMap((p, k) => {
           const val = p.values[lead.key];
-          if (k === hit || typeof val !== "number") return [];
+          // The hit bar too: the note never sits on its value label (image-correction 2026-11-12: « hides its value label »).
+          if (typeof val !== "number") return [];
           const [cx, top] = chart.convertToPixel({ seriesIndex: 0 }, [k, val]) as number[];
           return [{ x: cx - half - 30, y: Math.min(top, base) - 34, w: 2 * half + 60, h: Math.abs(base - top) + 34 }];
         })
       : lineObstacles(chart, e.series.map((s, i) => ({ index: i, values: e.points.map((p) => p.values[s.key]) })), (k, v) => [k, v]);
-    chart.setOption({ graphic: [...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top - 20, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
+    chart.setOption({ graphic: [...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
   }
   let svg = chart.renderToSVGString();
   chart.dispose();
