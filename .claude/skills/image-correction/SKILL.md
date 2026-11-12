@@ -25,6 +25,9 @@ Read every word and number to its last character: the title, the label under it,
 - **Another style**: `pro` when the news or price card crowds the picture or the news card says nothing new.
 Keep the tone skill's Image section and `content-matrix` « The picture »: a correction never breaks them.
 
+## The opportunity frame
+A picture headed by the price against its fair value and « The market believes » is drawn from the analysis (narrative + reversing drivers), never from the spec: only « Drawing: » defects apply to it, image null.
+
 ## A defect no spec change can fix
 The drawing code itself is wrong (a card cut whatever the words, a box over the line on every point): say it in one line starting « Drawing: », give no new spec, and the run reports it so the code gets fixed.
 

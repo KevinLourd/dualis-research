@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { exhibits, fairValues, narrativeStates } from "@/db/schema/analysis";
 import * as content from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
 import * as sandbox from "@/db/schema/sandbox";
@@ -14,6 +15,7 @@ import { runDimension } from "../../runner";
 import { macroNews, MACRO_QUERIES } from "../macro-news";
 import { SANDBOX_ACCOUNTS, sandboxAccounts } from "../sandbox-accounts";
 import { substackTrending, TRENDING_HOSTS } from "../substack-trending";
+import { opportunityStory } from "../content-visuals/opportunity";
 import { sandboxImageFix } from "../sandbox-image-fix";
 import { sandboxReview } from "../sandbox-review";
 import { postKey, sandboxVisuals } from "../sandbox-visuals";
@@ -306,6 +308,25 @@ describe("sandbox-posts", () => {
     await db.update(sandbox.sandboxPosts).set({ image: null }).where(eq(sandbox.sandboxPosts.accountId, "x:narrativegap"));
     expect(await sandboxPostSubjects(db)).toEqual([`x:narrativegap|${new Date().toISOString().slice(0, 10)}|2`]);
   });
+
+  it("opportunity frame: a company with a driver reversing now gets the narrative + one chart per reversing driver, on every account", async () => {
+    const day = (i: number) => new Date(Date.now() - (8 - i) * 91 * 86400_000).toISOString().slice(0, 10);
+    await db.insert(exhibits).values({ id: "CCLD:long:1:1", symbol: "CCLD", driverId: "CCLD:long:1", rank: 1, number: 1, title: "Revenue per quarter, $", chart: "line", series: [{ key: "revenue", label: "Revenue", unit: "usd", currency: "USD" } as never], points: Array.from({ length: 8 }, (_, i) => ({ period: day(i), values: { revenue: (40 + i) * 1e6 } })), takeaway: "t", sources: ["Company filings (SEC EDGAR)"] });
+    await db.insert(narrativeStates).values({ id: "CCLD:long:driver:1", symbol: "CCLD", side: "long", level: "driver", driverId: "CCLD:long:1", effect: "reversal", strength: "strong", why: "w", probability: 0.9, evidenceIds: [], headline: "Revenue up 7% in Q3", judgmentId: crypto.randomUUID(), asOf: new Date() });
+    await db.insert(fairValues).values({ symbol: "CCLD", value: 6, currency: "USD", low: 5, high: 7, author: "claude", inputs: [] });
+    const story = await opportunityStory(db, "CCLD");
+    expect(story?.drivers.map((d) => [d.title, d.tag, d.headline])).toEqual([["Client loss", "STRONG INFLECTION", "Revenue up 7% in Q3"]]);
+    await run(macroNews);
+    await run(sandboxAccounts);
+    await run(sandboxPosts);
+    const report = await run(sandboxVisuals);
+    expect(report.error ?? report.sources.flatMap((x) => x.errors)).toEqual([]);
+    const own = await db.select({ caption: sandbox.sandboxVisuals.caption, kind: sandbox.sandboxVisuals.kind }).from(sandbox.sandboxVisuals);
+    expect(own).toHaveLength(6 * POSTS_PER_DAY);
+    expect(own.every((v) => v.caption === "Opportunity: Client loss")).toBe(true);
+    // No writer call drew it: the frame comes from the analysis.
+    expect(complete.mock.calls.filter(([req]) => /CALLOUT|You judge/.test(req.system))).toHaveLength(0);
+  }, 60_000);
 
   it("image correction: a defective picture gets a corrected spec and is drawn again; the review waits for clean pictures", async () => {
     await run(macroNews);
