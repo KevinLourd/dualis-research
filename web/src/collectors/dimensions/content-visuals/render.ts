@@ -188,6 +188,10 @@ export type Annotation = {
    * 2026-11-10): the same chart, point, arrow and note, no news card, no price card, a factual title.
    */
   style?: "breaking" | "pro" | "panel";
+  /** Periods the claim compares (Kevin 2026-11-12: « encadre les deux »): each gets a box, its colour and a big ring. */
+  highlight?: string[];
+  /** The earlier period the claim compares the hit point to: an arrow goes from it to the hit point, the change written on it. */
+  compareFrom?: string;
 };
 
 const BANNER_H = 112;
@@ -512,7 +516,10 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
       // With an annotation the lead series fades and its one point takes the tone's colour.
       const data =
         a && i === 0 && bars
-          ? raw.map((v, k) => ({ value: v, itemStyle: { color: k === hit ? accent : NOTE.bench }, label: k === hit ? { color: accent, fontSize: 22 } : {} }))
+          ? raw.map((v, k) => {
+              const lit = k === hit || !!a.highlight?.includes(e.points[k].period);
+              return { value: v, itemStyle: { color: lit ? accent : NOTE.bench }, label: lit ? { color: accent, fontSize: 22 } : {} };
+            })
           : raw;
       return bars
         ? {
@@ -556,7 +563,47 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
           return [{ x: cx - half - 30, y: Math.min(top, base) - 34, w: 2 * half + 60, h: Math.abs(base - top) + 34 }];
         })
       : lineObstacles(chart, e.series.map((s, i) => ({ index: i, values: e.points.map((p) => p.values[s.key]) })), (k, v) => [k, v]);
-    chart.setOption({ graphic: [...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top, right: W - 40, bottom: H - grid.bottom }, !bars, obstacles)] });
+    // The compared periods: a tinted box from the top of the plot to its axis, the period's name over it, a big ring.
+    const boxes = (a.highlight ?? []).flatMap((period) => {
+      const k = e.points.findIndex((p) => p.period === period);
+      const val = k === -1 ? null : e.points[k].values[lead.key];
+      if (typeof val !== "number") return [];
+      const [cx, cy] = chart.convertToPixel({ seriesIndex: 0 }, [k, val]) as number[];
+      const bw = Math.max(56, band * 0.86);
+      return [
+        { type: "rect", shape: { x: cx - bw / 2, y: grid.top - 10, width: bw, height: H - grid.bottom - grid.top + 6, r: 10 }, style: { fill: accent, fillOpacity: 0.18, stroke: accent, strokeOpacity: 1, lineWidth: 3 }, z: 1 },
+        { type: "text", style: { text: periodLabel(period, seriesPeriod(lead.key)), x: cx, y: grid.top - 34, fill: accent, fontSize: 20, fontWeight: 600, fontFamily: FONT, align: "center" }, z: 21 },
+        ...(bars ? [] : [{ type: "circle", shape: { cx, cy, r: 20 }, style: { fill: "none", stroke: accent, lineWidth: 6 }, z: 22 }]),
+      ];
+    });
+    // The boxes are obstacles for the note: it never covers a compared period.
+    const boxObstacles: Rect[] = boxes.filter((b) => b.type === "rect").map((b) => ({ x: (b.shape as { x: number }).x, y: grid.top - 40, w: (b.shape as { width: number }).width, h: H - grid.bottom - grid.top + 60 }));
+    // A comparison (Kevin 2026-11-12: « mets en couleur les deux et colle une flèche avec l'explication »): an arc from the
+    // earlier period's value to the hit one, the change written over it, instead of a lone arrow on the last value.
+    const from = a.compareFrom ? e.points.findIndex((p) => p.period === a.compareFrom) : -1;
+    const v0 = from === -1 ? null : e.points[from].values[lead.key];
+    let compare: unknown[] = [];
+    if (typeof v0 === "number" && from !== hit) {
+      const [x0, y0] = chart.convertToPixel({ seriesIndex: 0 }, [from, v0]) as number[];
+      const lift = bars ? 44 : 34;
+      const ya = Math.min(y0, py) - lift - 40;
+      const sx = x0, sy = y0 - lift, ex = px, ey = py - lift;
+      const cxm = (sx + ex) / 2;
+      const change = v0 !== 0 ? (v / v0 - 1) * 100 : null;
+      const text = `${fmtV(v0)} → ${fmtV(v)}${change === null ? "" : ` (${change >= 0 ? "+" : ""}${Math.round(change)}%)`}`;
+      const tw = text.length * 13 + 32;
+      const head = 14;
+      const dx = ex - cxm, dy = ey - ya;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      compare = [
+        { type: "bezierCurve", shape: { x1: sx, y1: sy, x2: ex - ux * head, y2: ey - uy * head, cpx1: cxm, cpy1: ya }, style: { stroke: accent, lineWidth: 5, fill: "none" }, z: 23 },
+        { type: "polygon", shape: { points: [[ex, ey], [ex - ux * head - uy * head * 0.6, ey - uy * head + ux * head * 0.6], [ex - ux * head + uy * head * 0.6, ey - uy * head - ux * head * 0.6]] }, style: { fill: accent }, z: 23 },
+        { type: "rect", shape: { x: cxm - tw / 2, y: ya - 30, width: tw, height: 44, r: 8 }, style: { fill: accent }, z: 24 },
+        { type: "text", style: { text, x: cxm, y: ya - 8, fill: INDIGO, fontSize: 24, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 25 },
+      ];
+    }
+    chart.setOption({ graphic: [...boxes, ...compare, ...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...(compare.length ? [] : calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top, right: W - 40, bottom: H - grid.bottom }, !bars, [...obstacles, ...boxObstacles]))] });
   }
   let svg = chart.renderToSVGString();
   chart.dispose();
@@ -614,8 +661,8 @@ export function coverSvg(chartPng: Buffer, chartW = W, chartH = H): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${COVER_W}" height="${COVER_H}" viewBox="0 0 ${COVER_W} ${COVER_H}"><rect width="${COVER_W}" height="${COVER_H}" fill="${NOTE.bg}"/><image x="${(COVER_W - w) / 2}" y="0" width="${w}" height="${h}" xlink:href="data:image/png;base64,${chartPng.toString("base64")}"/></svg>`;
 }
 
-/** One panel of the opportunity picture: a reversing driver, its strength, its chart drawn full size (PNG 1280x720). */
-export type OpportunityPanel = { title: string; tag: string; png: Buffer };
+/** One panel of the opportunity picture: what the market believes (A), what is happening (not A), its tag, its chart (PNG 1280x720). */
+export type OpportunityPanel = { narrative: string; reality: string; tag: string; png: Buffer };
 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 /** Words cut into lines of at most `max` characters (resvg does not wrap). */
@@ -631,49 +678,52 @@ function wrapWords(text: string, max: number): string[] {
 
 export const OPP_W = 1600;
 /**
- * The opportunity picture (Kevin 2026-11-12: « Voici la narrative qui explique pourquoi le prix est sous sa fair value. La
- * narrative est portée par ces 1-3 drivers. Or ces drivers ont un reversal weak | strong maintenant »), the same frame on
- * every account whatever its tone: the price against its fair value and the opportunity, the narrative in one sentence,
- * then ONE full chart per reversing driver (1 to 3, a collage: one row, or 2 + 1).
+ * The opportunity picture, the same frame on every account whatever its tone (Kevin 2026-11-12): the price against its
+ * fair value and the opportunity, then ONE block per driver reversing now (1 to 3, a collage: one row, or 2 + 1), each
+ * « Narrative: A » (what the market believes) against « Reality: not A » (what is happening), its tag and its chart.
+ * No narrative paragraph (Kevin: « la phrase de narrative n'est pas compréhensible »).
  */
-export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; narrative: string; turning: string; panels: OpportunityPanel[]; sources: string }): { svg: string; width: number; height: number } {
+export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; intro: string; panels: OpportunityPanel[]; sources: string }): { svg: string; width: number; height: number } {
   const accent = o.up ? COLOR.long.dark : COLOR.short.dark;
   const n = o.panels.length;
   const perRow = n === 1 ? 1 : 2;
-  const gap = 32;
+  const gap = 40;
   const pw = (OPP_W - 80 - gap * (perRow - 1)) / perRow;
   const ph = (pw * 720) / 1280;
-  const story = wrapWords(`“${o.narrative}”`, 78).slice(0, 3);
+  const chars = (size: number) => Math.floor((pw - 24) / (size * 0.55));
+  const blocks = o.panels.map((p) => ({ a: wrapWords(p.narrative, chars(26)).slice(0, 2), b: wrapWords(p.reality, chars(30)).slice(0, 2) }));
+  const textH = Math.max(...blocks.map((b) => 34 + b.a.length * 34 + 22 + 34 + b.b.length * 38)) + 14;
   const top = 56;
-  const storyTop = top + 132;
-  const turnTop = storyTop + story.length * 44 + 26;
-  const panelsTop = turnTop + 52;
+  const introTop = top + 132;
+  const panelsTop = introTop + 40;
   const rows = Math.ceil(n / perRow);
-  const panelH = 54 + ph;
+  const panelH = textH + ph;
   const height = Math.round(panelsTop + rows * panelH + (rows - 1) * gap + 70);
   const parts: string[] = [
     `<rect width="${OPP_W}" height="${height}" fill="${NOTE.bg}"/>`,
     `<text x="40" y="${top + 34}" font-size="40" font-weight="600" fill="#fff">${esc(o.company)}</text>`,
     `<text x="40" y="${top + 82}" font-size="28" font-weight="600" fill="${accent}">${esc(o.priceLine)}</text>`,
-    `<text x="40" y="${storyTop + 4}" font-size="20" fill="${NOTE.muted}">The market believes</text>`,
-    ...story.map((l, i) => `<text x="40" y="${storyTop + 40 + i * 44}" font-size="32" font-weight="600" fill="#fff">${esc(l)}</text>`),
-    `<text x="40" y="${turnTop + 26}" font-size="24" fill="${NOTE.muted}">${esc(o.turning)}</text>`,
+    `<text x="40" y="${introTop + 4}" font-size="24" fill="${NOTE.muted}">${esc(o.intro)}</text>`,
   ];
   o.panels.forEach((p, i) => {
     const row = Math.floor(i / perRow);
     const inRow = Math.min(perRow, n - row * perRow);
     const rowW = inRow * pw + (inRow - 1) * gap;
     const x = (OPP_W - rowW) / 2 + (i % perRow) * (pw + gap);
-    const y = panelsTop + row * (panelH + gap);
+    let y = panelsTop + row * (panelH + gap);
+    const { a, b } = blocks[i];
     const tagW = p.tag.length * 13 + 28;
-    const titleMax = Math.floor((pw - tagW - 70) / 13.5);
-    const title = p.title.length > titleMax ? wrapWords(p.title, titleMax)[0] : p.title;
-    parts.push(
-      `<circle cx="${x + 16}" cy="${y + 20}" r="16" fill="${accent}"/><text x="${x + 16}" y="${y + 27}" font-size="20" font-weight="600" fill="#fff" text-anchor="middle">${i + 1}</text>`,
-      `<text x="${x + 44}" y="${y + 28}" font-size="24" font-weight="600" fill="#fff">${esc(title)}</text>`,
-      `<rect x="${x + pw - tagW}" y="${y + 2}" width="${tagW}" height="36" rx="6" fill="${accent}"/><text x="${x + pw - tagW / 2}" y="${y + 27}" font-size="20" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`,
-      `<image x="${x}" y="${y + 54}" width="${pw}" height="${ph}" xlink:href="data:image/png;base64,${p.png.toString("base64")}"/>`,
-    );
+    parts.push(`<rect x="${x}" y="${y}" width="${pw}" height="${panelH}" rx="12" fill="rgba(255,255,255,0.04)"/>`);
+    // Narrative: A, struck through as the belief the reality contradicts.
+    parts.push(`<text x="${x + 20}" y="${y + 30}" font-size="16" font-weight="600" letter-spacing="2" fill="${NOTE.muted}">NARRATIVE</text>`);
+    parts.push(`<rect x="${x + pw - tagW - 16}" y="${y + 10}" width="${tagW}" height="34" rx="6" fill="${accent}"/><text x="${x + pw - 16 - tagW / 2}" y="${y + 34}" font-size="19" font-weight="600" fill="#fff" text-anchor="middle">${esc(p.tag)}</text>`);
+    y += 34;
+    a.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 28 + k * 34}" font-size="26" fill="${NOTE.muted}" text-decoration="line-through">${esc(l)}</text>`));
+    y += a.length * 34 + 22;
+    parts.push(`<text x="${x + 20}" y="${y + 26}" font-size="16" font-weight="600" letter-spacing="2" fill="${accent}">REALITY</text>`);
+    y += 34;
+    b.forEach((l, k) => parts.push(`<text x="${x + 20}" y="${y + 30 + k * 38}" font-size="30" font-weight="600" fill="#fff">${esc(l)}</text>`));
+    parts.push(`<image x="${x}" y="${panelsTop + row * (panelH + gap) + textH}" width="${pw}" height="${ph}" xlink:href="data:image/png;base64,${p.png.toString("base64")}"/>`);
   });
   parts.push(`<text x="40" y="${height - 28}" font-size="18" fill="${NOTE.muted}">${esc(o.sources)}</text>`);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${OPP_W}" height="${height}" viewBox="0 0 ${OPP_W} ${height}" font-family="${FONT}">${parts.join("")}</svg>`;
