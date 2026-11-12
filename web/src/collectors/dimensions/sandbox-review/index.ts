@@ -32,7 +32,9 @@ export async function reviewSubjects(db: Db, _ctx?: unknown, now = new Date()): 
   if (rounds.length === 0) return [];
   const reviews = await db.select({ accountId: sandbox.sandboxReviews.accountId, day: sandbox.sandboxReviews.day, round: sandbox.sandboxReviews.round }).from(sandbox.sandboxReviews).where(gte(sandbox.sandboxReviews.day, since(now)));
   const done = new Set(reviews.map((r) => `${r.accountId}|${r.day}|${r.round}`));
-  return rounds.filter((r) => r.settled && !done.has(r.key)).map((r) => r.key);
+  // A past day's round never had its pictures corrected: the review reads today's only.
+  const today = now.toISOString().slice(0, 10);
+  return rounds.filter((r) => r.key.split("|")[1] === today && r.settled && !done.has(r.key)).map((r) => r.key);
 }
 
 export function reviewSystem(reviewSkill: string): string {
