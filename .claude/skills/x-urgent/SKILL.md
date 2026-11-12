@@ -10,7 +10,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 ## X post
 - **Length**: at most 200 characters.
 - **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
-- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »). `$TICKER` once. ONE measure only: no second figure or claim (gross margin, net cash, fair value gap) that the picture does not show, and no claim without its number.
+- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »); if that line says the price is high or low, it carries the fair value gap with its number (« $7220.T trades 13% above our fair value. »). `$TICKER` once. ONE measure only: no second figure or claim (gross margin, net cash, fair value gap) that the picture does not show, and no claim without its number.
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
 - **Visual**: see Image below.
 - Example:

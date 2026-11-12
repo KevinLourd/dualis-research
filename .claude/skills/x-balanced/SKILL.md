@@ -10,7 +10,7 @@ The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). Th
 ## X post
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
 - **Hook**: opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number.
-- **Structure**: the fact, then why the price has it wrong. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
+- **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »), also when the price is above fair value. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
 - **Visual**: see Image below.
 - **Say in words** what the image no longer says: the news source when it is a big name (« per Reuters »), the live signal (« Shares 28% under fair value »).
 - Example:
@@ -36,5 +36,5 @@ X Articles carry a title, a cover image, headers, images and embedded posts (htt
 
 ## Image
 - **style**: `pro` (chart, arrow and note; no news or price card, skill `x-post`). Its heading is « Company: chartLabel », so the **note** carries the conclusion with its number (« Profit up 4x in a year »).
-- **chart**: the Exhibit that proves the claim; the price only for a post about the price.
+- **chart**: the Exhibit that proves the claim; the price only for a post about the price. An Article's cover is the chart of the measure in its title (a net debt title gets the net debt chart, never the share price chart).
 - **title**: the conclusion anyway (kept with the post).

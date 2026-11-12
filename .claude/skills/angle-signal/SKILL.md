@@ -13,7 +13,7 @@ Our own edge: a narrative cracking or inflecting, read by our analysis. It is th
 - Sandbox: slots 08:00 and 14:00 take the day's best and second Ideas.
 
 ## How to write it
-- ONE claim: what just happened and why the price is wrong now. The strongest fact only. Every % change is computed from two dated prices printed in the text (never mix start dates); say « profit for shareholders », never « net income ».
+- ONE claim: what just happened and why the price is wrong now. The strongest fact only, one measure: a text on the price move carries no profit figure (Solera: « closed at $15.80, down 27% since Sep 25 » and the fair value, never « after profit before loan losses fell to $7.0M »), a profit text no price move (the fair value comparison may follow). Every % change is computed from two dated prices printed in the text (never mix start dates); say « profit for shareholders », never « net income ».
 - An Idea can be a plain company update: say what is new and why a holder cares today.
 - Inflection (price under fair value) reads as a missed opportunity; crack (price above) as a danger.
 

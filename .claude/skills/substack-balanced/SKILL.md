@@ -17,7 +17,7 @@ The house style (skills `daily-content`, `breaking-chart`, `research-note`, `con
 🚨 CareCloud: profit for shareholders jumped 4x in Q3, to $4.7M. The price still bets it leaks to preferred holders. Watch the next quarter's payout.
 ```
 - Do: one claim; no Substack link or CTA in the text.
-- Don't: hedge, describe the chart point by point, a hashtag, any emoji but the siren.
+- Don't: hedge, describe the chart point by point, a hashtag, any emoji but the siren, a claim with no figure ("China and Europe still lose money"), a second measure or figure in a Note (sales or cash next to the margin, a Q4 forecast next to Q3 sales: say 'the company forecasts', never 'guides'), a history claim the chart does not show ("five years of shrinking sales" on a 2-year chart).
 
 ## Article
 Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim with its figures).
@@ -29,6 +29,6 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 - Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know.
 
 ## Image
-- **style**: `breaking` (skill `breaking-chart`): news card when a news item is listed, else the big title.
-- **title**: the claim, never a label (« Profit quadrupled, the price did not move »).
+- **style**: ALWAYS `breaking` (skill `breaking-chart`), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
+- **title**: ALWAYS set, the claim with its number and period, never a label and never the chartLabel (« Musashi profit rose to 2.9B yen in the Sep quarter »); a picture heading with no claim fails.
 - **note**: the proof with its number on the point.

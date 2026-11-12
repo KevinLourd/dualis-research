@@ -13,7 +13,7 @@ Learn from what the best independent research writers publish: borrow the patter
 
 ## How to write it
 - Name the PATTERN for yourself first (a closed-call scoreboard, a « primer » that explains an industry, a teaser with 3 figures, a contrarian question, a field note).
-- Rebuild that pattern with our Idea and its figures; the text states the same period as the news line (quarter or half year) and, for a one-off gain, what share of the profit it is, and the picture shows that share (note "One-off 56% of half-year profit" on the half-year chart); otherwise lead the text with the number the picture proves.
+- Rebuild that pattern with our Idea and its figures; the text states the same period as the news line (quarter or half year) and, for a one-off gain, what share of the profit it is, and the picture prints that same share and lead number (note "One-off 56% of half-year profit" on the half-year chart, never a quarter bar's note such as "2.9B yen"); if no half-year chart is listed, lead the text with the quarterly bar the note prints (note "Sep quarter profit 2.9B yen" means the text opens on 2.9B yen) and drop the one-off share; the note's number is always written in the text; never add a second claim (regions, segments, other losses) that the picture does not show; otherwise lead the text with the number the picture proves.
 
 ## Never
 - Copy a sentence, a title or a figure from their post.
