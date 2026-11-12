@@ -31,7 +31,7 @@ const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().s
  * Bump when the drawing code changes what a picture looks like: the pictures of today and yesterday are drawn again
  * (render only, no Claude call). 2 = 2026-11-12, the defects image-correction found (ring on the end value, note boxes).
  */
-export const DRAW_VERSION = 5;
+export const DRAW_VERSION = 6;
 /** A post's picture key: `post:<id>[:v<n> once corrected n-1 times]:d<drawing code version>`. */
 export const postKey = (postId: string, version = 1) => `post:${postId}${version > 1 ? `:v${version}` : ""}:d${DRAW_VERSION}`;
 
@@ -109,7 +109,9 @@ export const renderSource: Source = {
     // Only when no driver of the ticker reverses does the writer's own chart stand in.
     const story = await opportunityStory(db, symbol, ctx.complete);
     if (story) {
-      const pic = await drawOpportunity(story);
+      // The account's look: its tone and its channel (Kevin 2026-11-12: « les 6 versions, du plus alarmiste au moins, X x Substack »).
+      const [account] = await db.select({ tone: sandbox.sandboxAccounts.tone, platform: sandbox.sandboxAccounts.platform }).from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, post.accountId));
+      const pic = await drawOpportunity(story, { tone: account?.tone ?? "balanced", channel: account?.platform ?? "x" });
       if (post.format === "x-article") {
         const cover = await coverPng(pic.file, pic.width, pic.height);
         rendered.set(subject, { file: cover.file, mime: "image/png", width: cover.width, height: cover.height, caption: pic.caption, kindOf: "x-cover", symbol });

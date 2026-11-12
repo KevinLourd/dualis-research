@@ -9,6 +9,7 @@ import { type Callout, type ChartChoice, chooseChart, writeCallout } from "./cho
 import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
 import { type OpportunityStory, opportunityStory } from "./opportunity";
+import type { OpportunityLook } from "./render";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
@@ -112,7 +113,7 @@ export async function drawCallout(input: VisualInput, choice: ChartChoice, style
  * The opportunity picture of a story (opportunity.ts): one panel per reversing driver, its chart drawn full size with the
  * arrow on its latest value and a note (`notes[i]` from the writer, else the judge's headline of the driver's state).
  */
-export async function drawOpportunity(story: OpportunityStory): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
+export async function drawOpportunity(story: OpportunityStory, look: OpportunityLook = { tone: "balanced", channel: "x" }): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
   const r = await renderModule();
   const { input } = story;
   const last = input.bars.at(-1)!;
@@ -128,10 +129,23 @@ export async function drawOpportunity(story: OpportunityStory): Promise<{ file: 
     return { narrative: d.title, reality: d.headline ?? d.exhibit.takeaway, tag: d.tag, png: r.png(r.exhibitSvg(input, d.exhibit, a)) };
   });
   const cur = fair.currency ?? "";
-  const priceLine = `Share price ${r.fmt(last.close)} ${cur} · fair value ${r.fmt(fair.value)} ${cur} · ${r.opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up)}`.replace(/ {2,}/g, " ");
-  const intro = up ? "Why the price sits below its fair value, and what is changing now:" : "Why the price sits above its fair value, and what is breaking now:";
+  const opp = r.opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up);
+  // The same facts in each tone's words: the urgent one leads with the opportunity, the neutral one states the gap.
+  const priceLine = (
+    look.tone === "urgent"
+      ? `${opp.toUpperCase()} · price ${r.fmt(last.close)} ${cur}, fair value ${r.fmt(fair.value)} ${cur}`
+      : look.tone === "neutral"
+        ? `Share price ${r.fmt(last.close)} ${cur}, fair value ${r.fmt(fair.value)} ${cur} (Dualis estimate)`
+        : `Share price ${r.fmt(last.close)} ${cur} · fair value ${r.fmt(fair.value)} ${cur} · ${opp}`
+  ).replace(/ {2,}/g, " ");
+  const intro =
+    look.tone === "urgent"
+      ? up ? "The market is still pricing the old story:" : "The market is still pricing the dream:"
+      : look.tone === "neutral"
+        ? up ? "The story behind the price, and the latest data:" : "The story behind the price, and the latest data:"
+        : up ? "Why the price sits below its fair value, and what is changing now:" : "Why the price sits above its fair value, and what is breaking now:";
   const sources = `Source: ${[...new Set(story.drivers.flatMap((d) => d.exhibit.sources))].join(", ")}, Dualis Research`;
-  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, intro, panels, sources });
+  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, intro, panels, sources, look });
   return { file: r.png(svg), width, height, caption: `Opportunity: ${story.drivers.map((d) => d.title).join(", ")}` };
 }
 
@@ -156,7 +170,8 @@ export const renderSource: Source = {
     // The same frame as the Sandbox (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
     const story = charted && input.symbol ? await opportunityStory(ctx.db, input.symbol, ctx.complete) : null;
     if (story) {
-      const pic = await drawOpportunity(story);
+      // WhatsApp drafts: the house look, an X post in the X format, a Note in the Substack one.
+      const pic = await drawOpportunity(story, { tone: "balanced", channel: kind === "x-chart" ? "x" : "substack" });
       rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, sourceUrl: null, caption: pic.caption });
       return { request: { version: VISUALS_VERSION, ideaId, kind, input: summary(input), opportunity: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { mime: "image/png", width: pic.width, height: pic.height, sizeBytes: pic.file.length } };
     }
