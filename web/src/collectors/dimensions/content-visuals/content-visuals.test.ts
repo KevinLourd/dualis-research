@@ -232,7 +232,7 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     // Whole, strictly different, strictly above 0: a price inside the range still reads 1 to the low.
     expect(opportunity(3.5, 3.4, 3.51, true)).toBe("+1-2% opportunity");
     expect(opportunity(12, 8, 10, false)).toBe("16-34% downside");
-    expect(signalCardSvg({ ...input, signal: null })).toContain("below fair value");
+    expect(signalCardSvg({ ...input, signal: null })).toMatch(/\d+% below</);
     expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
     const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "short", banner: null });
     expect(price).toContain("Sold off");

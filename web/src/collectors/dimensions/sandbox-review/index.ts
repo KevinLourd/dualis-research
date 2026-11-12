@@ -68,8 +68,9 @@ export function parseReview(text: string, postCount: number, skills: string[]): 
     if (typeof e.old !== "string" || !e.old || typeof e.new !== "string" || typeof e.why !== "string") throw new Error(`edit ${i + 1} needs old, new and why`);
     return { skill: e.skill, old: e.old, new: e.new, why: e.why };
   });
-  const pass = posts.every((p) => p.imageAlone && p.aligned && p.clear);
-  if (!pass && edits.length === 0) throw new Error("a post fails and the review edits no skill");
+  // A failure the writer caused needs a skill edit; a drawing defect (« Drawing: ... ») has none to make.
+  const writerFails = posts.some((p) => !(p.imageAlone && p.aligned && p.clear) && !/^Drawing:/i.test(p.why));
+  if (writerFails && edits.length === 0) throw new Error("a post fails on its writing and the review edits no skill");
   return { posts, edits };
 }
 
@@ -142,6 +143,15 @@ export async function promoteReviews(db: Db, rows: BronzeFetch[]): Promise<Promo
     const pass = posts.every((p) => p.imageAlone && p.aligned && p.clear);
     const applied: SandboxSkillEdit[] = [];
     if (!pass) for (const e of edits) applied.push(await applyEdit(e));
+    // Drawing defects are code to fix: said loud in the run log and the GitHub run summary.
+    for (const p of posts.filter((x) => /^Drawing:/i.test(x.why))) {
+      const line = `${req.accountId} ${req.day} round ${req.round}, post ${p.post}: ${p.why}`;
+      console.warn(`[sandbox-review] drawing defect: ${line}`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        const { appendFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `- Drawing defect: ${line}\n`);
+      }
+    }
     for (const e of applied) console.log(`[sandbox-review] ${req.accountId} ${req.day} round ${req.round}: ${e.skill} ${e.applied ? "edited" : `not edited (${e.reason})`}: ${e.why}`);
     const inserted = await db
       .insert(sandbox.sandboxReviews)

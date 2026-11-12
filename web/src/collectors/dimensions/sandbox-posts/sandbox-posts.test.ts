@@ -56,7 +56,7 @@ const complete = vi.fn<Complete>(async ({ system, prompt }) => {
   };
   const posts = blocks.map((block, i) => {
     const [, format, angle] = /^## Post \d+: ([^,]+), angle (\S+)/.exec(block)!;
-    return /Article/.test(format) ? { post: i + 1, title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two", image: image(block) } : { post: i + 1, text: `${tone} ${angle} post ${i + 1} — $CCLD`, image: image(block), ...(angle === "macro-24h" ? { ticker: "$ccld" } : {}) };
+    return /Article/.test(format) ? { post: i + 1, title: `${tone} article ${angle}`, subtitle: "Sub", body: "## What happened\n\nCareCloud — profit up.\n\n- one\n- two", image: image(block), ...(angle === "macro-24h" ? { ticker: "$ccld" } : {}) } : { post: i + 1, text: `${tone} ${angle} post ${i + 1} — $CCLD`, image: image(block), ...(angle === "macro-24h" ? { ticker: "$ccld" } : {}) };
   });
   // Real writers sometimes answer twice ("Correction: ...") and out of order: the last object, matched on post numbers, wins.
   return { text: `${JSON.stringify({ posts: ["placeholder"] })}\n\nCorrection, the full answer:\n\n${JSON.stringify({ posts: posts.reverse() })}`, model: "fake" };
@@ -282,6 +282,13 @@ describe("sandbox-posts", () => {
     await run(sandboxPosts);
     await db.update(sandbox.sandboxPosts).set({ image: null }).where(eq(sandbox.sandboxPosts.accountId, "x:narrativegap"));
     expect(await sandboxPostSubjects(db)).toEqual([`x:narrativegap|${new Date().toISOString().slice(0, 10)}|2`]);
+  });
+
+  it("review: a drawing defect fails the post with no skill edit to make", async () => {
+    const { parseReview } = await import("../sandbox-review");
+    const drawing = JSON.stringify({ posts: [{ post: 1, imageAlone: false, aligned: true, clear: true, why: "Drawing: the price card pill reads % below fair val." }], edits: [] });
+    expect(parseReview(drawing, 1, ["x-urgent"]).posts[0].imageAlone).toBe(false);
+    expect(() => parseReview(drawing.replace("Drawing: ", ""), 1, ["x-urgent"])).toThrow(/edits no skill/);
   });
 
   it("review: an edit whose text is not in the skill is kept as not applied, with why", async () => {

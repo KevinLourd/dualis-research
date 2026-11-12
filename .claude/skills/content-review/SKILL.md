@@ -8,7 +8,7 @@ description: Post-evaluation of Dualis Research content - reads each post WITH i
 Kevin: « les images ne sont pas claires, pas autoporteuses, parfois le message n'est pas aligné avec la conclusion ». This skill is the bar every post clears before anyone reads it. The writer is fixed through its skills, never by rewriting its text: a failure is a rule missing or unclear in what the writer read.
 
 ## The three checks (per post, each true or false)
-1. **imageAlone**: shown ONLY the picture, a retail investor knows in five seconds which company, what is measured (unit, period) and what the picture claims. Fails on: an unnamed or cut axis, a unit missing, a note that does not say what the number is, a heading that is a label with no claim anywhere, a picture that could not be drawn, a chart the reader must decode (many series, unlabelled colours).
+1. **imageAlone**: shown ONLY the picture, a retail investor knows in five seconds which company, what is measured (unit, period) and what the picture claims. **Read EVERY word and number on the picture to its last character, the small inset cards included** (the price card top right, the news card, axis labels, the end value): one cut, hidden or overlapping word fails it (Kevin 2026-11-12: the price card's pill read « % below fair val », its number lost, and this review passed it). Fails on: an unnamed or cut axis, a unit missing, a note that does not say what the number is, a heading that is a label with no claim anywhere, a picture that could not be drawn, a chart the reader must decode (many series, unlabelled colours).
 2. **aligned**: the picture and the text tell ONE conclusion with the same main number. Fails on: the text says profit tripled and the picture shows the share price; the note's number is not in the text or contradicts it; the picture argues the opposite side (an inflection picture under a crack text); the arrow on a point that does not prove the text's claim.
 3. **clear**: the post reads in one pass. Fails on: jargon (EPS, YoY, net income, common shareholders), a sentence the reader must read twice, two ideas fighting in one short post, a claim with no number, a number with no meaning (« $4.7M » without what it is), the tone skill's own rules broken (length, hook, structure).
 
@@ -16,6 +16,9 @@ A post passes when all three are true. The day passes when every post passes.
 
 ## The why
 One sentence per post: what the reader sees, and the exact failure (« the picture heads "CareCloud: Share price" while the text is about profit quadrupling »). On a pass, the one thing that makes it work.
+
+## A drawing defect is not a writing defect
+Cut or overlapping text, a box over the line, a number lost in a card: the writer did not cause it and no skill edit fixes it. The check still FAILS, its why starts with « Drawing: » and names the exact element (« Drawing: the price card pill reads "% below fair val", its number is cut »), and no edit is made for it. The run reports every « Drawing: » line so the code gets fixed.
 
 ## Edits: fix the skill, never the post
 On any failure, edit the writing skill whose rule would have prevented it:
