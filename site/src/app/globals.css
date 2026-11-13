@@ -1827,22 +1827,6 @@ h2 + .lead,
 }
 
 /* A small card before each page's poker line. */
-.card-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 20px;
-  margin-right: 10px;
-  vertical-align: -5px;
-  background: #fff;
-  border: 1px solid var(--brand);
-  border-radius: 3px;
-}
-.card-glyph img {
-  width: 8px;
-}
-
 @media (max-width: 900px) {
   .hand {
     height: auto;

@@ -24,7 +24,7 @@ import { analysedSymbols } from "../watchlist";
 import { bookValueJudgment } from "./book-value";
 import { targetsIn, valuationFacts } from "./facts";
 import { dataAsOf, historyOf, methodSpec, runScenarios, VALUATION_METHODS, weighted, type MethodSpec, type ValuationFacts } from "./methods";
-import { METHOD_SYSTEM, SYNTHESIS_SYSTEM, VALUATION_VERSION, methodPrompt, parseMethodAnswer, parseReport, parseWeights, reportPrompt, weightsPrompt } from "./prompt";
+import { METHOD_SYSTEM, SYNTHESIS_SYSTEM, SYNTHESIS_VERSION, VALUATION_VERSION, methodPrompt, parseMethodAnswer, parseReport, parseWeights, reportPrompt, weightsPrompt } from "./prompt";
 
 export { VALUATION_METHODS } from "./methods";
 export const VALUATION_DIMENSION = "valuation";
@@ -155,7 +155,7 @@ export const valuationSource: Source = {
 
     const live = results.filter((x) => x.r.applicable && x.r.base !== null);
     if (live.length === 0) return { request: { symbol, factsHash }, httpStatus: null, payload: { methods, synthesis: null } satisfies ValuationPayload };
-    const synthHash = fnv(JSON.stringify({ v: VALUATION_VERSION, m: live.map((x) => [x.id, round(x.r.low), round(x.r.base), round(x.r.high)]), bucket }));
+    const synthHash = fnv(JSON.stringify({ v: VALUATION_VERSION, s: SYNTHESIS_VERSION, m: live.map((x) => [x.id, round(x.r.low), round(x.r.base), round(x.r.high)]), bucket }));
     const [prior] = await db.select({ id: valuationSyntheses.id }).from(valuationSyntheses).where(and(eq(valuationSyntheses.symbol, symbol), eq(valuationSyntheses.inputHash, synthHash))).limit(1);
     if (prior) return { request: { symbol, factsHash }, httpStatus: null, payload: { methods, synthesis: { inputHash: synthHash, reusedId: prior.id } } satisfies ValuationPayload };
     if (!ctx.complete) throw new Error("valuation: no LLM in the collector context (cli.ts sets ctx.complete)");

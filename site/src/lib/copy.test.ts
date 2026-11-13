@@ -39,7 +39,7 @@ describe("site copy and colours", () => {
   // Thierry 2026-11-09: « remove my name from the website almost entirely… keep it in one place, the about page ».
   // The legal pages name him as the publisher (Kevin 2026-11-11).
   it("names Thierry on About and the legal pages only", () => {
-    const allowed = [join("app", "about", "page.tsx"), join("app", "disclaimer", "page.tsx"), join("lib", "legal.ts")];
+    const allowed = [join("app", "team", "page.tsx"), join("app", "disclaimer", "page.tsx"), join("lib", "legal.ts")];
     const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
     const named = files.filter((f) => !allowed.some((a) => f.path.endsWith(a)) && /Thierry|Matin/.test(strip(f.text)));
     expect(named.map((f) => f.path)).toEqual([]);
@@ -52,15 +52,15 @@ describe("site copy and colours", () => {
     expect(company?.text).not.toMatch(/CallsBoard|Track record|Every published call/);
   });
 
-  // Kevin 2026-11-11: engraved playing cards are the site's thread (Research hand, Company cards, a small card before each
-  // poker line), static like everything else.
+  // Kevin 2026-11-11: engraved playing cards are the site's thread (Research hand, Company cards), static like everything else.
+  // Thierry 2026-11-12: « remove everywhere the small card icon » before the poker lines.
   it("deals the winnable games as cards, never animated", () => {
     const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
     expect(text(join("app", "research", "page.tsx"))).toContain("<Hand ");
     expect(text(join("app", "company", "page.tsx"))).toContain("<PlayingCard ");
-    expect(text(join("components", "page-band.tsx"))).toContain("<CardGlyph />");
+    expect(files.filter((f) => /CardGlyph|card-glyph/.test(f.text)).map((f) => f.path)).toEqual([]);
     const css = text(join("app", "globals.css"));
-    const cardRules = css.match(/\.(pcard|pc-[a-z]+|hand[a-z-]*|card-glyph)[^{]*\{[^}]*\}/g) ?? [];
+    const cardRules = css.match(/\.(pcard|pc-[a-z]+|hand[a-z-]*)[^{]*\{[^}]*\}/g) ?? [];
     expect(cardRules.length).toBeGreaterThan(5);
     expect(cardRules.filter((r) => /transition|animation/.test(r))).toEqual([]);
   });

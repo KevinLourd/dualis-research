@@ -75,6 +75,10 @@ const PAIRS: Pair[] = [
   },
 ];
 
+/** Thierry 2026-11-12: these accounts are marketing partners of Dualis Research, never Dualis itself, so a clickbaity tone
+ * never dents its authority; the bio says so. */
+export const PARTNER_LINE = "Partnered with Dualis Research.";
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -88,8 +92,8 @@ export const SANDBOX_ACCOUNTS: SandboxAccountSeed[] = PAIRS.flatMap((p) => {
   const url = `${p.handle}.substack.com`;
   const shared = { tone: p.tone, handle: p.handle, author: p.author, avatarText: initials(p.name), avatarColor: p.color, bannerColor: COLOR.deep.light, joined: p.joined };
   return [
-    { ...shared, platform: "x" as const, displayName: p.name, bio: `${p.xBio} Research: ${url}`, url, followers: p.xFollowers, following: 180 + p.xFollowers % 200 },
-    { ...shared, platform: "substack" as const, displayName: p.name, bio: p.tagline, url, followers: p.subscribers, following: 0 },
+    { ...shared, platform: "x" as const, displayName: p.name, bio: `${p.xBio} ${PARTNER_LINE} Research: ${url}`, url, followers: p.xFollowers, following: 180 + p.xFollowers % 200 },
+    { ...shared, platform: "substack" as const, displayName: p.name, bio: `${p.tagline} ${PARTNER_LINE}`, url, followers: p.subscribers, following: 0 },
   ];
 });
 

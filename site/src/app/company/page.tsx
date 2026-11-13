@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CtaBand } from "@/components/blocks";
-import { type Card, CardGlyph, PlayingCard } from "@/components/cards";
+import { type Card, PlayingCard } from "@/components/cards";
 import { MARKETS } from "@/lib/model";
 import { WINNABLE } from "@/lib/winnable";
 
@@ -66,7 +66,6 @@ export default function Company() {
               <h2 className="h-bold">What we look for</h2>
               <p className="tables-intro">A good poker player picks the table first. We pick opportunities where we see edge.</p>
               <p className="band-thread">
-                <CardGlyph />
                 {WINNABLE.company}
               </p>
             </div>

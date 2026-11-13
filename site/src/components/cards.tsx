@@ -53,13 +53,3 @@ export function Hand({ cards, caption }: { cards: readonly Card[]; caption: stri
     </div>
   );
 }
-
-/** A small card, the mark before each page's poker line. */
-export function CardGlyph() {
-  return (
-    <span className="card-glyph" aria-hidden="true">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/mark.svg" alt="" />
-    </span>
-  );
-}
