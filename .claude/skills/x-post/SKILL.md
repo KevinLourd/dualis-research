@@ -9,6 +9,7 @@ description: An X post of Dualis Research (for @quantum_macro), text AND chart. 
 
 ## The text = the breaking news
 - Opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number, `$TICKER` once after the opening.
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - 1 or 2 sentences, at most 160 characters: the fact, then why the price has it wrong. Nothing else.
 - Plain words, no hedge, no hashtag, no other emoji, no em/en dash, no link (the bio carries it). Never a figure absent from the inputs.
 - What the image no longer says, the text says: the news (with its source when it is a big name: « per Reuters ») and the signal when one is live (« Shares 28% under fair value »).

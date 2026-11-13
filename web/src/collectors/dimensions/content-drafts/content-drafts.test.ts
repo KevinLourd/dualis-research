@@ -10,7 +10,7 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentDrafts } from ".";
-import { draftSystem, parseGeneration, publishLink, SHORT_DISCLAIMER, stripDashes, withDisclaimer } from "./format";
+import { draftPrompt, draftSystem, parseGeneration, publishLink, SHORT_DISCLAIMER, stripDashes, withDisclaimer } from "./format";
 
 const ARTICLE = JSON.stringify({
   title: "CareCloud found its new client",
@@ -150,6 +150,30 @@ describe("draft writer dispatch", () => {
 });
 
 describe("draft format", () => {
+  it("gives a signal post its 5 steps: type, size, trigger with its date, each driver's turn with its date, conclusion", () => {
+    const prompt = draftPrompt(
+      { symbol: "CCLD", companyName: "CareCloud", news: null, worthJudgmentId: null, worth: null, thesis: null, driver: null, chart: null, idea: { id: "i1", title: "Margin turn", angle: "Q3", sources: [] } },
+      {
+        narrative: "A shrinking billing shop.",
+        signal: "BUY (strong inflection)",
+        signalSince: "2026-11-10",
+        fairValue: "4.6 USD; quote 3.1 on 2026-11-12, -33% vs fair value",
+        evidence: [],
+        drivers: [
+          { title: "Margins in decline", summary: null, state: { word: "Strong inflection", since: "2026-11-10", headline: "Q3 operating margin 19.6%", pricedIn: "Not in the price yet" } },
+          { title: "Debt load", summary: null, state: null },
+        ],
+        signalChanges: [],
+      },
+    );
+    expect(prompt).toContain("Signal: BUY (strong inflection), since 2026-11-10");
+    expect(prompt).toContain("- Margins in decline. Now: Strong inflection since 2026-11-10, Q3 operating margin 19.6% (Not in the price yet)");
+    expect(prompt).toMatch(/^- Debt load$/m);
+    const system = draftSystem("x-post", null, null);
+    expect(system).toMatch(/1\. Signal type/);
+    expect(system).toMatch(/5\. Conclusion/);
+    expect(system).toMatch(/at most 250 characters/);
+  });
   it("asks for a Note as one small paragraph with a chart, an X post smaller still", () => {
     const note = draftSystem("substack-note", null, "Analysis Paralysis");
     expect(note).toMatch(/one small paragraph with a chart/);

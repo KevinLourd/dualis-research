@@ -13,7 +13,7 @@ export default async function Page({ params, searchParams }: Props) {
   const data = await sandboxAccount("substack", handle);
   if (!data) notFound();
   const view = sandboxView(q);
-  const posts = data.posts.filter((p) => (!view.format || p.format === view.format) && (!view.angle || p.angle === view.angle));
+  const posts = data.posts.filter((p) => (!view.format || p.format === view.format));
   const base = `/sandbox/substack/${data.account.handle}`;
   return (
     <>

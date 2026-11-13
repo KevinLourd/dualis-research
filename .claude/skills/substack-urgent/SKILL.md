@@ -8,6 +8,7 @@ description: Substack in the URGENT tone - breaking-news Note and Article, one s
 Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so judge this tone by signups, never by likes (https://escapethecubicle.substack.com/p/substack-changed-their-algorithm). Every house rule stays (skill `content-matrix`).
 
 ## Note
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: under 200 characters when possible (the length that breaks out most: https://eden.so/blog/how-to-grow-on-substack-notes/), 300 at most, no line breaks.
 - **Hook**: `🚨 BREAKING: <short name>` then ONE shock number.
 - **Structure**: shock number, then one line of urgency. ONE idea only: the urgency line adds no second figure and no second measure, even without a number (no price, no fair value gap, no half-year number, no "profit dropped", "cash is melting", "losses go on"); it says only what the shock number means for a holder, no "Here is what happened:" filler.
