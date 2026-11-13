@@ -281,6 +281,22 @@ describe("sandbox-posts", () => {
     expect(await sandboxPostSubjects(db)).toEqual([`x:narrativegap|${new Date().toISOString().slice(0, 10)}|2`]);
   });
 
+  it("a reviewed day whose skills changed since is written again, a review-less or capped day is not", async () => {
+    await run(sandboxAccounts);
+    await run(sandboxPosts);
+    expect(await sandboxPostSubjects(db)).toEqual([]);
+    await db.update(sandbox.sandboxPosts).set({ skillHash: "old" }).where(eq(sandbox.sandboxPosts.accountId, "x:narrativegap"));
+    // Not reviewed yet: the review of the round comes first.
+    expect(await sandboxPostSubjects(db)).toEqual([]);
+    await run(sandboxVisuals);
+    await run(sandboxImageFix);
+    await run(sandboxReview);
+    expect(await sandboxPostSubjects(db)).toEqual([`x:narrativegap|${new Date().toISOString().slice(0, 10)}|2`]);
+    await db.update(sandbox.sandboxPosts).set({ round: 6 }).where(eq(sandbox.sandboxPosts.accountId, "x:narrativegap"));
+    await db.update(sandbox.sandboxReviews).set({ round: 6 }).where(eq(sandbox.sandboxReviews.accountId, "x:narrativegap"));
+    expect(await sandboxPostSubjects(db)).toEqual([]);
+  }, 60_000);
+
   it("opportunity frame: a company with a driver reversing now gets the narrative + one chart per reversing driver, on every account", async () => {
     const day = (i: number) => new Date(Date.now() - (8 - i) * 91 * 86400_000).toISOString().slice(0, 10);
     await db.insert(exhibits).values({ id: "CCLD:long:1:1", symbol: "CCLD", driverId: "CCLD:long:1", rank: 1, number: 1, title: "Revenue per quarter, $", chart: "line", series: [{ key: "revenue", label: "Revenue", unit: "usd", currency: "USD" } as never], points: Array.from({ length: 8 }, (_, i) => ({ period: day(i), values: { revenue: (40 + i) * 1e6 } })), takeaway: "t", sources: ["Company filings (SEC EDGAR)"] });

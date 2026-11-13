@@ -33,6 +33,12 @@ export const POSTS_PER_DAY = 5;
 export const SANDBOX_VERSION = "sandbox-v4";
 /** A day is written at most this many times: the first writing + one per failed review (skill content-review). */
 export const MAX_ROUNDS = 3;
+/**
+ * A day whose skills changed after it was written (a merged skill edit, Kevin 2026-11-13: « je ne vois pas les changes »)
+ * is written again once its latest round was reviewed, up to this many rounds in all: the cap stops a reviewer that
+ * fails every round and edits the skills each time from looping.
+ */
+export const MAX_ROUNDS_WITH_SKILL_CHANGES = 6;
 /** Display times on the fake timeline: 08:00, 11:00, 14:00, 17:00, 20:00 Astana (UTC+5). */
 export const SLOT_HOURS_UTC = [3, 6, 9, 12, 15] as const;
 
@@ -261,24 +267,32 @@ export const claudePosts: Source = {
 /**
  * Accounts with no post today (round 1), and accounts whose latest round today failed its review (skill content-review)
  * with rounds left: the day is written again with the edited skills (Kevin 2026-11-11: « relancer la génération jusqu'à
- * ce que ce soit satisfaisant »). A day written before posts carried their picture is written again too.
+ * ce que ce soit satisfaisant »). A day written before posts carried their picture is written again too, and so is a
+ * reviewed day whose skills changed since it was written (`MAX_ROUNDS_WITH_SKILL_CHANGES`).
  */
 export async function sandboxPostSubjects(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
   const day = utcDay(now);
   const [accounts, written, reviews, [anyIdea]] = await Promise.all([
-    db.select({ id: sandbox.sandboxAccounts.id }).from(sandbox.sandboxAccounts),
-    db.select({ accountId: sandbox.sandboxPosts.accountId, round: sandbox.sandboxPosts.round, hasImage: sql<boolean>`${sandbox.sandboxPosts.image} is not null` }).from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.day, day)),
+    db.select({ id: sandbox.sandboxAccounts.id, platform: sandbox.sandboxAccounts.platform, tone: sandbox.sandboxAccounts.tone }).from(sandbox.sandboxAccounts),
+    db.select({ accountId: sandbox.sandboxPosts.accountId, round: sandbox.sandboxPosts.round, skillHash: sandbox.sandboxPosts.skillHash, hasImage: sql<boolean>`${sandbox.sandboxPosts.image} is not null` }).from(sandbox.sandboxPosts).where(eq(sandbox.sandboxPosts.day, day)),
     db.select({ accountId: sandbox.sandboxReviews.accountId, round: sandbox.sandboxReviews.round, pass: sandbox.sandboxReviews.pass }).from(sandbox.sandboxReviews).where(eq(sandbox.sandboxReviews.day, day)),
     db.select({ id: content.goldContentIdeas.id }).from(content.goldContentIdeas).limit(1),
   ]);
   if (!anyIdea) return [];
+  const hashes = new Map<string, string>();
+  for (const a of accounts) {
+    const key = `${a.platform}-${a.tone}`;
+    if (!hashes.has(key)) hashes.set(key, (await loadSkills(a.platform, a.tone)).hash);
+  }
   return accounts.flatMap((a) => {
     const mine = written.filter((w) => w.accountId === a.id);
     if (mine.length === 0) return [`${a.id}|${day}|1`];
     const round = Math.max(...mine.map((w) => w.round));
     const pictureless = mine.some((w) => w.round === round && !w.hasImage);
     const review = reviews.find((r) => r.accountId === a.id && r.round === round);
-    return (pictureless || (review && !review.pass)) && round < MAX_ROUNDS ? [`${a.id}|${day}|${round + 1}`] : [];
+    if ((pictureless || (review && !review.pass)) && round < MAX_ROUNDS) return [`${a.id}|${day}|${round + 1}`];
+    const skillsChanged = mine.some((w) => w.round === round && w.skillHash !== hashes.get(`${a.platform}-${a.tone}`));
+    return skillsChanged && review && round < MAX_ROUNDS_WITH_SKILL_CHANGES ? [`${a.id}|${day}|${round + 1}`] : [];
   });
 }
 
