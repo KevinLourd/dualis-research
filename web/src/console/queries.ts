@@ -3,6 +3,7 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { companyProfiles, quotes, tickers } from "@/db/schema/gold";
 import { consensus, consensusCoverage } from "@/db/schema/consensus";
+import { goldOperatingKpis } from "@/db/schema/financials";
 import { runSources, runs } from "@/db/schema/ops";
 
 /** Console reads: gold for business data, ops for run health. Never bronze or silver. */
@@ -55,6 +56,11 @@ export async function consensusOf(symbol: string) {
     .from(consensus)
     .where(eq(consensus.symbol, symbol))
     .orderBy(desc(consensus.periodEnd), asc(consensus.periodType), asc(consensus.metric));
+}
+
+/** The operating KPIs a ticker reports (backlog, orders...), newest period first (Analysis page). */
+export async function operatingKpisOf(symbol: string) {
+  return getDb().select().from(goldOperatingKpis).where(eq(goldOperatingKpis.symbol, symbol)).orderBy(desc(goldOperatingKpis.periodEnd), asc(goldOperatingKpis.kpi));
 }
 
 /** Per (source, ticker), what the latest consensus run got (Data page). */

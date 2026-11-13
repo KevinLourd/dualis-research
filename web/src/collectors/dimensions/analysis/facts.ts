@@ -7,6 +7,7 @@ import { valuationReports } from "@/db/schema/valuation";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { itemsOf } from "../evidence/items";
+import { kpisTextOf } from "../operating-kpis";
 import { seriesCatalog, seriesMenu, type StoredSeries } from "./series";
 
 /**
@@ -83,11 +84,13 @@ export function streamsText(rows: GoldRevenueStream[]): string | null {
 }
 /**
  * The reported numbers every judge of the story reads (evidence, driver and thesis state): the last fiscal years,
- * quarters and half years, and revenue by stream. A results filing arrives as a title; these are its figures.
+ * quarters and half years, revenue by stream, and the operating KPIs the company reports (backlog, orders,
+ * subscribers...). A results filing arrives as a title; these are its figures.
  */
 export async function figuresText(db: Db, symbol: string): Promise<string> {
   const catalog = await seriesCatalog(db, symbol);
   const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
+  const kpis = await kpisTextOf(db, symbol);
   const keys = (prefix: string) => ["revenue", "operating-income", "net-income"].map((l) => `${prefix}:${l}`).filter((k) => catalog.has(k));
   return [
     "The company's reported figures:",
@@ -95,6 +98,7 @@ export async function figuresText(db: Db, symbol: string): Promise<string> {
     keys("qline").length ? `Last quarters:\n${table(catalog, keys("qline"), 4)}` : null,
     keys("hline").length ? `Last half years:\n${table(catalog, keys("hline"), 4)}` : null,
     streamsText(streams),
+    kpis,
   ]
     .filter((x) => x !== null)
     .join("\n");
@@ -120,6 +124,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const catalog = await seriesCatalog(db, symbol);
   const currency = valuation?.currency ?? profile?.currency ?? null;
   const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
+  const kpis = await kpisTextOf(db, symbol);
   const halves = HALF_LINES.filter((k) => catalog.has(k));
   const price = catalog.get("price");
   const closes = price ? [...price.points].sort((a, b) => a[0].localeCompare(b[0])).slice(-24) : [];
@@ -139,6 +144,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     table(catalog, QUARTER_LINES, 6),
     halves.length ? `\nLast half years:\n${table(catalog, halves, 4)}` : null,
     streams.length ? `\n${streamsText(streams)}` : null,
+    kpis ? `\n${kpis}` : null,
     "",
     valuation
       ? `Valuation from gold: EV/EBITDA over fiscal years ${valuation.evEbitdaYears.join(", ") || "none"}: low ${fmt(valuation.evEbitdaLow, "multiple")}, median ${fmt(valuation.evEbitdaMedian, "multiple")}, high ${fmt(valuation.evEbitdaHigh, "multiple")}. Latest shares outstanding ${fmt(valuation.sharesOutstanding)}; net debt ${fmt(valuation.netDebt)} (${valuation.inputs["total-debt"]?.period ?? "n/a"}); EBITDA ${fmt(valuation.ebitda)} (${valuation.ebitdaBasis ?? "n/a"}).`

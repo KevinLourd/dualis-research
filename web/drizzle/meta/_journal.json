@@ -351,6 +351,13 @@
       "when": 1794553295345,
       "tag": "0049_x-publish",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794561704558,
+      "tag": "0050_operating-kpis",
+      "breakpoints": true
     }
   ]
 }
