@@ -42,7 +42,7 @@ The writer writes that fallback picture with the text, in the same answer (`imag
 - Each post has its own picture: never repeat the chart, point and words of another post of the day.
 
 ## The Sandbox (Business > Sandbox in the console, never published)
-6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post). Skill `image-correction` looks at each drawn picture and corrects its spec until clean (3 passes); skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
+6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a merged skill edit rewrites today's reviewed posts as the next round (6 max), never a past day (the skills' hash is stored on each post). Skill `image-correction` looks at each drawn picture and corrects its spec until clean (3 passes); skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
 
 ### Daily mix per account (5 posts)
 Every slot (08:00, 11:00, 14:00, 17:00, 20:00 Astana) is a signal post on the next of the day's best Ideas, one Idea per slot (fewer Ideas = fewer posts).
