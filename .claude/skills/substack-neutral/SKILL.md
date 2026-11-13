@@ -8,6 +8,7 @@ description: Substack in the NEUTRAL tone - sober research-note Note and Article
 The sell-side research note: the view and why now first, then the evidence, valuation and risks (https://www.marketscreener.com/news/investor-education-how-to-read-an-equity-research-note-ce7e51d9db8bff2c, https://www.idealsvdr.com/blog/sell-side-report/). Every house rule stays (skill `content-matrix`).
 
 ## Note
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: one paragraph of 2 to 4 sentences, 200 to 450 characters, no line breaks.
 - **Hook**: the company and the finding. No emoji, no exclamation mark, no CAPS, no alarm word.
 - **Structure**: fact with number and period, what it implies for the valuation, what to watch next.

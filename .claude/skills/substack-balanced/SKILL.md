@@ -8,6 +8,7 @@ description: Substack in the BALANCED tone (today's Dualis house style) - Note a
 The house style (skills `daily-content`, `breaking-chart`, `research-note`, `content-drafts/format.ts`). The analyst with conviction: urgent, direct, certain, sober words.
 
 ## Note
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: one paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks. Short Notes break out most often; 600-1,199 characters is a dead zone (Eden, 473k Notes: https://eden.so/blog/how-to-grow-on-substack-notes/).
 - **Hook**: `🚨 <short name>: ` then the alarm with its number and period (« Q3 profit $4.7M »). Never a label or question (« Trade alert », « Here Is What Happened Next »); every claim carries a number.
 - **Structure**: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch.

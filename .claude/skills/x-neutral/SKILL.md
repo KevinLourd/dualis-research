@@ -8,6 +8,7 @@ description: X in the NEUTRAL tone - sober research-note X post and X Article, s
 A research note in miniature. The sell-side note opens with the view and why the note is written now, then the evidence, then the risks (https://www.marketscreener.com/news/investor-education-how-to-read-an-equity-research-note-ce7e51d9db8bff2c). Credibility first: measured words, every figure sourced. Every house rule stays (skill `content-matrix`).
 
 ## X post
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: at most 260 characters.
 - **Hook**: the company name and the fact with its number. No emoji, no exclamation mark, no CAPS, no alarm word.
 - **Structure**: fact with number, then what it implies for the valuation. `$TICKER` once.

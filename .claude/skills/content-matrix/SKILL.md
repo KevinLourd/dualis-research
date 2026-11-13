@@ -17,6 +17,7 @@ A post = **channel x tone x format x angle**. Each axis has its skill; the write
 One post = the channel x tone skill (its format section) + the angle skill of that post. Balanced = today's house style (skills `x-post`, `daily-content`, `research-note`, `breaking-chart`); the urgent and neutral skills move ONLY the tone and keep every other rule.
 
 ## Rules every post keeps, whatever the tone
+- A signal post (BUY or SELL) follows the 5-step skeleton of `angle-signal` (type, size, trigger + date, rationale per driver with dates, conclusion), one step per line; it overrides each tone's length and « one measure » rules (Kevin 2026-11-13).
 - English. Plain words: subject, verb, object. One idea per sentence. Never mention our internal notes, our searches (« three of our searches found the story » fails), our signal rating ("weak buy") or earlier gaps, and no sentence the reader must read twice.
 - Never a figure absent from the inputs. Never a price target, upside % or horizon Claude made up (the fair value is ours and computed: it may be quoted).
 - No em or en dash, no hashtag, no link in an X post (the bio carries it).
