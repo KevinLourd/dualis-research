@@ -9,8 +9,24 @@ export const SCHEDULE: Record<string, string> = {
   "0 2 * * *": "growth-outreach,substack-network,growth-brief", // 07:00 Astana: fresh count, then the 08:00 Growth brief
 };
 
+/**
+ * Slots that start their own workflow instead of collect.yml (no inputs). x-publish.yml: every hour from 08:10 to 21:10
+ * Astana, each connected X account posts its next due Sandbox post (Kevin 2026-11-13); its own concurrency group, never
+ * queued behind a long collect.
+ */
+export const OWN_WORKFLOW: Record<string, string> = {
+  "10 3-16 * * *": "x-publish.yml",
+};
+
 export const REPO = "KevinLourd/dualis-research";
 export const WORKFLOW = "collect.yml";
+
+/** The workflow a slot starts and its dispatch body. Throws on a cron this file does not know (wrangler.jsonc drifted). */
+export function dispatchFor(cron: string): { workflow: string; body: { ref: string; inputs?: { dimension: string; trigger: string } } } {
+  const own = OWN_WORKFLOW[cron];
+  if (own) return { workflow: own, body: { ref: "main" } };
+  return { workflow: WORKFLOW, body: dispatchBody(cron) };
+}
 
 /** The workflow_dispatch body for one cron slot. Throws on a cron this file does not know (wrangler.jsonc drifted). */
 export function dispatchBody(cron: string): { ref: string; inputs: { dimension: string; trigger: string } } {

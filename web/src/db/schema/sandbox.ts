@@ -4,7 +4,7 @@ import { silver } from "./silver";
 
 /**
  * Sandbox (Kevin 2026-11-11): fake X accounts and Substack publications, one pair per posting TONE, so Thierry compares
- * tones idea by idea before we pick one for his real accounts. Nothing here is ever published anywhere.
+ * tones idea by idea before we pick one for his real accounts. An X account connected to the X API posts for real (x-publish, schema x.ts).
  * - sandbox-accounts: the seed list in code (bronze = the raw definition) -> silver -> gold.
  * - sandbox-posts: each day the top Ideas written once per account in its tone (bronze = the LLM answer) -> silver -> gold.
  */

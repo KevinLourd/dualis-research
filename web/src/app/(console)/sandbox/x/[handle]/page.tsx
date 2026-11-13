@@ -17,8 +17,8 @@ export default async function Page({ params, searchParams }: Props) {
   const base = `/sandbox/x/${data.account.handle}`;
   return (
     <>
-      <SandboxFilters base={base} view={view} formats={["x-post", "x-article"]} />
-      <XProfile account={data.account} posts={posts} total={data.posts.length} pairedHref={`/sandbox/substack/${data.account.handle}`} base={base} view={view} />
+      <SandboxFilters base={base} view={view} formats={["x-post", "x-article"]} live={data.live} />
+      <XProfile account={data.account} posts={posts} total={data.posts.length} pairedHref={`/sandbox/substack/${data.account.handle}`} base={base} view={view} liveUrls={data.liveUrls} />
     </>
   );
 }

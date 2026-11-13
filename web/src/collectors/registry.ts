@@ -41,6 +41,7 @@ import { price } from "./dimensions/price";
 import { intradayPrice } from "./dimensions/intraday-price";
 import { thesis } from "./dimensions/thesis";
 import { watchlist } from "./dimensions/watchlist";
+import { xPublish } from "./dimensions/x-publish";
 import type { Dimension } from "./types";
 
 /**
@@ -56,12 +57,14 @@ import type { Dimension } from "./types";
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
  * Intraday price (5-minute bars, Yahoo) alone in its stage right after price (Yahoo rate limit): it moves gold.quotes to the latest 5-minute price, so EV, valuation, every judge and the live test read the real price, and market reaction the price at the minute a news item lands.
- * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11): macro-news (Google News, last 24 h) and substack-trending (finance Substacks' best recent posts) feed their angles; each fake account writes 5 posts a day, text and picture, from the skills (content-matrix); sandbox-visuals draws each post's picture; sandbox-image-fix (skill image-correction) looks at each picture and corrects its spec until clean (3 passes); sandbox-review (skill content-review) reads them, edits the writing skills on a failure and the day is written again (3 rounds max). Never published.
+ * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11): macro-news (Google News, last 24 h) and substack-trending (finance Substacks' best recent posts) feed their angles; each fake account writes 5 posts a day, text and picture, from the skills (content-matrix); sandbox-visuals draws each post's picture; sandbox-image-fix (skill image-correction) looks at each picture and corrects its spec until clean (3 passes); sandbox-review (skill content-review) reads them, edits the writing skills on a failure and the day is written again (3 rounds max). A connected X account publishes them (x-publish, below).
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
+ * X publish (Kevin 2026-11-13) runs ONLY when named (x-publish.yml, every hour): it posts for real on X, and two runs at
+ * once would race the account's rotating token, so `all`, `core` and `growth` never include it.
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, macroNews, substackTrending, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, macroNews, substackTrending, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -74,6 +77,9 @@ export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "conten
  * stages one after the other. A stage only reads what earlier stages wrote; Yahoo users (company-profile, price,
  * consensus, financials, peers) sit in different stages so they never hit its rate limit together.
  */
+/** Dimensions that run only when named: never part of `all`, `core` or `growth`. */
+export const ON_DEMAND_DIMENSIONS: readonly string[] = ["x-publish"];
+
 export const STAGES: readonly (readonly string[])[] = [
   ["watchlist"],
   ["portfolio", "company-profile"],
@@ -91,6 +97,7 @@ export const STAGES: readonly (readonly string[])[] = [
   ["signals"],
   ["signal-alerts"],
   ...GROWTH_DIMENSIONS.map((d) => [d]),
+  ...ON_DEMAND_DIMENSIONS.map((d) => [d]),
 ];
 
 /** The dimensions to run, grouped by stage, in order. */
@@ -104,16 +111,17 @@ export function stagesFor(dimensions: readonly Dimension[]): Dimension[][] {
  * core one: what a change to it can move), or a comma list of those.
  */
 export function dimensionsFor(arg: string): readonly Dimension[] {
-  if (arg === "all") return DIMENSIONS;
-  if (arg === "core") return DIMENSIONS.filter((d) => !GROWTH_DIMENSIONS.includes(d.name));
-  if (arg === "growth") return DIMENSIONS.filter((d) => GROWTH_DIMENSIONS.includes(d.name));
+  const scheduled = DIMENSIONS.filter((d) => !ON_DEMAND_DIMENSIONS.includes(d.name));
+  if (arg === "all") return scheduled;
+  if (arg === "core") return scheduled.filter((d) => !GROWTH_DIMENSIONS.includes(d.name));
+  if (arg === "growth") return scheduled.filter((d) => GROWTH_DIMENSIONS.includes(d.name));
   if (arg.includes(",")) {
     const names = new Set(arg.split(",").flatMap((a) => dimensionsFor(a.trim()).map((d) => d.name)));
     return DIMENSIONS.filter((d) => names.has(d.name));
   }
   if (arg.startsWith("from:")) {
     const i = DIMENSIONS.indexOf(dimensionByName(arg.slice(5)));
-    return DIMENSIONS.slice(i).filter((d) => d === DIMENSIONS[i] || !GROWTH_DIMENSIONS.includes(d.name));
+    return DIMENSIONS.slice(i).filter((d) => d === DIMENSIONS[i] || (!GROWTH_DIMENSIONS.includes(d.name) && !ON_DEMAND_DIMENSIONS.includes(d.name)));
   }
   return [dimensionByName(arg)];
 }
@@ -127,6 +135,8 @@ export function collectPlan(files: readonly string[]): string | null {
   const touched = new Set<string>();
   for (const f of files) {
     const dim = /^web\/src\/collectors\/dimensions\/([^/]+)\//.exec(f)?.[1];
+    // An on-demand dimension (x-publish posts for real) never runs from a merge: its own schedule picks the change up.
+    if (dim && ON_DEMAND_DIMENSIONS.includes(dim)) continue;
     if (dim && DIMENSIONS.some((d) => d.name === dim)) touched.add(dim);
     else if (/^web\/(src\/(collectors|llm|bsg|db|private|growth|content|onedrive)\/|drizzle\/)/.test(f) && !/\.test\.ts$/.test(f)) core = true;
   }

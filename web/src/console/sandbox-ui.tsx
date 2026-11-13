@@ -25,12 +25,8 @@ export const ANGLE_LABEL: Record<SandboxAngle, string> = { signal: "Signal", "ma
 const ANGLES = Object.keys(ANGLE_LABEL) as SandboxAngle[];
 const isArticle = (f: SandboxFormat) => f === "x-article" || f === "substack-article";
 
-function SandboxLabel() {
-  return (
-    <Badge variant="outline">
-      Sandbox, not published
-    </Badge>
-  );
+function SandboxLabel({ live }: { live: boolean }) {
+  return <Badge variant="outline">{live ? "Live on X: each post goes out at its time" : "Sandbox, not published"}</Badge>;
 }
 
 export function Avatar({ account, size }: { account: Pick<GoldSandboxAccount, "avatarText" | "avatarColor" | "displayName" | "platform">; size: number }) {
@@ -60,7 +56,7 @@ function hrefWith(base: string, view: SandboxView, change: Partial<SandboxView>)
 }
 
 /** One row: the « not published » badge, then format and angle chips above the timeline (Dualis console look: they are ours, not the site's). */
-export function SandboxFilters({ base, view, formats }: { base: string; view: SandboxView; formats: SandboxFormat[] }) {
+export function SandboxFilters({ base, view, formats, live = false }: { base: string; view: SandboxView; formats: SandboxFormat[]; live?: boolean }) {
   const chip = (active: boolean, href: string, label: string) => (
     <Link key={href + label} href={href} className={`rounded-full border px-3 py-1 text-sm ${active ? "border-transparent bg-kumo-brand text-white" : "border-kumo-line bg-kumo-base text-kumo-default hover:bg-kumo-tint"}`}>
       {label}
@@ -68,7 +64,7 @@ export function SandboxFilters({ base, view, formats }: { base: string; view: Sa
   );
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <SandboxLabel />
+      <SandboxLabel live={live} />
       <span className="ml-4 text-sm text-kumo-subtle">Format</span>
       {chip(view.format === null, hrefWith(base, view, { format: null, article: null }), "All")}
       {formats.map((f) => chip(view.format === f, hrefWith(base, view, { format: f, article: null }), FORMAT_LABEL[f]))}
@@ -197,7 +193,7 @@ function XActions() {
   );
 }
 
-type PageProps = { account: GoldSandboxAccount; posts: GoldSandboxPost[]; total: number; pairedHref: string; base: string; view: SandboxView };
+type PageProps = { account: GoldSandboxAccount; posts: GoldSandboxPost[]; total: number; pairedHref: string; base: string; view: SandboxView; liveUrls?: Record<string, string> };
 
 /** An open X Article: X's reader view (title, cover, author row, body). */
 function XArticle({ account, post, back }: { account: GoldSandboxAccount; post: GoldSandboxPost; back: string }) {
@@ -226,7 +222,7 @@ function XArticle({ account, post, back }: { account: GoldSandboxAccount; post: 
   );
 }
 
-export function XProfile({ account, posts, total, pairedHref, base, view }: PageProps) {
+export function XProfile({ account, posts, total, pairedHref, base, view, liveUrls = {} }: PageProps) {
   const now = new Date();
   const open = view.article ? posts.find((p) => p.id === view.article) : undefined;
   return (
@@ -308,6 +304,11 @@ export function XProfile({ account, posts, total, pairedHref, base, view }: Page
                   <span className="truncate" style={{ color: X.muted }}>
                     @{account.handle} · {xTime(p.postAt, now)}
                   </span>
+                  {liveUrls[`${p.day}:${p.slot}`] && (
+                    <a href={liveUrls[`${p.day}:${p.slot}`]} target="_blank" rel="noreferrer" className="ml-auto shrink-0 text-[13px] font-bold hover:underline" style={{ color: X.blue }}>
+                      View on X ↗
+                    </a>
+                  )}
                 </div>
                 {isArticle(p.format) ? (
                   <Link href={hrefWith(base, view, { article: p.id })} className="mt-2 block overflow-hidden rounded-2xl border hover:bg-black/[0.02]" style={{ borderColor: X.rule }}>
