@@ -12,7 +12,7 @@ A post = **channel x tone x format x angle**. Each axis has its skill; the write
 | Channel | X, Substack | the channel x tone skill |
 | Tone | urgent, balanced, neutral | `x-urgent`, `x-balanced`, `x-neutral`, `substack-urgent`, `substack-balanced`, `substack-neutral` |
 | Format | X post, X Article (X); Note, Article (Substack) | a section of the channel x tone skill |
-| Angle | signal, macro-24h, trending-format, competitor | `angle-signal`, `angle-macro-24h`, `angle-trending-format`, `angle-competitor` |
+| Angle | signal only (Kevin 2026-11-13: « on va se focus sur nos signaux ») | `angle-signal` |
 
 One post = the channel x tone skill (its format section) + the angle skill of that post. Balanced = today's house style (skills `x-post`, `daily-content`, `research-note`, `breaking-chart`); the urgent and neutral skills move ONLY the tone and keep every other rule.
 
@@ -44,12 +44,6 @@ The writer writes that fallback picture with the text, in the same answer (`imag
 6 fake accounts: one X account and one Substack per tone (urgent Siren Small Caps, balanced Narrative Gap, neutral Ledger and Lens). Code: `web/src/collectors/dimensions/sandbox-posts/` reads THESE files at run time; a skill edit changes the next day's posts, never a past day (the skills' hash is stored on each post). Skill `image-correction` looks at each drawn picture and corrects its spec until clean (3 passes); skill `content-review` then reads each day's posts with their pictures; a failing post makes it edit these skills and the day is written again (3 rounds max).
 
 ### Daily mix per account (5 posts)
-| Slot (Astana) | Angle | Input |
-|---|---|---|
-| 08:00 | signal | the day's best Idea |
-| 11:00 | macro-24h | the top macro headline of the last 24 h |
-| 14:00 | signal | the day's second Idea |
-| 17:00 | trending-format | a format that performs now, applied to the third Idea |
-| 20:00 | competitor | a reference publication's pattern, applied to the fourth Idea |
+Every slot (08:00, 11:00, 14:00, 17:00, 20:00 Astana) is a signal post on the next of the day's best Ideas, one Idea per slot (fewer Ideas = fewer posts).
 
-4 short posts (X post or Note) + 1 Article. The Article's angle rotates by day (signal, macro-24h, trending-format, competitor). Every account of a channel writes the same inputs in the same formats: only the tone differs, so Thierry compares tones with everything else equal.
+4 short posts (X post or Note) + 1 Article, the Article on the day's best Idea. Every account of a channel writes the same inputs in the same formats: only the tone differs, so Thierry compares tones with everything else equal.

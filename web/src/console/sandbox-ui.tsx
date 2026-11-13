@@ -13,7 +13,7 @@ import {
 import Link from "@/console/link";
 import { LogoDownload } from "@/console/logo-download";
 import { hasLogo, logoSvg } from "@/console/sandbox-logos";
-import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat } from "@/db/schema/sandbox";
+import type { GoldSandboxAccount, GoldSandboxPost, SandboxFormat } from "@/db/schema/sandbox";
 
 /**
  * Sandbox pages (Kevin 2026-11-11): fake X profiles and Substack publications drawn as close to the real sites as we can,
@@ -23,8 +23,6 @@ import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat }
  */
 
 export const FORMAT_LABEL: Record<SandboxFormat, string> = { "x-post": "X post", "x-article": "X Article", "substack-note": "Note", "substack-article": "Article" };
-export const ANGLE_LABEL: Record<SandboxAngle, string> = { signal: "Signal", "macro-24h": "Macro 24h", "trending-format": "Trending format", competitor: "Competitor" };
-const ANGLES = Object.keys(ANGLE_LABEL) as SandboxAngle[];
 const isArticle = (f: SandboxFormat) => f === "x-article" || f === "substack-article";
 
 function SandboxLabel({ live }: { live: boolean }) {
@@ -56,19 +54,18 @@ function BigAvatar({ account, size }: { account: GoldSandboxAccount; size: numbe
 }
 
 /** The page's filters and open Article, from the URL. */
-export type SandboxView = { format: SandboxFormat | null; angle: SandboxAngle | null; article: string | null };
+export type SandboxView = { format: SandboxFormat | null; article: string | null };
 
 function hrefWith(base: string, view: SandboxView, change: Partial<SandboxView>) {
   const next = { ...view, ...change };
   const q = new URLSearchParams();
   if (next.format) q.set("format", next.format);
-  if (next.angle) q.set("angle", next.angle);
   if (next.article) q.set("article", next.article);
   const s = q.toString();
   return s ? `${base}?${s}` : base;
 }
 
-/** One row: the « not published » badge, then format and angle chips above the timeline (Dualis console look: they are ours, not the site's). */
+/** One row: the badge, then format chips above the timeline (signal posts only) (Dualis console look: they are ours, not the site's). */
 export function SandboxFilters({ base, view, formats, live = false }: { base: string; view: SandboxView; formats: SandboxFormat[]; live?: boolean }) {
   const chip = (active: boolean, href: string, label: string) => (
     <Link key={href + label} href={href} className={`rounded-full border px-3 py-1 text-sm ${active ? "border-transparent bg-kumo-brand text-white" : "border-kumo-line bg-kumo-base text-kumo-default hover:bg-kumo-tint"}`}>
@@ -81,19 +78,15 @@ export function SandboxFilters({ base, view, formats, live = false }: { base: st
       <span className="ml-4 text-sm text-kumo-subtle">Format</span>
       {chip(view.format === null, hrefWith(base, view, { format: null, article: null }), "All")}
       {formats.map((f) => chip(view.format === f, hrefWith(base, view, { format: f, article: null }), FORMAT_LABEL[f]))}
-      <span className="ml-4 text-sm text-kumo-subtle">Angle</span>
-      {chip(view.angle === null, hrefWith(base, view, { angle: null, article: null }), "All")}
-      {ANGLES.map((a) => chip(view.angle === a, hrefWith(base, view, { angle: a, article: null }), ANGLE_LABEL[a]))}
     </div>
   );
 }
 
-/** The two tags and where the idea came from, under every post. */
+/** The format tag and the Idea the post came from, under every post. */
 function PostTags({ post, muted }: { post: GoldSandboxPost; muted: string }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
       <span className="rounded-full bg-kumo-recessed px-2 py-0.5 font-medium text-kumo-default">{FORMAT_LABEL[post.format]}</span>
-      <span className="rounded-full bg-kumo-recessed px-2 py-0.5 font-medium text-kumo-default">{ANGLE_LABEL[post.angle]}</span>
       <span className="min-w-0 truncate" style={{ color: muted }} title={post.input.label}>
         {post.input.url ? (
           <a href={post.input.url} target="_blank" rel="noreferrer" className="hover:underline">
