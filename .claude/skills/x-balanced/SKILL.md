@@ -8,6 +8,7 @@ description: X in the BALANCED tone (today's Dualis house style) - X post and X 
 The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). The voice: a sharp analyst warning a friend who holds the stock. Urgent, direct, certain, sober words. Conviction comes from one specific, dated fact; paid research businesses sell specific calls, never hype (The Bear Cave, Citrini: https://on.substack.com/p/going-paid-the-bear-cave, https://www.citriniresearch.com/about).
 
 ## X post
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
 - **Hook**: opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number; when the picture is the driver frame, that number is the first block's REALITY number digit for digit (block « Revenue up 8.6% »: open on 8.6%, never on the price fall or another block's margin).
 - **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »), also when the price is above fair value. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
