@@ -35,7 +35,7 @@ export const financialLines = silver.table(
     periodEnd: text("period_end").notNull(),
     /** Canonical line key (`lines.ts`): revenue, operating-income, cash... or `segment:<axis>:<name>`. */
     line: text("line").notNull(),
-    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment">().notNull(),
+    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment" | "operating">().notNull(),
     value: doublePrecision("value").notNull(),
     currency: text("currency"),
     label: text("label").notNull(),
@@ -60,7 +60,7 @@ export const goldFinancialLines = gold.table(
     periodType: text("period_type").$type<"year" | "half" | "quarter" | "month">().notNull(),
     periodEnd: text("period_end").notNull(),
     line: text("line").notNull(),
-    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment">().notNull(),
+    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment" | "operating">().notNull(),
     value: doublePrecision("value").notNull(),
     currency: text("currency"),
     label: text("label").notNull(),
@@ -177,75 +177,3 @@ export const valuations = gold.table("valuations", {
   rebuiltAt,
 });
 export type GoldValuation = typeof valuations.$inferSelect;
-
-/**
- * Operating KPIs (dimension `operating-kpis`): what a company reports about its business beyond the statements
- * (backlog, order intake, bookings, book-to-bill, subscribers, same-store sales, utilisation, ARR...), copied by
- * Claude from its own filings and earnings releases, each value kept only when printed in the quoted text.
- * `kpi` = a lowercase slug Claude keeps across documents ("backlog", "order-intake"); `name` = the company's words.
- * `periodType`: "instant" (a balance at the period end: backlog, subscribers) or a flow over a "year" / "half" /
- * "quarter" (bookings). Units: "currency" (full units, `currency`), "count", "ratio" (0.12 = 12%), "multiple" (1.2x).
- */
-export type KpiPeriodType = "instant" | "year" | "half" | "quarter";
-export type KpiUnit = "currency" | "count" | "ratio" | "multiple";
-/** Where a KPI value was printed: the document, the passage Claude cited (as printed) and the figure in it. */
-export type KpiCitation = { document: string; url: string; registry: string; filedAt: string; quote: string; printed: string };
-
-/** One row per (ticker, KPI, period): the latest filed document's value, every document that printed it. */
-export const operatingKpis = silver.table(
-  "operating_kpis",
-  {
-    symbol: text("symbol").notNull(),
-    kpi: text("kpi").notNull(),
-    periodType: text("period_type").$type<KpiPeriodType>().notNull(),
-    periodEnd: text("period_end").notNull(),
-    name: text("name").notNull(),
-    unit: text("unit").$type<KpiUnit>().notNull(),
-    /** What a count counts ("subscribers", "units", "tonnes"), as the company says it. */
-    unitLabel: text("unit_label"),
-    currency: text("currency"),
-    value: doublePrecision("value").notNull(),
-    /** Registries whose documents printed the value ("sec", "hkex", "tdnet"). */
-    sources: text("sources").array().notNull(),
-    bronzeIds: uuid("bronze_ids").array().notNull(),
-    /** Every document that printed this KPI for this period, the latest filed first, with its value. */
-    observations: jsonb("observations").$type<(KpiCitation & { value: number })[]>().notNull(),
-    lastRebuiltAt: timestamp("last_rebuilt_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [primaryKey({ columns: [t.symbol, t.kpi, t.periodType, t.periodEnd] })],
-);
-export type SilverOperatingKpi = typeof operatingKpis.$inferSelect;
-
-/**
- * What the analysis and the console read, rebuilt from silver each run (`operating-kpis/derive.ts`): the value, its
- * move on the same period a year earlier, and for a currency KPI its ratio to revenue (a balance at a date over the
- * last 12 months of revenue to that date; a flow over the revenue of the same period). Data only: whether a KPI
- * matters, and whether it inflects, is the analysis' call (no rule per KPI or sector).
- */
-export const goldOperatingKpis = gold.table(
-  "operating_kpis",
-  {
-    symbol: text("symbol").notNull(),
-    kpi: text("kpi").notNull(),
-    periodType: text("period_type").$type<KpiPeriodType>().notNull(),
-    periodEnd: text("period_end").notNull(),
-    name: text("name").notNull(),
-    unit: text("unit").$type<KpiUnit>().notNull(),
-    unitLabel: text("unit_label"),
-    currency: text("currency"),
-    value: doublePrecision("value").notNull(),
-    priorValue: doublePrecision("prior_value"),
-    growth: doublePrecision("growth"),
-    /** The revenue the ratio divides by, and which periods it is ("LTM to 2026-09", "FY 2025-12"). */
-    revenue: doublePrecision("revenue"),
-    revenueBasis: text("revenue_basis"),
-    revenueRatio: doublePrecision("revenue_ratio"),
-    sources: text("sources").array().notNull(),
-    citation: jsonb("citation").$type<KpiCitation>().notNull(),
-    /** Other values printed for the same period (a restatement): document + value. */
-    alternatives: jsonb("alternatives").$type<{ document: string; value: number }[]>().notNull(),
-    rebuiltAt,
-  },
-  (t) => [primaryKey({ columns: [t.symbol, t.kpi, t.periodType, t.periodEnd] }), index("gold_operating_kpis_symbol").on(t.symbol)],
-);
-export type GoldOperatingKpi = typeof goldOperatingKpis.$inferSelect;

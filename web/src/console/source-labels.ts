@@ -12,7 +12,6 @@ const FILINGS: Record<string, string> = {
   tdnet: "TDnet",
   "companies-house": "Companies House",
   hkexnews: "HKEXnews",
-  hkex: "HKEXnews",
   asx: "ASX",
 };
 const PROVIDERS: Record<string, string> = {

@@ -7,7 +7,6 @@ import { valuationReports } from "@/db/schema/valuation";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { itemsOf } from "../evidence/items";
-import { kpisTextOf } from "../operating-kpis";
 import { seriesCatalog, seriesMenu, type StoredSeries } from "./series";
 
 /**
@@ -45,6 +44,12 @@ export function fnv(text: string): string {
 
 const TABLE_LINES = ["line:revenue", "line:gross-profit", "line:operating-income", "line:depreciation-amortization", "metric:ebitda", "line:net-income", "line:eps-diluted", "line:eps-basic", "metric:operating-margin", "metric:ebitda-margin", "metric:revenue-growth", "line:cfo", "line:capex", "metric:fcf", "line:dividends-paid", "line:buybacks", "line:cash", "line:total-debt", "metric:net-debt", "line:equity", "line:shares-outstanding", "metric:ev-ebitda", "metric:pe"];
 const QUARTER_LINES = ["qline:revenue", "qline:operating-income", "qline:net-income", "qmetric:operating-margin"];
+/**
+ * What the company reports about its business beside the statements, when it does (a table drops absent rows): the
+ * order book and new orders, each against revenue. Whether one matters, and whether the price saw it, is the model's call.
+ */
+const OPERATING_KEYS = ["line:backlog", "metric:backlog-growth", "metric:backlog-to-revenue", "line:remaining-performance-obligations", "metric:remaining-performance-obligations-growth", "metric:remaining-performance-obligations-to-revenue", "line:order-intake", "metric:book-to-bill"];
+const OPERATING_QUARTER_KEYS = OPERATING_KEYS.map((k) => `q${k}`);
 const HALF_LINES = ["hline:revenue", "hline:gross-profit", "hline:operating-income", "hline:net-income"];
 
 const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
@@ -84,21 +89,33 @@ export function streamsText(rows: GoldRevenueStream[]): string | null {
 }
 /**
  * The reported numbers every judge of the story reads (evidence, driver and thesis state): the last fiscal years,
- * quarters and half years, revenue by stream, and the operating KPIs the company reports (backlog, orders,
- * subscribers...). A results filing arrives as a title; these are its figures.
+ * quarters and half years, and revenue by stream. A results filing arrives as a title; these are its figures.
  */
 export async function figuresText(db: Db, symbol: string): Promise<string> {
   const catalog = await seriesCatalog(db, symbol);
   const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
-  const kpis = await kpisTextOf(db, symbol);
   const keys = (prefix: string) => ["revenue", "operating-income", "net-income"].map((l) => `${prefix}:${l}`).filter((k) => catalog.has(k));
   return [
     "The company's reported figures:",
     keys("line").length ? `Fiscal years:\n${table(catalog, keys("line"), 4)}` : "Fiscal years: none collected.",
     keys("qline").length ? `Last quarters:\n${table(catalog, keys("qline"), 4)}` : null,
     keys("hline").length ? `Last half years:\n${table(catalog, keys("hline"), 4)}` : null,
+    operatingText(catalog),
     streamsText(streams),
-    kpis,
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+/** The order book and new orders the company reports, fiscal years then quarters; null when it reports none. */
+function operatingText(catalog: Map<string, StoredSeries>): string | null {
+  const years = OPERATING_KEYS.filter((k) => catalog.has(k));
+  const quarters = OPERATING_QUARTER_KEYS.filter((k) => catalog.has(k));
+  if (years.length + quarters.length === 0) return null;
+  return [
+    "Operating figures the company reports (backlog = at the period end; x = times the revenue of the 12 months to that date):",
+    years.length ? table(catalog, years, 4) : null,
+    quarters.length ? `Quarters:\n${table(catalog, quarters, 4)}` : null,
   ]
     .filter((x) => x !== null)
     .join("\n");
@@ -124,7 +141,6 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const catalog = await seriesCatalog(db, symbol);
   const currency = valuation?.currency ?? profile?.currency ?? null;
   const streams = await db.select().from(revenueStreams).where(eq(revenueStreams.symbol, symbol));
-  const kpis = await kpisTextOf(db, symbol);
   const halves = HALF_LINES.filter((k) => catalog.has(k));
   const price = catalog.get("price");
   const closes = price ? [...price.points].sort((a, b) => a[0].localeCompare(b[0])).slice(-24) : [];
@@ -143,8 +159,8 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     "Last quarters:",
     table(catalog, QUARTER_LINES, 6),
     halves.length ? `\nLast half years:\n${table(catalog, halves, 4)}` : null,
+    operatingText(catalog) ? `\n${operatingText(catalog)}` : null,
     streams.length ? `\n${streamsText(streams)}` : null,
-    kpis ? `\n${kpis}` : null,
     "",
     valuation
       ? `Valuation from gold: EV/EBITDA over fiscal years ${valuation.evEbitdaYears.join(", ") || "none"}: low ${fmt(valuation.evEbitdaLow, "multiple")}, median ${fmt(valuation.evEbitdaMedian, "multiple")}, high ${fmt(valuation.evEbitdaHigh, "multiple")}. Latest shares outstanding ${fmt(valuation.sharesOutstanding)}; net debt ${fmt(valuation.netDebt)} (${valuation.inputs["total-debt"]?.period ?? "n/a"}); EBITDA ${fmt(valuation.ebitda)} (${valuation.ebitdaBasis ?? "n/a"}).`

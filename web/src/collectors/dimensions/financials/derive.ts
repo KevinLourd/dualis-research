@@ -114,6 +114,18 @@ export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
     margin("operating-margin", "operating-income");
     margin("net-margin", "net-income");
     add("revenue-growth", "ratio", pt === "year" ? "revenue / prior fiscal year revenue - 1" : "revenue / same quarter prior year - 1", [g("revenue"), prior("revenue")], ([r, p]) => (p > 0 ? r / p - 1 : null));
+    // The order book against revenue (Thierry 2026-11-12: « over a hundred percent… ideally 200% » of sales): a balance
+    // at the period end over the revenue of the 12 months to it; order intake over the same period's revenue.
+    const ltmRevenue = pt === "year" ? [g("revenue")] : [0, 3, 6, 9].map((n) => get("quarter", minusMonths(pe, n), "revenue"));
+    const ltmWords = pt === "year" ? "fiscal year revenue" : "revenue of the last 4 reported quarters";
+    for (const line of ["backlog", "remaining-performance-obligations"] as const) {
+      add(`${line}-to-revenue`, "multiple", `${line.replace(/-/g, " ")} / ${ltmWords}`, [g(line), ...ltmRevenue], ([b, ...r]) => {
+        const rev = r.reduce((a, x) => a + x, 0);
+        return rev > 0 ? b / rev : null;
+      });
+      add(`${line}-growth`, "ratio", `${line.replace(/-/g, " ")} / the same date a year earlier - 1`, [g(line), prior(line)], ([b, p]) => (p > 0 ? b / p - 1 : null));
+    }
+    add("book-to-bill", "multiple", "order intake / revenue of the same period", [g("order-intake"), g("revenue")], ([o, r]) => (r > 0 ? o / r : null));
     add("operating-income-growth", "ratio", pt === "year" ? "operating income / prior fiscal year - 1" : "operating income / same quarter prior year - 1", [g("operating-income"), prior("operating-income")], ([r, p]) => (p > 0 ? r / p - 1 : null));
   }
   // Second pass: metrics on metrics (EBITDA margin, FCF margin) and market values at each period end.

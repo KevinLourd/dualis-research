@@ -1,10 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { ExhibitPoint, ExhibitSeries } from "@/db/schema/analysis";
 import { consensus } from "@/db/schema/consensus";
-import { financialMetrics, goldFinancialLines, goldOperatingKpis } from "@/db/schema/financials";
+import { financialMetrics, goldFinancialLines } from "@/db/schema/financials";
 import type { Db } from "@/db/types";
 import { LINES, type LineKey } from "../financials/lines";
-import { kpiSeriesKey } from "../operating-kpis";
 
 /**
  * The stored series a ticker's Exhibits can draw from: every number on a chart comes from here (gold), never from
@@ -14,9 +13,6 @@ import { kpiSeriesKey } from "../operating-kpis";
  *   consensus:<m> / actual:<m>        analyst mean vs reported actual per fiscal year (gold.consensus)
  *   qconsensus:<m> / qactual:<m>      same per quarter
  *   price                             month-end close, 5 years
- *   kpi:<k> / ykpi:<k> / hkpi:<k> / qkpi:<k>   operating KPI the company reports (gold.operating_kpis): a balance at each
- *                                     period end / a flow per fiscal year, half year, quarter
- *   kpi-ratio:<k>                     a currency KPI over revenue (a balance over the last 12 months of revenue)
  */
 export type StoredSeries = ExhibitSeries & { periodType: "year" | "half" | "quarter" | "month"; points: Map<string, number> };
 
@@ -37,6 +33,11 @@ const METRIC_NAMES: Record<string, string> = {
   ev: "Enterprise value",
   "ev-ebitda": "EV/EBITDA",
   pe: "P/E",
+  "backlog-to-revenue": "Backlog / last 12 months revenue",
+  "backlog-growth": "Backlog growth",
+  "remaining-performance-obligations-to-revenue": "Remaining performance obligations / last 12 months revenue",
+  "remaining-performance-obligations-growth": "Remaining performance obligations growth",
+  "book-to-bill": "Book-to-bill",
 };
 
 export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string, StoredSeries>> {
@@ -70,13 +71,6 @@ export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string,
     const srcOf = (stat: string) => c.provenance[stat]?.sources ?? [];
     if (c.mean !== null) put(`${q ? "qconsensus" : "consensus"}:${c.metric}`, { label: `${name}, analyst mean${q ? " (quarterly)" : ""}`, unit, currency: c.currency, periodType: c.periodType }, c.periodEnd, c.mean, srcOf("mean"));
     if (c.actual !== null) put(`${q ? "qactual" : "actual"}:${c.metric}`, { label: `${name}, reported${q ? " (quarterly)" : ""}`, unit, currency: c.currency, periodType: c.periodType }, c.periodEnd, c.actual, srcOf("actual"));
-  }
-  for (const k of await db.select().from(goldOperatingKpis).where(eq(goldOperatingKpis.symbol, symbol))) {
-    // A balance at period ends charts like a quarterly series (its dates are quarter or year ends).
-    const periodType = k.periodType === "instant" ? "quarter" : k.periodType;
-    const suffix = { instant: " (at period end)", year: "", half: " (half-yearly)", quarter: " (quarterly)" }[k.periodType];
-    put(kpiSeriesKey(k.kpi, k.periodType), { label: `${k.name}${suffix}`, unit: k.unit, currency: k.unit === "currency" ? k.currency : null, periodType }, k.periodEnd, k.value, k.sources);
-    if (k.revenueRatio !== null && k.periodType === "instant") put(`kpi-ratio:${k.kpi}`, { label: `${k.name} / last 12 months revenue`, unit: "multiple", currency: null, periodType }, k.periodEnd, k.revenueRatio, k.sources);
   }
   return out;
 }

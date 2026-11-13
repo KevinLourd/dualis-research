@@ -3,7 +3,6 @@ import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, FileTextIcon, Questi
 import Link from "@/console/link";
 import type { GoldEvidence, GoldExhibit, GoldNarrativeState, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
-import type { GoldOperatingKpi } from "@/db/schema/financials";
 import { type DriverWithExhibits, getTickerAnalysis, getValuation } from "./analysis-queries";
 import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
@@ -17,7 +16,7 @@ import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
 import { day, price, relativeTime, utc } from "./format";
-import { consensusOf, getTicker, operatingKpisOf } from "./queries";
+import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
 import { getThesis } from "./thesis-queries";
 import { saveFairValue } from "./thesis-actions";
@@ -36,7 +35,7 @@ export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | nul
 export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
 
 export async function analysisData(symbol: string, thesis: ThesisSide | null = null) {
-  const [row, data, ownFair, consensus, objects, chart, valuation, operatingKpis] = await Promise.all([
+  const [row, data, ownFair, consensus, objects, chart, valuation] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
     getThesis(symbol),
@@ -44,10 +43,9 @@ export async function analysisData(symbol: string, thesis: ThesisSide | null = n
     getTickerAnalysis(symbol, thesis),
     priceVsFairValue(symbol),
     getValuation(symbol),
-    operatingKpisOf(symbol),
   ]);
   if (!row || !data) return null;
-  return { row, data, ownFair, consensus, objects, chart, valuation, operatingKpis };
+  return { row, data, ownFair, consensus, objects, chart, valuation };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
@@ -130,60 +128,6 @@ function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
           })}
         </KTableBody>
       </KTable>
-    </div>
-  );
-}
-
-const compact = (v: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
-const kpiValue = (r: GoldOperatingKpi) =>
-  r.unit === "ratio" ? `${(r.value * 100).toFixed(1)}%` : r.unit === "multiple" ? `${r.value.toFixed(2)}x` : `${compact(r.value)}${r.unit === "currency" && r.currency ? ` ${r.currency}` : r.unitLabel ? ` ${r.unitLabel}` : ""}`;
-const KPI_PERIOD: Record<string, string> = { instant: "At", year: "FY", half: "6M to", quarter: "Q to" };
-
-/**
- * The operating KPIs the company itself reports (backlog, orders, subscribers...), the latest period of each, under
- * the KPIs vs consensus table: value, move on a year earlier, ratio to revenue, and the filing that printed it.
- */
-function OperatingKpis({ rows }: { rows: GoldOperatingKpi[] }) {
-  const latest = new Map<string, GoldOperatingKpi>();
-  for (const r of rows) if (!latest.has(`${r.kpi}|${r.periodType}`)) latest.set(`${r.kpi}|${r.periodType}`, r);
-  if (latest.size === 0) return null;
-  return (
-    <div className="flex flex-col gap-3">
-      <h3 className="text-base font-semibold text-kumo-strong">Reported by the company</h3>
-      <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
-        <KTable>
-          <KTableHeader>
-            <KTableRow>
-              <KTableHead className="pl-4">KPI</KTableHead>
-              <KTableHead>Period</KTableHead>
-              <KTableHead className="text-right">Value</KTableHead>
-              <KTableHead className="text-right">vs a year earlier</KTableHead>
-              <KTableHead className="text-right">x revenue</KTableHead>
-              <KTableHead className="pr-4">Source</KTableHead>
-            </KTableRow>
-          </KTableHeader>
-          <KTableBody>
-            {[...latest.values()].map((r) => (
-              <KTableRow key={`${r.kpi}|${r.periodType}`}>
-                <KTableCell className="py-3 pl-4 font-medium text-kumo-strong">{r.name}</KTableCell>
-                <KTableCell className="py-3 whitespace-nowrap text-kumo-subtle">{`${KPI_PERIOD[r.periodType]} ${r.periodEnd}`}</KTableCell>
-                <KTableCell className="py-3 text-right font-mono tabular text-kumo-strong">{kpiValue(r)}</KTableCell>
-                <KTableCell className={`py-3 text-right font-mono tabular ${r.growth === null ? "text-kumo-subtle" : r.growth >= 0 ? "text-dualis-long" : "text-dualis-short"}`}>
-                  {r.growth === null ? "–" : `${r.growth >= 0 ? "+" : "-"}${Math.abs(r.growth * 100).toFixed(1)}%`}
-                </KTableCell>
-                <KTableCell className="py-3 text-right font-mono tabular" title={r.revenueBasis ?? undefined}>
-                  {r.revenueRatio === null ? "–" : `${r.revenueRatio.toFixed(2)}x`}
-                </KTableCell>
-                <KTableCell className="py-3 pr-4">
-                  <a href={r.citation.url} target="_blank" rel="noreferrer" title={r.citation.quote} className="inline-flex items-center gap-1 text-sm text-kumo-link hover:underline">
-                    {r.citation.document} <ArrowSquareOutIcon size={14} aria-hidden />
-                  </a>
-                </KTableCell>
-              </KTableRow>
-            ))}
-          </KTableBody>
-        </KTable>
-      </div>
     </div>
   );
 }
@@ -323,7 +267,7 @@ function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: D
  * one, else the long. The competition between two theses stays in the backend.
  */
 export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
-  const { row, ownFair: thesis, consensus, objects, chart, valuation, operatingKpis } = analysis;
+  const { row, ownFair: thesis, consensus, objects, chart, valuation } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const symbol = row.symbol;
   // The analysis writes the narrative; nobody edits it by hand (Kevin 2026-11-09).
@@ -386,7 +330,6 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
         <>
           <Section title="KPIs vs consensus">
             <Kpis symbol={symbol} rows={consensus} />
-            <OperatingKpis rows={operatingKpis} />
           </Section>
           {objects.signalChanges.length > 0 && (
             <Section title="Signal history">
