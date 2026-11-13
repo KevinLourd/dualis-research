@@ -27,9 +27,7 @@ import { signalsDim } from "./dimensions/signals";
 import { signalAlertsDim } from "./dimensions/signal-alerts";
 import { growthBriefDim } from "./dimensions/growth-brief";
 import { growthOutreach } from "./dimensions/growth-outreach";
-import { macroNews } from "./dimensions/macro-news";
 import { sandboxAccounts } from "./dimensions/sandbox-accounts";
-import { substackTrending } from "./dimensions/substack-trending";
 import { sandboxPosts } from "./dimensions/sandbox-posts";
 import { sandboxImageFix } from "./dimensions/sandbox-image-fix";
 import { sandboxReview } from "./dimensions/sandbox-review";
@@ -57,20 +55,20 @@ import type { Dimension } from "./types";
  * Cover photos right after content-posts: one photo per own article for the website covers.
  * Content ideas after content-voices (the day's Ideas, scored per channel x format); content-picks after it files the day's 2 posts (best X post, best Substack Note); content-drafts after it writes the drafts Thierry asked for and the picks; content-visuals after it draws each drafted Idea's chart, card, video and news capture.
  * Intraday price (5-minute bars, Yahoo) alone in its stage right after price (Yahoo rate limit): it moves gold.quotes to the latest 5-minute price, so EV, valuation, every judge and the live test read the real price, and market reaction the price at the minute a news item lands.
- * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11): macro-news (Google News, last 24 h) and substack-trending (finance Substacks' best recent posts) feed their angles; each fake account writes 5 posts a day, text and picture, from the skills (content-matrix); sandbox-visuals draws each post's picture; sandbox-image-fix (skill image-correction) looks at each picture and corrects its spec until clean (3 passes); sandbox-review (skill content-review) reads them, edits the writing skills on a failure and the day is written again (3 rounds max). A connected X account publishes them (x-publish, below).
+ * Sandbox accounts and posts after content-visuals (Kevin 2026-11-11; signals only since 2026-11-13): each fake account writes 5 posts a day on the day's best signal Ideas, text and picture, from the skills (content-matrix); sandbox-visuals draws each post's picture; sandbox-image-fix (skill image-correction) looks at each picture and corrects its spec until clean (3 passes); sandbox-review (skill content-review) reads them, edits the writing skills on a failure and the day is written again (3 rounds max). A connected X account publishes them (x-publish, below).
  * Growth brief last: it reads the subscriber count and outreach the two before it just rebuilt.
  * X publish (Kevin 2026-11-13) runs ONLY when named (x-publish.yml, every hour): it posts for real on X, and two runs at
  * once would race the account's rotating token, so `all`, `core` and `growth` never include it.
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, macroNews, substackTrending, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
  * collect runs `core` = everything else, the analysis chain, so it lands in minutes (Kevin 2026-11-05: speed).
  */
-export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-picks", "content-drafts", "content-visuals", "macro-news", "substack-trending", "sandbox-accounts", "sandbox-posts", "sandbox-visuals", "sandbox-image-fix", "sandbox-review", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
+export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "content-posts", "cover-photos", "content-voices", "content-ideas", "content-picks", "content-drafts", "content-visuals", "sandbox-accounts", "sandbox-posts", "sandbox-visuals", "sandbox-image-fix", "sandbox-review", "content-dispatch", "content-replies", "growth-outreach", "substack-network", "growth-brief"];
 
 /**
  * Stages of a collect (Kevin 2026-11-06: « comment speeder x10 »): the dimensions of one stage run at the same time,

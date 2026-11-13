@@ -12,14 +12,12 @@ import type { Complete } from "@/llm/complete";
 import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
-import { macroNews, MACRO_QUERIES } from "../macro-news";
 import { SANDBOX_ACCOUNTS, sandboxAccounts } from "../sandbox-accounts";
-import { substackTrending, TRENDING_HOSTS } from "../substack-trending";
 import { opportunityStory } from "../content-visuals/opportunity";
 import { sandboxImageFix } from "../sandbox-image-fix";
 import { sandboxReview } from "../sandbox-review";
 import { postKey, sandboxVisuals } from "../sandbox-visuals";
-import { articleAngle, loadSkills, parsePosts, POSTS_PER_DAY, sandboxPostSubjects, sandboxPosts } from ".";
+import { loadSkills, parsePosts, POSTS_PER_DAY, sandboxPostSubjects, sandboxPosts } from ".";
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000);
 
@@ -118,9 +116,6 @@ beforeEach(async () => {
   const days = Array.from({ length: 60 }, (_, i) => new Date(Date.now() - (60 - i) * 86400_000).toISOString().slice(0, 10));
   await db.insert(gold.priceBars).values(days.map((date, i) => ({ symbol: "CCLD", date, close: 3 - i / 60, sources: ["yahoo"], alternatives: [] })));
   for (const [rank, score] of [[1, 90], [2, 40], [3, 80], [4, 70], [5, 60], [6, 50]] as const) ideaIds.push(await addIdea(rank, score));
-  // A reference publication's recent post (content-posts) for the competitor angle.
-  await db.insert(content.contentPublications).values({ host: "www.citriniresearch.com", name: "Citrini Research", kind: "reference", sources: ["rss"], bronzeIds: [] });
-  await db.insert(content.contentPosts).values({ urlKey: "citrini/p/x", url: "https://www.citriniresearch.com/p/x", publicationHost: "www.citriniresearch.com", format: "substack-article", title: "A primer on shipping", excerpt: "Shipping is a cycle.", publishedAt: hoursAgo(72), topics: [], tickers: [], tickersBySource: {}, sources: ["rss"], bronzeIds: [] });
 });
 afterEach(async () => {
   await close();
@@ -141,27 +136,8 @@ describe("sandbox-accounts", () => {
   });
 });
 
-describe("macro-news and substack-trending", () => {
-  it("macro: one row per article with every search that found it; gold keeps the last 24 h", async () => {
-    await run(macroNews);
-    const items = await db.select().from(sandbox.macroNewsItems);
-    expect(items.map((i) => i.title).sort()).toEqual(["Fed holds rates", "Oil jumps"]);
-    expect(items.find((i) => i.title === "Fed holds rates")?.queries).toHaveLength(MACRO_QUERIES.length);
-    expect(await db.select().from(sandbox.goldMacroNews)).toHaveLength(2);
-  });
-
-  it("trending: the best recent posts of the last 30 days, scored", async () => {
-    await run(substackTrending);
-    const gold = await db.select().from(sandbox.goldSubstackTrending);
-    expect(gold).toHaveLength(TRENDING_HOSTS.length);
-    expect(gold.every((g) => g.title !== "Old" && g.score === g.reactions + 2 * g.restacks + g.comments)).toBe(true);
-  });
-});
-
 describe("sandbox-posts", () => {
-  it("5 posts per account per day: 4 short + 1 Article, all 4 angles, same inputs per channel; a rerun does nothing", async () => {
-    await run(macroNews);
-    await run(substackTrending);
+  it("5 posts per account per day: 4 short + 1 Article, all signal posts on distinct Ideas, same inputs per channel; a rerun does nothing", async () => {
     await run(sandboxAccounts);
     expect((await run(sandboxPosts)).status).toBe("succeeded");
     expect(complete).toHaveBeenCalledTimes(6);
@@ -170,11 +146,12 @@ describe("sandbox-posts", () => {
     const accounts = await db.select().from(sandbox.goldSandboxAccounts);
     for (const a of accounts) {
       const mine = posts.filter((p) => p.accountId === a.id).sort((x, y) => x.slot - y.slot);
-      expect(new Set(mine.map((p) => p.angle))).toEqual(new Set(["signal", "macro-24h", "trending-format", "competitor"]));
+      expect(new Set(mine.map((p) => p.angle))).toEqual(new Set(["signal"]));
+      expect(new Set(mine.map((p) => p.ideaId)).size).toBe(POSTS_PER_DAY);
       expect(mine.filter((p) => p.format.endsWith("article"))).toHaveLength(1);
       expect(mine.filter((p) => p.format === (a.platform === "x" ? "x-post" : "substack-note"))).toHaveLength(4);
       const article = mine.find((p) => p.format.endsWith("article"))!;
-      expect(article.angle).toBe(articleAngle(article.day));
+      expect(article.slot).toBe(0);
       expect(article.title).toMatch(/article/);
     }
     // Same inputs for every account of a channel.
@@ -183,16 +160,11 @@ describe("sandbox-posts", () => {
       const inputs = ids.map((id) => JSON.stringify(posts.filter((p) => p.accountId === id).sort((x, y) => x.slot - y.slot).map((p) => [p.format, p.angle, p.input.label])));
       expect(new Set(inputs).size).toBe(1);
     }
-    // The macro slot names its headline; Substack's trending slot names the post it borrows the shape from.
-    expect(posts.find((p) => p.angle === "macro-24h")?.input.url).toBe("https://www.reuters.com/fed");
-    expect(posts.find((p) => p.accountId.startsWith("substack:") && p.angle === "trending-format")?.input.url).toMatch(/\/p\/a$/);
-    expect(posts.find((p) => p.angle === "competitor")?.input.label).toMatch(/A primer on shipping/);
     // Dashes stripped, disclaimer, staggered times; each post carries the picture its writer specified, not drawn yet.
     expect(posts.every((p) => !p.text.includes("—") && /Not investment advice/.test(p.text))).toBe(true);
     expect(new Set(posts.map((p) => p.postAt.toISOString().slice(11, 16)))).toEqual(new Set(["03:00", "06:00", "09:00", "12:00", "15:00"]));
     const silverPosts = await db.select().from(sandbox.sandboxPosts);
     expect(silverPosts.every((p) => p.image && p.round === 1 && p.visualId === null)).toBe(true);
-    expect(silverPosts.find((p) => p.angle === "macro-24h")?.image).toMatchObject({ chart: "price", point: "latest" });
     expect(silverPosts.find((p) => p.accountId.startsWith("x:sirensmallcaps"))?.image?.note).toBe("Down 30%, in a year");
     // The writer sees each post's charts and the tone's Image section.
     expect(complete.mock.calls[0][0].prompt).toMatch(/picture can draw/);
@@ -206,8 +178,6 @@ describe("sandbox-posts", () => {
   });
 
   it("every post gets its OWN picture, drawn as its writer specified; X Article covers at 5:2", async () => {
-    await run(macroNews);
-    await run(substackTrending);
     await run(sandboxAccounts);
     await run(sandboxPosts);
     const report = await run(sandboxVisuals);
@@ -216,8 +186,7 @@ describe("sandbox-posts", () => {
     const posts = await db.select().from(sandbox.goldSandboxPosts);
     expect(posts.filter((p) => p.visualId)).toHaveLength(6 * POSTS_PER_DAY);
     expect(new Set(posts.map((p) => p.visualId)).size).toBe(6 * POSTS_PER_DAY);
-    const macro = posts.filter((p) => p.angle === "macro-24h");
-    expect(new Set(macro.map((p) => p.symbol))).toEqual(new Set(["CCLD"]));
+    expect(new Set(posts.map((p) => p.symbol))).toEqual(new Set(["CCLD"]));
     const own = await db.select({ id: sandbox.sandboxVisuals.id, kind: sandbox.sandboxVisuals.kind, width: sandbox.sandboxVisuals.width, height: sandbox.sandboxVisuals.height }).from(sandbox.sandboxVisuals);
     const xArticles = posts.filter((p) => p.format === "x-article");
     expect(xArticles.every((p) => own.find((v) => v.id === p.visualId)?.kind === "x-cover")).toBe(true);
@@ -256,7 +225,7 @@ describe("sandbox-posts", () => {
   it("skills: each channel x tone file exists with its Image section; an Article must be an object; a picture must use a listed chart and point", async () => {
     for (const p of ["x", "substack"] as const) for (const t of ["urgent", "balanced", "neutral"]) {
       const { text } = await loadSkills(p, t);
-      expect(text).toMatch(/angle: competitor/i);
+      expect(text).toMatch(/angle: signal/i);
       expect(text).toMatch(/## Image/);
     }
     const charts = [{ id: "price", label: "Price", points: [{ id: "2026-11-01", label: "close 3" }] }];
@@ -271,8 +240,6 @@ describe("sandbox-posts", () => {
   });
 
   it("review: a failed round edits the writer's skill and the day is written, drawn and reviewed again; a pass stops it", async () => {
-    await run(macroNews);
-    await run(substackTrending);
     await run(sandboxAccounts);
     reviewPlan.fail = "Siren Small Caps », X,";
     const skill = join(skillsDir, "x-urgent/SKILL.md");
@@ -324,7 +291,6 @@ describe("sandbox-posts", () => {
     // With a judge, the line's compared period is the one before the latest (boxed with it, the arrow between them).
     const judged = await opportunityStory(db, "CCLD", complete);
     expect(judged?.drivers[0].base).toBe(day(6));
-    await run(macroNews);
     await run(sandboxAccounts);
     await run(sandboxPosts);
     const report = await run(sandboxVisuals);
@@ -338,7 +304,6 @@ describe("sandbox-posts", () => {
   }, 60_000);
 
   it("image correction: a defective picture gets a corrected spec and is drawn again; the review waits for clean pictures", async () => {
-    await run(macroNews);
     await run(sandboxAccounts);
     fixPlan.fixFirst = "Ledger and Lens », X,";
     await run(sandboxPosts);
@@ -373,7 +338,6 @@ describe("sandbox-posts", () => {
   });
 
   it("review: an edit whose text is not in the skill is kept as not applied, with why", async () => {
-    await run(macroNews);
     await run(sandboxAccounts);
     reviewPlan.fail = "Siren Small Caps », X,";
     reviewPlan.edit = { skill: "x-urgent", old: "a line that is nowhere", new: "x" };

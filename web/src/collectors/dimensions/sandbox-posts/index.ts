@@ -1,10 +1,8 @@
-import { and, asc, desc, eq, gte, inArray, like, sql } from "drizzle-orm";
-import { narratives } from "@/db/schema/analysis";
+import { and, asc, eq, like, sql } from "drizzle-orm";
 import { type BronzeFetch, fetches } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
 import type { DraftInputs } from "@/db/schema/content";
 import * as gold from "@/db/schema/gold";
-import { goldNewsItems } from "@/db/schema/news";
 import * as sandbox from "@/db/schema/sandbox";
 import type { SandboxAngle, SandboxFormat, SandboxImage, SandboxInput, SandboxPlatform } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
@@ -15,16 +13,14 @@ import { ideaContext } from "../content-drafts";
 import { calloutPoints } from "../content-visuals/choose";
 import { MIN_BARS, visualInput } from "../content-visuals/data";
 import { draftPrompt, stripDashes, withDisclaimer } from "../content-drafts/format";
-import { REFERENCE_PUBLICATIONS } from "../content-posts";
-import { topMacroHeadline } from "../macro-news";
-import { topTrending } from "../substack-trending";
-import { type IdeaPick, topIdeas } from "./ideas";
+import { topIdeas } from "./ideas";
 
 export { topIdeas } from "./ideas";
 
 /**
  * Sandbox posts (Kevin 2026-11-11, skill content-matrix): every day each fake account writes 5 posts, 4 short (X post or
- * Note) + 1 Article, over the 4 angles (signal x2, macro-24h, trending-format, competitor). Every account of a channel
+ * Note) + 1 Article, all on the day's best signal Ideas (Kevin 2026-11-13: « on va se focus sur nos signaux »; the
+ * macro-24h, trending-format and competitor angles are gone). Every account of a channel
  * writes the same inputs in the same formats, so only the tone differs. The writer's rules are the skill files in
  * `.claude/skills/`, read at run time (never copied here): a skill edit changes the next day's posts, never a past day.
  * ONE LLM call per account per day; a rerun the same day does nothing. Never published.
@@ -34,14 +30,11 @@ export const SANDBOX_POSTS_DIMENSION = "sandbox-posts";
 export const CLAUDE_SOURCE = "claude";
 export const POSTS_PER_DAY = 5;
 /** Bump to rewrite the next day's posts with a new prompt frame; the skills' own text is hashed on top. */
-export const SANDBOX_VERSION = "sandbox-v3";
+export const SANDBOX_VERSION = "sandbox-v4";
 /** A day is written at most this many times: the first writing + one per failed review (skill content-review). */
 export const MAX_ROUNDS = 3;
 /** Display times on the fake timeline: 08:00, 11:00, 14:00, 17:00, 20:00 Astana (UTC+5). */
 export const SLOT_HOURS_UTC = [3, 6, 9, 12, 15] as const;
-/** The angle of each slot; the Ideas used by the signal, trending and competitor slots, in order. */
-export const SLOT_ANGLES: readonly SandboxAngle[] = ["signal", "macro-24h", "signal", "trending-format", "competitor"];
-const ANGLE_ROTATION: readonly SandboxAngle[] = ["signal", "macro-24h", "trending-format", "competitor"];
 
 const SHORT: Record<SandboxPlatform, SandboxFormat> = { x: "x-post", substack: "substack-note" };
 const ARTICLE: Record<SandboxPlatform, SandboxFormat> = { x: "x-article", substack: "substack-article" };
@@ -50,7 +43,7 @@ export const FORMAT_NAME: Record<SandboxFormat, string> = { "x-post": "X post", 
 // ------------------------------------------------------------------------------------------------ skills
 
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
-const ANGLE_SKILLS = ["angle-signal", "angle-macro-24h", "angle-trending-format", "angle-competitor"];
+const ANGLE_SKILLS = ["angle-signal"];
 
 /** The repo's skills folder (`SANDBOX_SKILLS_DIR` = a copy, for tests: the reviewer edits these files). */
 export function skillsRoot(): URL {
@@ -85,9 +78,6 @@ export type SlotPlan = { slot: number; angle: SandboxAngle; article: boolean; id
 /** A chart the post's picture can draw: `price` or an Exhibit id, with the points its arrow can hit (id + value). */
 export type ChartOption = { id: string; label: string; points: { id: string; label: string }[] };
 
-/** The macro post's chart: the price of the company the writer ties the headline to, known only once it answers. */
-const MACRO_CHART: ChartOption = { id: "price", label: "Share price of the ONE company you tie the headline to (your \"ticker\"), last 12 months, vs its fair value", points: [{ id: "latest", label: "the latest close, printed at the end of the line" }] };
-
 /** The charts an Idea's post can draw (its price, the Exhibits of the drivers it cites) and the news it cites. */
 async function ideaCharts(db: Db, ideaId: string): Promise<{ charts: ChartOption[]; news: string[] }> {
   const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
@@ -100,11 +90,6 @@ async function ideaCharts(db: Db, ideaId: string): Promise<{ charts: ChartOption
   return { charts, news: input.news.map((n) => `${n.publisher}: ${n.headline}${n.citedSentence ? `. Key sentence: ${n.citedSentence}` : ""}`) };
 }
 
-/** The angle whose slot is the day's Article: rotates by day. */
-export function articleAngle(day: string): SandboxAngle {
-  return ANGLE_ROTATION[Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400_000) % ANGLE_ROTATION.length];
-}
-
 /** One Idea in words (the block content-drafts hands its writer). */
 async function ideaBrief(db: Db, ideaId: string): Promise<string> {
   const [idea] = await db.select().from(content.contentIdeas).where(eq(content.contentIdeas.id, ideaId));
@@ -113,19 +98,6 @@ async function ideaBrief(db: Db, ideaId: string): Promise<string> {
   const [profile] = symbol ? await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol)) : [];
   const inputs: DraftInputs = { symbol, companyName: profile?.name ?? null, news: null, worthJudgmentId: null, worth: null, thesis: null, driver: null, chart: null, idea: { id: idea.id, title: idea.title, angle: idea.angle, sources: idea.sourceRefs } };
   return draftPrompt(inputs, await ideaContext(db, idea, symbol));
-}
-
-/** Our covered companies in one line each (name, ticker, the story the price tells), for the macro tie. */
-async function coverage(db: Db): Promise<string> {
-  const tickers = await db.select({ symbol: gold.tickers.symbol }).from(gold.tickers).where(eq(gold.tickers.analysed, true));
-  const symbols = tickers.map((t) => t.symbol);
-  if (symbols.length === 0) return "";
-  const [profiles, narrs] = await Promise.all([
-    db.select({ symbol: gold.companyProfiles.symbol, name: gold.companyProfiles.name }).from(gold.companyProfiles).where(inArray(gold.companyProfiles.symbol, symbols)),
-    db.select({ symbol: narratives.symbol, text: narratives.text }).from(narratives).where(inArray(narratives.symbol, symbols)),
-  ]);
-  const name = new Map(profiles.map((p) => [p.symbol, p.name]));
-  return symbols.map((s) => `- ${name.get(s) ?? s} (${s}): ${narrs.filter((n) => n.symbol === s).map((n) => n.text).join(" / ") || "no narrative yet"}`).join("\n");
 }
 
 /** The day's plan (memoized per run): the same inputs for every account. A missing input falls back to a signal Idea. */
@@ -140,103 +112,26 @@ export async function dayPlan(db: Db, platform: SandboxPlatform, day: string, ct
       .limit(1);
     const earlier = (first?.request as { plans?: SlotPlan[] } | undefined)?.plans;
     if (earlier?.length) return earlier;
-    const ideas = await memo(ctx, "sandbox-ideas", () => topIdeas(db));
+    const ideas = await memo(ctx, "sandbox-ideas", () => topIdeas(db, SLOT_HOURS_UTC.length));
     if (ideas.length === 0) return [];
-    const ideaAt = (i: number) => ideas[i % ideas.length];
     const brief = (id: string) => memo(ctx, `sandbox-idea:${id}`, () => ideaBrief(db, id));
-    const articleFor = articleAngle(day);
+    const charts = (id: string) => memo(ctx, `sandbox-charts:${id}`, () => ideaCharts(db, id));
+    // Signals only (Kevin 2026-11-13: « on va se focus sur nos signaux »): one distinct Idea per slot, best first.
     const plans: SlotPlan[] = [];
-    let ideaIndex = 0;
-    for (const [slot, wanted] of SLOT_ANGLES.entries()) {
-      const idea = wanted === "macro-24h" ? null : ideaAt(ideaIndex++);
-      const charts = (id: string) => memo(ctx, `sandbox-charts:${id}`, () => ideaCharts(db, id));
-      const signal = async (i: IdeaPick, note = ""): Promise<Omit<SlotPlan, "slot" | "article">> => ({
+    for (const [slot, i] of ideas.slice(0, SLOT_HOURS_UTC.length).entries()) {
+      plans.push({
+        slot,
+        article: false,
         ...(await charts(i.id)),
         angle: "signal",
         ideaId: i.id,
         symbol: i.symbol,
-        input: { kind: "signal", label: `Idea: ${i.title}${note}`, url: null },
+        input: { kind: "signal", label: `Idea: ${i.title}`, url: null },
         brief: `Angle: signal.\n${await brief(i.id)}`,
       });
-      let p: Omit<SlotPlan, "slot" | "article">;
-      if (wanted === "signal") p = await signal(idea!);
-      else if (wanted === "macro-24h") {
-        const head = await memo(ctx, "sandbox-macro", () => topMacroHeadline(db));
-        if (!head) p = await signal(ideaAt(ideaIndex++), " (no macro headline today)");
-        else {
-          const since = new Date(Date.now() - 24 * 3600_000);
-          const tickerNews = await db.select({ title: goldNewsItems.title, publisher: goldNewsItems.publisher, symbols: goldNewsItems.symbols }).from(goldNewsItems).where(gte(goldNewsItems.publishedAt, since)).orderBy(desc(goldNewsItems.publishedAt)).limit(8);
-          p = {
-            angle: "macro-24h",
-            ideaId: null,
-            symbol: null,
-            input: { kind: "macro-24h", label: `${head.title}${head.publisher ? ` (${head.publisher})` : ""}`, url: head.url },
-            charts: [MACRO_CHART],
-            news: [],
-            brief: [
-              "Angle: macro-24h.",
-              `Headline of the last 24 h: ${head.title}${head.publisher ? `, per ${head.publisher}` : ""}${head.publishedAt ? ` (${head.publishedAt.toISOString().slice(0, 16).replace("T", " ")} UTC)` : ""}. Found by searches: ${head.queries.join(", ")}.`,
-              "",
-              "Companies we cover (tie the headline to one only when its story supports the link):",
-              await memo(ctx, "sandbox-coverage", () => coverage(db)),
-              ...(tickerNews.length ? ["", "Their own headlines of the last 24 h:", ...tickerNews.map((n) => `- ${n.symbols.join(", ")}: ${n.title}${n.publisher ? ` (${n.publisher})` : ""}`)] : []),
-            ].join("\n"),
-          };
-        }
-      } else if (wanted === "trending-format") {
-        const [top] = platform === "substack" ? await memo(ctx, "sandbox-trending", () => topTrending(db, 1)) : [];
-        const format =
-          platform === "x"
-            ? "X has no free source of trending posts: pick the best fitting format from the curated list of skill angle-trending-format."
-            : top
-              ? `The best performing recent finance Substack post (${top.reactions} likes, ${top.restacks} restacks, ${top.comments} comments in ${Math.max(1, Math.round((Date.now() - top.postDate.getTime()) / 86400_000))} days, ${top.wordcount ?? "?"} words): title « ${top.title} »${top.subtitle ? `, subtitle « ${top.subtitle} »` : ""}. Copy its SHAPE only.`
-              : null;
-        if (!format) p = await signal(idea!, " (no trending post today)");
-        else
-          p = {
-            angle: "trending-format",
-            ideaId: idea!.id,
-            symbol: idea!.symbol,
-            input: platform === "x" ? { kind: "trending-format", label: `Curated X format, on: ${idea!.title}`, url: null } : { kind: "trending-format", label: `Format of « ${top!.title} » (${top!.publicationName ?? top!.host}), on: ${idea!.title}`, url: top!.url },
-            ...(await charts(idea!.id)),
-            brief: `Angle: trending-format.\n${format}\n\nOur Idea to put in that shape:\n${await brief(idea!.id)}`,
-          };
-      } else {
-        const refs = await memo(ctx, "sandbox-competitor", async () => {
-          const hosts = REFERENCE_PUBLICATIONS.map((r) => r.host);
-          const since = new Date(Date.now() - 60 * 86400_000);
-          return db
-            .select({ url: content.contentPosts.url, host: content.contentPosts.publicationHost, title: content.contentPosts.title, subtitle: content.contentPosts.subtitle, excerpt: content.contentPosts.excerpt, publishedAt: content.contentPosts.publishedAt })
-            .from(content.contentPosts)
-            .where(and(inArray(content.contentPosts.publicationHost, hosts), gte(content.contentPosts.publishedAt, since)))
-            .orderBy(desc(content.contentPosts.publishedAt))
-            .limit(20);
-        });
-        const ref = refs.length ? refs[Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400_000) % refs.length] : null;
-        if (!ref) p = await signal(idea!, " (no competitor post today)");
-        else {
-          const pub = REFERENCE_PUBLICATIONS.find((r) => r.host === ref.host)?.name ?? ref.host;
-          p = {
-            angle: "competitor",
-            ideaId: idea!.id,
-            symbol: idea!.symbol,
-            input: { kind: "competitor", label: `Pattern of « ${ref.title} » (${pub}), on: ${idea!.title}`, url: ref.url },
-            ...(await charts(idea!.id)),
-            brief: [
-              "Angle: competitor.",
-              `A reference publication's recent post: « ${ref.title} »${ref.subtitle ? `, « ${ref.subtitle} »` : ""}.`,
-              `Its opening (to learn the pattern, never to copy): ${(ref.excerpt ?? "").slice(0, 1200)}`,
-              "",
-              "Our Idea to rebuild in that pattern:",
-              await brief(idea!.id),
-            ].join("\n"),
-          };
-        }
-      }
-      plans.push({ slot, article: false, ...p });
     }
-    // The Article: the first slot of the day's rotating angle (else the first slot).
-    (plans.find((p) => p.angle === articleFor) ?? plans[0]).article = true;
+    // The Article: the day's best Idea.
+    plans[0].article = true;
     return plans;
   });
 }
@@ -265,14 +160,12 @@ export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): str
     ].join("\n"),
   );
   const article = plans.find((p) => p.article);
-  const macro = plans.find((p) => p.angle === "macro-24h");
   return [
     ...blocks,
     "",
     `Answer with ONE JSON object only, no prose, no code fence, no second attempt: {"posts": [...]} with exactly ${plans.length} items, one per post, each carrying its post number:`,
     `{"post": <n>, "text": "...", "image": IMAGE} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>", "image": IMAGE} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
     `IMAGE = every word of that post's picture, written by you as your Image section says: {"chart": "<a chart id listed for that post>", "point": "<a point id listed under that chart>", "style": "breaking" | "pro", "title": "...", "chartLabel": "...", "note": "...", "priceSays": "...", "newsLine": "<text, or null>", "news": <null, or {"index": <a news index listed for that post>, "domain": "<that publisher's web domain>"}>}.`,
-    ...(macro ? [`Post ${macro.slot + 1} (macro-24h) also carries "ticker": the symbol of the ONE covered company it ties the headline to (its chart is that company's price vs fair value).`] : []),
   ].join("\n\n");
 }
 

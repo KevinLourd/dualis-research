@@ -11,7 +11,7 @@ import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } fr
  * Publishes the Sandbox posts of every CONNECTED X account on X, for real (Kevin 2026-11-13: « commence à poster
  * automatiquement sur notre compte X connecté (small cap) »). The account's Sandbox timeline is the queue: each post
  * goes out once its display time has passed (08:00, 11:00, 14:00, 17:00, 20:00 Astana) and its picture is drawn,
- * one post per account per run, oldest first, today's posts only (a day not posted by midnight UTC is dropped).
+ * signal posts only (Kevin 2026-11-13), one post per account per run, oldest first, today's posts only (a day not posted by midnight UTC is dropped).
  * A slot already live is never posted again, even when a review round rewrites the day under new post ids.
  * An X post = its text + picture; an X Article (no API) = its title and subtitle + its cover picture.
  * Each run: refresh the token (rotated, saved first), upload the PNG, create the post. 3 failed attempts = given up.
@@ -42,7 +42,7 @@ export async function duePosts(db: Db, ctx: SourceContext, now = new Date()): Pr
     .select({ id: goldSandboxPosts.id, accountId: goldSandboxPosts.accountId, slot: goldSandboxPosts.slot })
     .from(goldSandboxPosts)
     .innerJoin(sandboxVisuals, eq(sandboxVisuals.id, goldSandboxPosts.visualId))
-    .where(and(inArray(goldSandboxPosts.accountId, accounts), eq(goldSandboxPosts.day, day), lte(goldSandboxPosts.postAt, now), inArray(goldSandboxPosts.format, ["x-post", "x-article"]), eq(sandboxVisuals.status, "ok"), isNotNull(sandboxVisuals.file)))
+    .where(and(inArray(goldSandboxPosts.accountId, accounts), eq(goldSandboxPosts.day, day), lte(goldSandboxPosts.postAt, now), inArray(goldSandboxPosts.format, ["x-post", "x-article"]), eq(goldSandboxPosts.angle, "signal"), eq(sandboxVisuals.status, "ok"), isNotNull(sandboxVisuals.file)))
     .orderBy(asc(goldSandboxPosts.postAt), asc(goldSandboxPosts.slot));
   if (posts.length === 0) return [];
   const done = await db.select().from(xPublications).where(and(inArray(xPublications.accountId, accounts), eq(xPublications.day, day)));
