@@ -27,6 +27,7 @@ jobs:
       X_TOKEN_KEY: ${{ secrets.X_TOKEN_KEY }}
       # First token of each account (read once, while the account has no stored token).
       X_REFRESH_TOKEN_SIRENSMALLCAPS: ${{ secrets.X_REFRESH_TOKEN_SIRENSMALLCAPS }}
+      X_REFRESH_TOKEN_NARRATIVEGAP: ${{ secrets.X_REFRESH_TOKEN_NARRATIVEGAP }}
       COLLECT_TRIGGER: schedule
     steps:
       - name: Required secrets are set
