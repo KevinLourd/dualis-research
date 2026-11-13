@@ -11,6 +11,8 @@ import {
   LinkSimpleIcon,
 } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
+import { LogoDownload } from "@/console/logo-download";
+import { hasLogo, logoSvg } from "@/console/sandbox-logos";
 import type { GoldSandboxAccount, GoldSandboxPost, SandboxAngle, SandboxFormat } from "@/db/schema/sandbox";
 
 /**
@@ -29,7 +31,7 @@ function SandboxLabel({ live }: { live: boolean }) {
   return <Badge variant="outline">{live ? "Live on X: each post goes out at its time" : "Sandbox, not published"}</Badge>;
 }
 
-export function Avatar({ account, size }: { account: Pick<GoldSandboxAccount, "avatarText" | "avatarColor" | "displayName" | "platform">; size: number }) {
+export function Avatar({ account, size }: { account: Pick<GoldSandboxAccount, "avatarText" | "avatarColor" | "displayName" | "platform" | "handle">; size: number }) {
   return (
     <span
       role="img"
@@ -37,8 +39,19 @@ export function Avatar({ account, size }: { account: Pick<GoldSandboxAccount, "a
       className={`inline-flex shrink-0 items-center justify-center font-bold text-white select-none ${account.platform === "x" ? "rounded-full" : "rounded-[22%]"}`}
       style={{ width: size, height: size, background: account.avatarColor, fontSize: Math.round(size * 0.38) }}
     >
-      {account.avatarText}
+      {hasLogo(account.handle) ? <span className="inline-flex" dangerouslySetInnerHTML={{ __html: logoSvg(account.handle, { size }) }} /> : account.avatarText}
     </span>
+  );
+}
+
+/** The profile's big avatar: its logo downloads as a PNG on hover. */
+function BigAvatar({ account, size }: { account: GoldSandboxAccount; size: number }) {
+  const avatar = <Avatar account={account} size={size} />;
+  if (!hasLogo(account.handle)) return avatar;
+  return (
+    <LogoDownload handle={account.handle} background={account.avatarColor} round={account.platform === "x"}>
+      {avatar}
+    </LogoDownload>
   );
 }
 
@@ -243,7 +256,7 @@ export function XProfile({ account, posts, total, pairedHref, base, view, liveUr
           <div className="px-4">
             <div className="flex items-start justify-between">
               <span className="-mt-[12%] inline-flex rounded-full border-4 border-white">
-                <Avatar account={account} size={133} />
+                <BigAvatar account={account} size={133} />
               </span>
               <span className="mt-3 rounded-full px-4 py-1.5 text-[15px] font-bold text-white" style={{ background: X.ink }}>
                 Follow
@@ -396,7 +409,7 @@ export function SubstackHome({ account, posts, total, pairedHref, base, view }: 
       ) : (
         <>
           <section className="mx-auto flex max-w-[560px] flex-col items-center px-5 py-12 text-center">
-            <Avatar account={account} size={80} />
+            <BigAvatar account={account} size={80} />
             <h1 className="mt-5 text-[32px] leading-tight font-bold" style={{ fontFamily: S.serif }}>
               {account.displayName}
             </h1>
