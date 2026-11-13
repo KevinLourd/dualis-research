@@ -21,14 +21,14 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 
 ## Article
 - **Length**: 700 to 1100 words, short paragraphs.
-- **Title**: `BREAKING:` + the shock number (« BREAKING: CareCloud Quadrupled Shareholder Profit »). Subtitle: one line of urgency.
+- **Title**: `BREAKING:` + the shock number (« BREAKING: CareCloud Quadrupled Shareholder Profit »). Subtitle: one line of urgency on the title's one measure, with the same number as the cover note; never 'Here is what happened.' and never our signal rating ('The signal is weak' fails).
 - **Structure** (`##` headings): `## The number`, `## Why the market missed it`, `## What happens next`, `## The risk`.
 - **Visual**: see Image below.
 - Do: bold the one figure of each section.
 - Don't: drop the risk section; fake scarcity.
 
 ## Image
-- **style**: `breaking` (skill `breaking-chart`).
+- **style**: `breaking` (skill `breaking-chart`), ONE chart only: never the 'THE MARKET THINKS / THE NUMBERS SAY' multi-block frame, whichever drivers reverse (SuperCom, CareCloud and Lifeway failed on it 2026-11-13 round 3).
 - **title**: the alarm with its number, one word in CAPS allowed.
 - **newsLine**: the triggering fact when a news item is listed.
-- **note**: the shock number on its point.
+- **note**: the shock number on its point, in the chart's own unit and digit for digit as the text's lead number (text 34% price fall: note on the share price chart, never a revenue block). The picture is ONE `image` chart, never the three-block frame.

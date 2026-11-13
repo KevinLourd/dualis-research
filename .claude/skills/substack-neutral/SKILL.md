@@ -22,7 +22,7 @@ CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four 
 - **Length**: 1000 to 1500 words.
 - **Title**: descriptive (« CareCloud: Q3 Profit for Common Shareholders Rose Fourfold »). Subtitle: the view in one line.
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence`, `## Valuation` (the fair value given in the inputs and its method), `## Risks`.
-- **Visual**: see Image below.
+- **Visual**: see Image below. The cover is ONE single-measure chart through `image`, never the three-block frame, and its note prints the title's number (Lifeway failed 2026-11-13).
 - Do: every figure with its period and source, in plain words (say operating profit, a profit multiple, cash flow forecast), never EBITDA, enterprise value to earnings, discounted cash flow or micro-cap.
 - Don't: emoji, hype, an unsourced figure.
 

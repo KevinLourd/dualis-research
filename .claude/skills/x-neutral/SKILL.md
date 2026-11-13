@@ -16,7 +16,7 @@ A research note in miniature. The sell-side note opens with the view and why the
 ```
 CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7M, four times the prior year. The share price still discounts most of it as owed to preferred holders.
 ```
-- Do: name the period and the source (« Q3 filing », « per Reuters »).
+- Do: name the period and the source in plain words (« Q3 filing », « per Reuters »), never a form name such as 10-Q.
 - Don't: adjectives that judge (« massive », « incredible »), a question hook, a call to buy or sell.
 
 ## X Article

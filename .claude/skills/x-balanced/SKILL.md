@@ -9,7 +9,7 @@ The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). Th
 
 ## X post
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
-- **Hook**: opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number.
+- **Hook**: opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number; when the picture is the driver frame, that number is the first block's REALITY number digit for digit (block « Revenue up 8.6% »: open on 8.6%, never on the price fall or another block's margin).
 - **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »), also when the price is above fair value. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
 - **Visual**: see Image below.
 - **Say in words** what the image no longer says: the news source when it is a big name (« per Reuters »), the live signal (« Shares 28% under fair value »).
@@ -31,7 +31,7 @@ X Articles carry a title, a cover image, headers, images and embedded posts (htt
   3. `## Why the price is wrong`: the evidence, 2-4 figures from the inputs.
   4. `## What would prove us wrong`: the kill criterion.
 - **Visual**: see Image below.
-- Do: short paragraphs (2-3 sentences), one figure per sentence.
+- Do: short paragraphs (2-3 sentences), one figure per sentence. The cover is ONE chart of the title's measure, never the three-block frame (Lifeway's cover held three tiny charts and 1.1M vs 6.3M against the text's 3.8M, 2026-11-13).
 - Don't: a heading with no new fact under it, a price target we did not compute.
 
 ## Image

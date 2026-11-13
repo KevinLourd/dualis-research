@@ -31,4 +31,4 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 ## Image
 - **style**: ALWAYS `breaking` (skill `breaking-chart`), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
 - **title**: ALWAYS set, the claim with its number and period, never a label and never the chartLabel (« Musashi profit rose to 2.9B yen in the Sep quarter »); a picture heading with no claim fails.
-- **note**: the proof with its number on the point.
+- **note**: the proof with its number on the point. An Article cover is ONE chart, never the three-block frame; its note prints the title's number with its unit, and the Article text uses that same number (Lifeway: title 7.6% margin, never "1.1M vs 6.3M" against $3.8M in the text).
