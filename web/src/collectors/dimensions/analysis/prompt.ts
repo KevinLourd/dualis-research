@@ -66,6 +66,7 @@ export function analysisPrompt(factsText: string, side: ThesisSide, previous: Pr
     "Drivers are every reason the market really holds, and only those: 1 to 5, as many as there are. Never invent a reason to fill the list, and never leave one out: a reason left out is a reason whose reversal no news can show.",
     `"Consensus expectations" is a driver when the analyst consensus agrees with the narrative, even when it only follows another reason: ${w.consensus}. When the consensus goes against this story, it is not one of its drivers.`,
     "Each driver needs at least one exhibit whose series keys appear EXACTLY in the stored chart series list.",
+    "The operating figures the company reports (backlog, remaining performance obligations, order intake) are facts like the statements: they often show a business changing before its revenue does. Weigh them like any figure: a driver can rest on one (its series can be charted), and one that goes against the story is said in the report.",
   ].join("\n");
 }
 

@@ -477,7 +477,17 @@ const SEC_SEGMENT_AXES: Record<string, (typeof SEGMENT_AXES)[number]> = {
 };
 const SEC_ANNUAL_FORMS = new Set(["10-K", "20-F", "40-F", "10-KT"]);
 /** What a filing read keeps: a document read under an older version is read again (v2 added revenue per segment). */
-const SEC_FILING_FACTS_VERSION = 2;
+/**
+ * Operating figures tagged in the filings, the company total only (no member): remaining performance obligations
+ * (ASC 606, us-gaap), and a backlog or order intake under the company's own element name. v3 reads them.
+ */
+const SEC_OPERATING_FACTS: { name: RegExp; line: "backlog" | "remaining-performance-obligations" | "order-intake"; instant: boolean }[] = [
+  { name: /^(us-gaap:)?RevenueRemainingPerformanceObligation$/, line: "remaining-performance-obligations", instant: true },
+  { name: /^[\w-]+:(Order|Contract|Funded|Total|Sales)?Backlog(Amount|Value)?$/i, line: "backlog", instant: true },
+  { name: /^[\w-]+:(NewOrders|OrdersReceived|OrderIntake|NewBookings|Bookings)(Amount|Value)?$/i, line: "order-intake", instant: false },
+];
+const operatingFact = (name: string) => SEC_OPERATING_FACTS.find((o) => o.name.test(name));
+const SEC_FILING_FACTS_VERSION = 3;
 /**
  * A tagged fact: its date (instant, or the end of a duration), the start of a duration, the members of its context
  * (share class, segment...) with their axes, its value in full units.
@@ -502,9 +512,12 @@ export function inlineXbrlFacts(html: string): SecFilingFact[] {
     if (end < 0) continue;
     const attr = (k: string) => m[1].match(new RegExp(`\\b${k}="([^"]*)"`))?.[1];
     const name = attr("name");
-    if (!name || !(SEC_FILING_FACTS.has(name) || SEC_REVENUE_FACTS.has(name))) continue;
+    const operating = name ? operatingFact(name) : undefined;
+    if (!name || !(SEC_FILING_FACTS.has(name) || SEC_REVENUE_FACTS.has(name) || operating)) continue;
     const ctx = contexts.get(attr("contextRef") ?? "");
     if (!ctx) continue;
+    // An operating figure: the company total only, a balance at a date or a flow over a period as its line says.
+    if (operating && (ctx.members.length > 0 || !!ctx.start === operating.instant)) continue;
     // Revenue: one segment axis and a duration only (a total, or a line split on two axes, is read elsewhere or skipped).
     if (SEC_REVENUE_FACTS.has(name) && !(ctx.start && ctx.axes.length === 1 && SEC_SEGMENT_AXES[ctx.axes[0].replace(/^.*:/, "")])) continue;
     const text = html.slice(m.index + m[0].length, end).replace(/<[^>]+>/g, "").trim();
@@ -512,7 +525,7 @@ export function inlineXbrlFacts(html: string): SecFilingFact[] {
     const raw = zero ? 0 : parseNumber(text.replace(/[()]/g, ""));
     if (raw === null) continue;
     const value = raw * 10 ** Number(attr("scale") ?? 0) * (attr("sign") === "-" ? -1 : 1);
-    out.push({ name: name.replace(/^us-gaap:/, ""), date: ctx.date, ...(ctx.start ? { start: ctx.start, axes: ctx.axes, unit: attr("unitRef") } : {}), members: ctx.members, value });
+    out.push({ name: name.replace(/^us-gaap:/, ""), date: ctx.date, ...(ctx.start ? { start: ctx.start, axes: ctx.axes, unit: attr("unitRef") } : operating ? { unit: attr("unitRef") } : {}), members: ctx.members, value });
   }
   return out;
 }
@@ -545,6 +558,32 @@ export function segmentsFromFilings(docs: SecFilingDoc[]): LineReading[] {
     }
   }
   return [...best.values()].map(({ rank, ...r }) => (void rank, r));
+}
+
+/**
+ * Backlog, remaining performance obligations and order intake as tagged in the filings: a balance at each balance
+ * sheet date (fiscal year end = "year", else "quarter"), a flow per fiscal year or 3-month quarter. A later filing's
+ * figure for the same period (a restatement) wins. Pure.
+ */
+export function operatingFromFilings(docs: SecFilingDoc[]): LineReading[] {
+  const fyeMonth = docs.filter((d) => SEC_ANNUAL_FORMS.has(d.form)).map((d) => d.reportDate.slice(5, 7))[0] ?? null;
+  const best = new Map<string, LineReading>();
+  for (const doc of [...docs].sort((a, b) => a.reportDate.localeCompare(b.reportDate))) {
+    for (const f of doc.facts) {
+      const o = operatingFact(f.name);
+      if (!o || f.members.length > 0) continue;
+      let periodType: PeriodType | null;
+      if (o.instant) periodType = fyeMonth && month(f.date).slice(5, 7) === fyeMonth ? "year" : "quarter";
+      else {
+        const months = f.start ? Math.round((Date.parse(f.date) - Date.parse(f.start)) / (30.44 * 86_400_000)) : 0;
+        periodType = months === 12 ? "year" : months === 3 ? "quarter" : null;
+      }
+      if (!periodType) continue;
+      const currency = f.unit && /^[A-Za-z]{3}$/.test(f.unit) ? f.unit.toUpperCase() : "USD";
+      best.set(`${periodType}|${month(f.date)}|${o.line}`, { periodType, periodEnd: month(f.date), line: o.line, value: f.value, currency, label: `${f.name} (${doc.form} ${doc.reportDate})`, consolidated: true });
+    }
+  }
+  return [...best.values()];
 }
 
 /** "us-gaap:SeriesAPreferredStockMember" -> "Series A preferred"; no class -> "preferred". */
@@ -617,7 +656,7 @@ const SEC_FILING_MAX = 28;
 
 export const secFilings: FinancialsSource = {
   name: "sec-filings",
-  publisher: "SEC EDGAR 10-K, 10-Q and 20-F filings (inline XBRL), 5 years: preferred stock per series at its liquidation value, revenue per segment",
+  publisher: "SEC EDGAR 10-K, 10-Q and 20-F filings (inline XBRL), 5 years: preferred stock per series at its liquidation value, revenue per segment, backlog and remaining performance obligations",
   requiredEnv: [],
   covers: isUsSymbol,
   async fetch(symbol, ctx) {
@@ -647,7 +686,7 @@ export const secFilings: FinancialsSource = {
       documents.push({ accession: f.accession, form: f.form, reportDate: f.reportDate, url, facts: inlineXbrlFacts(await res.text()), factsVersion: SEC_FILING_FACTS_VERSION });
     }
     return {
-      request: { url: subUrl, cik, filings: wanted.map((f) => `${f.form} ${f.reportDate}`), kept: "preferred stock facts (shares per series, liquidation preference), revenue per segment" },
+      request: { url: subUrl, cik, filings: wanted.map((f) => `${f.form} ${f.reportDate}`), kept: "preferred stock facts (shares per series, liquidation preference), revenue per segment, backlog / remaining performance obligations / order intake" },
       httpStatus: 200,
       payload: { cik, documents },
       ...(documents.length === 0 ? { error: "no 10-K, 20-F or 10-Q filed as HTML" } : {}),
@@ -655,7 +694,7 @@ export const secFilings: FinancialsSource = {
   },
   extract(payload) {
     const docs = (payload as { documents: SecFilingDoc[] }).documents;
-    return [...preferredFromFilings(docs), ...segmentsFromFilings(docs)];
+    return [...preferredFromFilings(docs), ...segmentsFromFilings(docs), ...operatingFromFilings(docs)];
   },
 };
 
@@ -855,7 +894,8 @@ export const edinetFinancials: FinancialsSource = {
 
 // ---------- Annual and interim report PDFs, read by Claude: markets without a free structured source (Hong Kong) ----------
 
-export const PDF_EXTRACT_VERSION = "pdf-extract@v2";
+/** v3: backlog, remaining performance obligations and order intake too (their pages picked by OPERATING_PAGE). */
+export const PDF_EXTRACT_VERSION = "pdf-extract@v3";
 type PdfPage = { page: number; text: string };
 /** `months` = how long the column's period is: 12 a fiscal year (a balance sheet at the year end too), 6 a half year, 3 a quarter. */
 type PdfExtraction = {
@@ -879,6 +919,8 @@ const PAGE_PATTERNS = [
 ];
 /** A numbered note that opens mid-page ("5. REVENUE AND SEGMENT INFORMATION"): interim reports run their notes on. */
 const SEGMENT_NOTE = /(^|\s)\d{1,2}\.\s+(revenue and |operating )?segments? information/i;
+/** A page that reports the order book or new orders, wherever its title sits (the business review runs on). */
+const OPERATING_PAGE = /\b(order )?backlog\b|order book|orders on hand|new orders|在手訂單|未完成訂單|手頭訂單/i;
 const MAX_PAGES = 12;
 const MAX_PAGE_CHARS = 7000;
 
@@ -894,6 +936,8 @@ export function pickPages(pages: string[]): PdfPage[] {
     const hits = flat.map((t, i) => (!isContents(t) && (re.test(t.slice(0, 400)) || (segment && SEGMENT_NOTE.test(t))) ? i : -1)).filter((i) => i >= 0);
     for (const i of hits.slice(0, 2)) for (const j of /summary/i.test(re.source) ? [i] : [i, i + 1]) if (j < pages.length && !picked.includes(j)) picked.push(j);
   }
+  // The order book last: statements first when the cap bites.
+  for (const i of flat.map((t, i) => (!isContents(t) && OPERATING_PAGE.test(t) ? i : -1)).filter((i) => i >= 0).slice(0, 2)) if (!picked.includes(i)) picked.push(i);
   // Pattern order = priority (the 5-year summary first), capped, then read in page order.
   return picked.slice(0, MAX_PAGES).sort((a, b) => a - b).map((i) => ({ page: i + 1, text: pages[i].slice(0, MAX_PAGE_CHARS) }));
 }
@@ -914,6 +958,7 @@ const pdfPrompt = (kind: ReportKind, title: string, pages: PdfPage[]) =>
       .map(([k, v]) => `${k} (${v.name})`)
       .join("; "),
     "and revenue per segment (by product or service line, business segment, region or customer), every period shown.",
+    "backlog, remaining-performance-obligations and order-intake: only when the company prints that figure itself (a backlog or order book at a date, with months = the period the column closes; order intake = new orders over the period), never one you compute.",
     'JSON shape: {"currency": "<ISO code of the figures, e.g. HKD>", "periods": [{"periodEnd": "YYYY-MM (the month the period ends)", "months": <12 | 6 | 3>, "lines": [{"line": "<canonical key>", "printed": "<the figure exactly as printed, e.g. (12,345) or 808,417>", "unit": "one|thousand|million|billion (from the column header, e.g. HK$\'000 = thousand)", "page": <PDF page number>, "label": "<the row label as printed>"}]}], "segments": [{"periodEnd": "YYYY-MM", "months": <12 | 6 | 3>, "axis": "product|business|region|customer", "name": "<segment name as printed>", "printed": "...", "unit": "...", "page": <n>}]}',
     "months = how long the column's period is: 12 for a fiscal year (and a balance sheet at a fiscal year end), 6 for six months (and a balance sheet at the interim date of a six-month report), 3 for three months.",
     "Only figures printed on these pages. EPS: unit one, in the currency per share. Shares: unit one (or thousand when the header says so). Skip a line you cannot find.",

@@ -44,6 +44,12 @@ export function fnv(text: string): string {
 
 const TABLE_LINES = ["line:revenue", "line:gross-profit", "line:operating-income", "line:depreciation-amortization", "metric:ebitda", "line:net-income", "line:eps-diluted", "line:eps-basic", "metric:operating-margin", "metric:ebitda-margin", "metric:revenue-growth", "line:cfo", "line:capex", "metric:fcf", "line:dividends-paid", "line:buybacks", "line:cash", "line:total-debt", "metric:net-debt", "line:equity", "line:shares-outstanding", "metric:ev-ebitda", "metric:pe"];
 const QUARTER_LINES = ["qline:revenue", "qline:operating-income", "qline:net-income", "qmetric:operating-margin"];
+/**
+ * What the company reports about its business beside the statements, when it does (a table drops absent rows): the
+ * order book and new orders, each against revenue. Whether one matters, and whether the price saw it, is the model's call.
+ */
+const OPERATING_KEYS = ["line:backlog", "metric:backlog-growth", "metric:backlog-to-revenue", "line:remaining-performance-obligations", "metric:remaining-performance-obligations-growth", "metric:remaining-performance-obligations-to-revenue", "line:order-intake", "metric:book-to-bill"];
+const OPERATING_QUARTER_KEYS = OPERATING_KEYS.map((k) => `q${k}`);
 const HALF_LINES = ["hline:revenue", "hline:gross-profit", "hline:operating-income", "hline:net-income"];
 
 const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
@@ -94,7 +100,22 @@ export async function figuresText(db: Db, symbol: string): Promise<string> {
     keys("line").length ? `Fiscal years:\n${table(catalog, keys("line"), 4)}` : "Fiscal years: none collected.",
     keys("qline").length ? `Last quarters:\n${table(catalog, keys("qline"), 4)}` : null,
     keys("hline").length ? `Last half years:\n${table(catalog, keys("hline"), 4)}` : null,
+    operatingText(catalog),
     streamsText(streams),
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+/** The order book and new orders the company reports, fiscal years then quarters; null when it reports none. */
+function operatingText(catalog: Map<string, StoredSeries>): string | null {
+  const years = OPERATING_KEYS.filter((k) => catalog.has(k));
+  const quarters = OPERATING_QUARTER_KEYS.filter((k) => catalog.has(k));
+  if (years.length + quarters.length === 0) return null;
+  return [
+    "Operating figures the company reports (backlog = at the period end; x = times the revenue of the 12 months to that date):",
+    years.length ? table(catalog, years, 4) : null,
+    quarters.length ? `Quarters:\n${table(catalog, quarters, 4)}` : null,
   ]
     .filter((x) => x !== null)
     .join("\n");
@@ -138,6 +159,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
     "Last quarters:",
     table(catalog, QUARTER_LINES, 6),
     halves.length ? `\nLast half years:\n${table(catalog, halves, 4)}` : null,
+    operatingText(catalog) ? `\n${operatingText(catalog)}` : null,
     streams.length ? `\n${streamsText(streams)}` : null,
     "",
     valuation

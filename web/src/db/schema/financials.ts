@@ -35,7 +35,7 @@ export const financialLines = silver.table(
     periodEnd: text("period_end").notNull(),
     /** Canonical line key (`lines.ts`): revenue, operating-income, cash... or `segment:<axis>:<name>`. */
     line: text("line").notNull(),
-    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment">().notNull(),
+    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment" | "operating">().notNull(),
     value: doublePrecision("value").notNull(),
     currency: text("currency"),
     label: text("label").notNull(),
@@ -60,7 +60,7 @@ export const goldFinancialLines = gold.table(
     periodType: text("period_type").$type<"year" | "half" | "quarter" | "month">().notNull(),
     periodEnd: text("period_end").notNull(),
     line: text("line").notNull(),
-    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment">().notNull(),
+    statement: text("statement").$type<"income" | "balance" | "cashflow" | "market" | "segment" | "operating">().notNull(),
     value: doublePrecision("value").notNull(),
     currency: text("currency"),
     label: text("label").notNull(),

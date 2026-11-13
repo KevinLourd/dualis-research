@@ -2,7 +2,8 @@
  * The canonical line catalogue: every source maps its own labels onto these keys.
  * Values in full currency units; outflows (capex, dividends paid, buybacks) are POSITIVE.
  */
-export type Statement = "income" | "balance" | "cashflow" | "market" | "segment";
+/** "operating" = what the company reports about its business beyond the three statements (backlog, orders). */
+export type Statement = "income" | "balance" | "cashflow" | "market" | "segment" | "operating";
 export type PeriodType = "year" | "half" | "quarter" | "month";
 
 export const LINES = {
@@ -53,6 +54,11 @@ export const LINES = {
   "dividends-paid": { statement: "cashflow", name: "Dividends paid" },
   buybacks: { statement: "cashflow", name: "Share buybacks" },
   "stock-compensation": { statement: "cashflow", name: "Stock-based compensation" },
+  // Operating figures the company reports beside its statements (Thierry 2026-11-12: a backlog far above revenue the
+  // price ignores). A backlog or contracted revenue is a balance at the period end; order intake a flow over the period.
+  backlog: { statement: "operating", name: "Backlog (order book) as the company reports it" },
+  "remaining-performance-obligations": { statement: "operating", name: "Remaining performance obligations (contracted revenue not yet recognised)" },
+  "order-intake": { statement: "operating", name: "Order intake (new orders or bookings in the period)" },
   // Market (month-end close, for EV at each fiscal period end)
   "share-price": { statement: "market", name: "Share price, month-end close" },
 } as const satisfies Record<string, { statement: Statement; name: string }>;

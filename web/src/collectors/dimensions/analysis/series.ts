@@ -33,6 +33,11 @@ const METRIC_NAMES: Record<string, string> = {
   ev: "Enterprise value",
   "ev-ebitda": "EV/EBITDA",
   pe: "P/E",
+  "backlog-to-revenue": "Backlog / last 12 months revenue",
+  "backlog-growth": "Backlog growth",
+  "remaining-performance-obligations-to-revenue": "Remaining performance obligations / last 12 months revenue",
+  "remaining-performance-obligations-growth": "Remaining performance obligations growth",
+  "book-to-bill": "Book-to-bill",
 };
 
 export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string, StoredSeries>> {
