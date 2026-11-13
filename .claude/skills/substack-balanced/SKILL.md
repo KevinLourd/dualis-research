@@ -30,6 +30,6 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 - Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know.
 
 ## Image
-- **style**: ALWAYS `breaking` (skill `breaking-chart`), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
+- **style**: ALWAYS `breaking` (skill `breaking-chart`) with ONE chart of the text's lead number, never the NARRATIVE/REALITY multi-block frame (SuperCom Article, CareCloud, Lifeway and Enviri still arrived as multi-block frames in round 5 on 2026-11-13), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
 - **title**: ALWAYS set, the claim with its number and period, never a label and never the chartLabel (« Musashi profit rose to 2.9B yen in the Sep quarter »); a picture heading with no claim fails.
 - **note**: the proof with its number on the point. An Article cover is ONE chart, never the three-block frame; its note prints the title's number with its unit, and the Article text uses that same number (Lifeway: title 7.6% margin, never "1.1M vs 6.3M" against $3.8M in the text).

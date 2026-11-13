@@ -14,7 +14,7 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 - **Structure**: shock number, then one line of urgency. ONE idea only: the urgency line adds no second figure and no second measure, even without a number (no price, no fair value gap, no half-year number, no "profit dropped", "cash is melting", "losses go on"); it says only what the shock number means for a holder, no "Here is what happened:" filler.
 - **Allowed**: one word in CAPS, one exclamation mark.
 - **Visual**: see Image below.
-- Example:
+- Example (a plain company update only; a BUY or SELL signal post never uses this one-line form, it takes the 5 spaced lines of `angle-signal`, as RCM's Note should have):
 ```
 🚨 BREAKING: CareCloud just QUADRUPLED profit for shareholders to $4.7M. The market is asleep on this one!
 ```
@@ -29,7 +29,7 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 - Don't: drop the risk section; fake scarcity.
 
 ## Image
-- **style**: `breaking` (skill `breaking-chart`), ONE chart only: never the 'THE MARKET THINKS / THE NUMBERS SAY' multi-block frame, whichever drivers reverse (SuperCom, CareCloud and Lifeway failed on it 2026-11-13 round 3).
+- **style**: `breaking` (skill `breaking-chart`), ONE chart only, sent through the `image` field for EVERY Note and Article: a picture holding 'THE MARKET THINKS / THE NUMBERS SAY' blocks fails, whichever drivers reverse (SuperCom, CareCloud, Lifeway and Enviri sent it again in round 4 on 2026-11-13). The chart is the one of the text's first number (a text opening on a price fall or % under fair value gets the `price` chart, a text opening on operating margin gets the single margin chart).
 - **title**: the alarm with its number, one word in CAPS allowed.
 - **newsLine**: the triggering fact when a news item is listed.
 - **note**: the shock number on its point, in the chart's own unit and digit for digit as the text's lead number (text 34% price fall: note on the share price chart, never a revenue block). The picture is ONE `image` chart, never the three-block frame.

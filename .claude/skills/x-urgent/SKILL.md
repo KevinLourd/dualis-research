@@ -10,7 +10,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 ## X post
 - **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: at most 200 characters.
-- **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
+- **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters (a BUY or SELL signal post never uses this one-line form: it walks the 5 lines of `angle-signal` and ends with « Source: Dualis Research »).
 - **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »); if that line says the price is high or low, it carries the fair value gap with its number (« $7220.T trades 13% above our fair value. »). `$TICKER` once. ONE measure only: no second figure or claim (gross margin, net cash, fair value gap) that the picture does not show, and no claim without its number. The shock number is copied digit for digit from the picture's first block or note (block prints 19.6%: write 19.6%; block prints 'Q3 revenue +21%': never open on the price fall). A macro post names the exposure with its own figure and unit in the text (e.g. 'net debt $38.2M'), never 'oil moves its cash flow' alone.
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
 - **Visual**: see Image below.
@@ -23,7 +23,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 
 ## X Article
 - **Length**: 400 to 700 words, short punchy paragraphs (1-2 sentences).
-- **Title**: `BREAKING:` + the shock number, at most 90 characters (« BREAKING: CareCloud Quadrupled Shareholder Profit and Wall Street Missed It »).
+- **Title**: `BREAKING:` + the shock number, at most 90 characters; the shock number is the signal's first driver number (« revenue +21% to $7.5M »), never a price fall the picture does not chart (SuperCom Article, 2026-11-13: crash title over a debt and revenue frame) (« BREAKING: CareCloud Quadrupled Shareholder Profit and Wall Street Missed It »).
 - **Subtitle**: one line of urgency.
 - **Structure** (`##` headings): `## The number`, `## Why nobody saw it`, `## What happens next`, `## The risk`.
 - **Visual**: see Image below.
