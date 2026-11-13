@@ -5,9 +5,9 @@ import { PageBand } from "@/components/page-band";
 import { LINKEDIN_URL, X_HANDLE, X_URL } from "@/lib/model";
 import { getPublications } from "@/lib/queries";
 
-export const metadata: Metadata = { title: "About" };
+export const metadata: Metadata = { title: "Team" };
 
-/** His name and photo live on this page only (Thierry 2026-11-09). Thierry's photo (LinkedIn portrait, extended to 4:5). */
+/** Nav label « Team », not « About » (Thierry 2026-11-12). His name and photo live on this page only (Thierry 2026-11-09). Thierry's photo (LinkedIn portrait, extended to 4:5). */
 function Portrait() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -15,11 +15,11 @@ function Portrait() {
   );
 }
 
-export default async function About() {
+export default async function Team() {
   const posts = (await getPublications()).slice(0, 3);
   return (
     <div className="about-page">
-      <PageBand label="About" thread="about" />
+      <PageBand label="Team" thread="team" />
       <section className="wrap">
         <article className="person">
           <div className="person-photo">

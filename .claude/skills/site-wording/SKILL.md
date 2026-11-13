@@ -15,8 +15,8 @@ Thierry owns the site's wording since 2026-11-09. You change TEXT only: the word
 | Research | `app/research/page.tsx` | page line, section titles, closing band |
 | Research, winnable games | `components/blocks.tsx` `GAMES` | the 5 cards of the hand (the ace in the middle); its caption sits in `app/research/page.tsx` |
 | Research, FAQ | `components/blocks.tsx` `FAQ` | questions and answers |
-| About | `app/about/page.tsx` | his name, role, bio paragraphs |
-| About, career | `components/blocks.tsx` `CAREER` | dates, firms, roles |
+| Team | `app/team/page.tsx` | his name, role, bio paragraphs |
+| Team, career | `components/blocks.tsx` `CAREER` | dates, firms, roles |
 | Contact | `app/contact/page.tsx` | `TOPICS`, lines, link labels |
 | Poker line of each page | `lib/winnable.ts` `WINNABLE` | one short line per page |
 | Plans and prices | `lib/model.ts` `PLANS`, `app/subscribe/page.tsx` | |
@@ -28,7 +28,7 @@ Not found in this table: search the words he quotes (`grep -rn "<his words>" sit
 
 ## Rules (a test fails the change otherwise)
 - English. Short sentences. No em dash or en dash.
-- His name (Thierry, Matin) appears on About and the legal pages only; everywhere else the site speaks as « we » / Dualis Research.
+- His name (Thierry, Matin) appears on Team and the legal pages only; everywhere else the site speaks as « we » / Dualis Research.
 - Never: Duality, fund manager, « own capital », where he lives, the number of names he holds, « X, never Y » sentences, « coming soon ».
 - Change only what he asked. Show him each line before → after.
 

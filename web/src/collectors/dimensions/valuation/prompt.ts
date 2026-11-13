@@ -5,6 +5,8 @@ import { FACT_LABEL, peerMedian, peerPriced, bridgeTotal, type MethodSpec, type 
 
 /** Bump when a prompt or the arithmetic changes meaning: every method and synthesis is asked again. */
 export const VALUATION_VERSION = "valuation@v5";
+/** The weighing call alone; bumped when only its rules change, so the methods are not asked again. */
+export const SYNTHESIS_VERSION = "synthesis@v2";
 
 const f2 = (v: number) => (Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(2)}B` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(3).replace(/0+$/, "").replace(/\.$/, ""));
 const median = (xs: number[]) => {
@@ -143,7 +145,7 @@ export function parseMethodAnswer(text: string, spec: MethodSpec, f: ValuationFa
 
 export const SYNTHESIS_SYSTEM = [
   "You are the head of research of a small-cap long/short fund. Several valuation methods were run on one company; you weigh them into one fair value and range, the way a sell-side football field is read.",
-  "Weight a method by how well it fits this business and how reliable its inputs are (a cyclical: through-the-cycle multiples; an asset-heavy holding: book and net cash; a cash generator: DCF and earnings). Plain English. No rating, no time horizon. No em dash, no en dash. JSON only, no prose, no code fence.",
+  "Weight a method by how well it fits this business and how reliable its inputs are (a cyclical: through-the-cycle multiples; an asset-heavy holding: book and net cash; a cash generator: DCF and earnings). Comparables weigh the most (Thierry 2026-11-12: « comparables should be weighed the most »): a method priced off listed peers carries more weight than any method built on the company's own forecasts or history, unless its peers are a poor match or its input is missing. Plain English. No rating, no time horizon. No em dash, no en dash. JSON only, no prose, no code fence.",
 ].join(" ");
 
 const fmtValue = (v: number | null) => (v === null ? "n/a" : f2(v));
@@ -165,8 +167,8 @@ export function weightsPrompt(f: ValuationFacts, context: string, methods: { id:
 export function parseWeights(text: string, ids: ValuationMethodId[]): { weights: MethodWeight[]; label: string } {
   const o = JSON.parse(firstJsonObject(text)) as { weights?: Record<string, { weight?: unknown; why?: unknown }>; label?: unknown };
   const weights = ids.map((id) => {
-    const w = Number(o.weights?.[id]?.weight);
-    if (!Number.isFinite(w) || w < 0) throw new Error(`synthesis: no weight for "${id}"`);
+    const w = o.weights?.[id]?.weight;
+    if (typeof w !== "number" || !Number.isFinite(w) || w < 0) throw new Error(`synthesis: no weight for "${id}"`);
     return { method: id, weight: w, why: isStr(o.weights?.[id]?.why) ? stripDashes(String(o.weights![id].why)) : "" };
   });
   if (!weights.some((w) => w.weight > 0)) throw new Error("synthesis: every weight is zero");
