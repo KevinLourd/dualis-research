@@ -11,7 +11,7 @@ The sell-side research note: the view and why now first, then the evidence, valu
 - **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: one paragraph of 2 to 4 sentences, 200 to 450 characters, no line breaks.
 - **Hook**: the company and the finding. No emoji, no exclamation mark, no CAPS, no alarm word.
-- **Structure**: fact with number and period, what it implies for the valuation, what to watch next.
+- **Structure**: fact with number and period, what it implies for the valuation, what to watch next. Every fact carries its figure (« Q3 sales $73.4M, down 4% from Q2 »), never « the shares fell » or « pushed the turn out » with no number.
 - **Visual**: see Image below.
 - Example:
 ```
@@ -29,6 +29,6 @@ CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four 
 
 ## Image
 - **style**: `pro`.
-- **chart**: a fundamentals Exhibit over the price whenever one is listed.
+- **chart**: ONE chart of the first driver line's number (a quarterly or yearly fundamentals Exhibit), never a multi-block frame, never the price for a result; its note prints that number.
 - **note**: the fact with its number, no adjective.
 - **chartLabel**: the exact measure, unit and period.

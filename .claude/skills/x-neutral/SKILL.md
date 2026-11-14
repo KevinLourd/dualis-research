@@ -30,7 +30,7 @@ CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7
 - Don't: emoji, hype, an unsourced figure.
 
 ## Image
-- **style**: `pro`.
+- **style**: `pro`, ONE chart in ONE `image` object written before the text, never several cards, never an EPS or net income title.
 - **chart**: the Exhibit of the measure in the text's first sentence (profit before loan losses, half-year profit, revenue, margin, debt); `price` only when that first sentence is about the share price. Never the price chart under a profit text.
 - **note**: the fact with its number, no adjective (« $4.7M in Q3 »).
 - **chartLabel**: the exact measure and period (« Profit for shareholders per quarter, $ millions »).
