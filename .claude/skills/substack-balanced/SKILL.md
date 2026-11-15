@@ -10,7 +10,7 @@ The house style (skills `daily-content`, `breaking-chart`, `research-note`, `con
 ## Note
 - **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note.
 - **Length**: one paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks. Short Notes break out most often; 600-1,199 characters is a dead zone (Eden, 473k Notes: https://eden.so/blog/how-to-grow-on-substack-notes/).
-- **Hook**: `🚨 <short name>: ` then the alarm with its number and period (« Q3 profit $4.7M »). Never a label or question (« Trade alert », « Here Is What Happened Next »); every claim carries a number.
+- **Hook**: `🚨 <short name>: ` then the alarm with its number and period (« Q3 profit $4.7M »), ONLY for an Idea with no BUY or SELL; an Idea with a BUY or SELL (RCM 2026-11-15 was one sentence plus Source again: a Note of fewer than 5 spaced lines fails) opens 📈 or 📉 on its own line and writes the 5 spaced lines of `angle-signal` (RCM: "📈 RCM Technologies: BUY, inflection.", then "🔎 $31.54 vs $33.18 fair value: 5% under.", a ⚡ trigger line with its date, a 📉 belief line, a ✅ conclusion, then the Source line). Never a label or question (« Trade alert », « Here Is What Happened Next »); every claim carries a number.
 - **Structure**: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch.
 - **Visual**: see Image below.
 - Example:
@@ -27,9 +27,9 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 - **Structure** (`##` headings): `## Key takeaways` (3 bullets), `## What the market believes`, `## What changed`, `## Bull vs bear`, `## What would prove us wrong`.
 - **Visual**: see Image below.
 - Do: numbers with date and source; the paywall would sit before « Bull vs bear » (Substack's examples put it before the payoff: https://on.substack.com/p/free-vs-paid).
-- Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know.
+- Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know, a valuation method name (« enterprise value to operating profit », « price to earnings »): say « built on profit multiples ».
 
 ## Image
-- **style**: ALWAYS `breaking` (skill `breaking-chart`) with ONE chart of the text's lead number, never the NARRATIVE/REALITY multi-block frame (SuperCom Article, CareCloud, Lifeway and Enviri still arrived as multi-block frames in round 5 on 2026-11-13), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
+- **style**: ALWAYS `breaking` (skill `breaking-chart`) with ONE chart of the text's lead number, never the NARRATIVE/REALITY multi-block frame. The answer's first key is `image`, written before `text`; for a BUY or SELL post it starts `{"image":{"style":"breaking","chart":"price"` and its title and note print the text's step-2 gap ("24% under fair value") (SuperCom Article, CareCloud, Lifeway and Enviri still arrived as multi-block frames in round 5 on 2026-11-13), never another style: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim).
 - **title**: ALWAYS set, the claim with its number and period, never a label and never the chartLabel (« Musashi profit rose to 2.9B yen in the Sep quarter »); a picture heading with no claim fails.
 - **note**: the proof with its number on the point. An Article cover is ONE chart, never the three-block frame; its note prints the title's number with its unit, and the Article text uses that same number (Lifeway: title 7.6% margin, never "1.1M vs 6.3M" against $3.8M in the text).

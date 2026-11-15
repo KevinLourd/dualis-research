@@ -27,10 +27,10 @@ CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence`, `## Valuation` (fair value as given in the inputs, its method in a few words), `## Risks`.
 - **Visual**: see Image below.
 - Do: one figure per sentence with its period.
-- Don't: emoji, hype, an unsourced figure.
+- Don't: emoji, hype, an unsourced figure, or jargon in the Article body: write "new shares sold" not dilution, "profit multiple" not price to earnings, "operating profit" not operating profit before depreciation (SuperCom Article 2026-11-15 round 6).
 
 ## Image
-- **style**: `pro`, ONE chart in ONE `image` object written before the text, never several cards, never an EPS or net income title.
+- **style**: `breaking` (as skill `content-matrix` requires), ONE chart in ONE `image` object written as the answer's first key before the text, never several cards, never an EPS or net income title; a BUY or SELL post uses chart `price` with the step-2 gap as its note ("24% under fair value").
 - **chart**: the Exhibit of the measure in the text's first sentence (profit before loan losses, half-year profit, revenue, margin, debt); `price` only when that first sentence is about the share price. Never the price chart under a profit text.
 - **note**: the fact with its number, no adjective (« $4.7M in Q3 »).
 - **chartLabel**: the exact measure and period (« Profit for shareholders per quarter, $ millions »).
