@@ -59,7 +59,7 @@ const complete = vi.fn<Complete>(async ({ system, prompt }) => {
   }
   if (system.startsWith("You review the Sandbox")) {
     const n = [...prompt.matchAll(/^## Post \d+:/gm)].length;
-    const fail = !!reviewPlan.fail && prompt.includes(`« ${reviewPlan.fail}`) && /round 1 of/.test(prompt);
+    const fail = !!reviewPlan.fail && prompt.includes(`« ${reviewPlan.fail}`) && /^Account: .*, round 1 of \d+\.$/m.test(prompt); // the account line only: the skills quote past rounds ("round 1 of 2026-11-16")
     const posts = Array.from({ length: n }, (_, i) => ({ post: i + 1, imageAlone: !(fail && i === 0), aligned: true, clear: true, why: fail && i === 0 ? "The picture shows the price, the text is about profit." : "Reads at once." }));
     return { text: JSON.stringify({ posts, edits: fail && reviewPlan.edit ? [{ ...reviewPlan.edit, why: "picture off-topic" }] : [] }), model: "fake" };
   }
