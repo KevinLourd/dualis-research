@@ -5,13 +5,13 @@ description: Substack in the NEUTRAL tone - sober research-note Note and Article
 
 # Substack, neutral tone
 
-The sell-side research note: the view and why now first, then the evidence, valuation and risks (https://www.marketscreener.com/news/investor-education-how-to-read-an-equity-research-note-ce7e51d9db8bff2c, https://www.idealsvdr.com/blog/sell-side-report/). Every house rule stays (skill `content-matrix`).
+The sell-side research note: the view and why now first, then the evidence and risks (https://www.marketscreener.com/news/investor-education-how-to-read-an-equity-research-note-ce7e51d9db8bff2c, https://www.idealsvdr.com/blog/sell-side-report/). Every house rule stays (skill `content-matrix`).
 
 ## Note
-- **Signal post (BUY or SELL)**: the 5 spaced lines of skill `angle-signal` instead, at most 600 characters, line 1 « BUY, inflection. » (or « SELL, crack. »), never one sentence plus Source.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead, at most 400 characters, no emoji, never one sentence plus Source.
 - **Length** (a post with no BUY or SELL): one paragraph of 2 to 4 sentences, 200 to 450 characters, no line breaks.
 - **Hook**: the company and the finding. No emoji, no exclamation mark, no CAPS, no alarm word.
-- **Structure**: fact with number and period, what it implies for the valuation, what to watch next. Every fact carries its figure (« Q3 sales $73.4M, down 4% from Q2 »), never « the shares fell » with no number.
+- **Structure**: fact with number and period, what it implies for the market's story, what to watch next. Every fact carries its figure (« Q3 sales $73.4M, down 4% from Q2 »), never « the shares fell » with no number.
 - **Visual**: see Image below.
 - Example:
 ```
@@ -22,12 +22,12 @@ CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four 
 ## Article
 - **Length**: 1000 to 1500 words, counted before sending: each of the 5 sections at least 240 words.
 - **Title**: descriptive, ONE measure only, plain words (« CareCloud: Q3 Profit for Shareholders Rose Fourfold »); never a price gap plus a one-day fall in one title. Subtitle: the view in one line.
-- **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence`, `## Valuation` (the fair value given in the inputs and its method), `## Risks`. The 5 signal steps are told as flowing sentences inside these sections, never pasted as a block of lines and never above the Summary.
+- **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence` (reported figures, each with both values), `## Risks`; no valuation section, never a fair value or price target. The 3 signal lines are told as flowing sentences inside these sections, never pasted as a block of lines and never above the Summary.
 - **Visual**: see Image below. The cover's note prints the title's number.
-- Do: every figure with its period and source, in plain words (operating profit, a profit multiple, cash flow forecast, « a year earlier »), never EBITDA, enterprise value, discounted cash flow, micro-cap or « year over year »; count beliefs once (never « four beliefs » then « two of the four »).
-- Don't: emoji, hype, an unsourced figure, a sentence about our own method (« we rate », « the five steps of the signal », « our analysis marks »).
+- Do: every figure with its period and source, in plain words (operating profit, « a year earlier »), never EBITDA, enterprise value, discounted cash flow, micro-cap or « year over year »; count beliefs once (never « four beliefs » then « two of the four »).
+- Don't: emoji, hype, an unsourced figure, a sentence about our own method (« we rate », « the three lines of the signal », « our analysis marks »).
 
 ## Image
-- **style**: `breaking`, ONE chart; a BUY or SELL post (Note or Article) follows content-matrix « The picture » (chart `price`, title and note = the step-2 gap, « 24% under fair value »).
+- **style**: `breaking`, ONE chart; a BUY or SELL post (Note or Article) follows content-matrix « The picture » (the chart of the line-2 figure, `from` = the compared period).
 - **note**: the fact with its number, no adjective.
 - **chartLabel**: the exact measure, unit and period.

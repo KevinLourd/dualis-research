@@ -80,7 +80,9 @@ describe("content-drafts dimension", () => {
     expect(system).not.toMatch(/Stay honest about what is not proven|calm, precise/);
     expect(prompt).toContain("Idea: CareCloud replaced the client the market thinks it lost.");
     expect(prompt).toContain("CCLD signs a new hospital client");
-    expect(prompt).toContain("Fair value: 6 USD (8x EV/EBITDA)");
+    // No fair value, quote vs it or gap reaches the writer (Thierry 2026-11-16): it cannot print what it is not given.
+    expect(prompt).not.toMatch(/fair value|8x EV\/EBITDA|% vs/i);
+    expect(prompt).toContain("Signal: BUY (strong inflection)");
 
     const [draft] = await db.select().from(content.contentDrafts);
     expect(draft).toMatchObject({ ideaId, inputKey: `idea:${ideaId}`, format: "linkedin-post", accountId: "linkedin:thierrymatin", body: "$CCLD post for Thierry Matin, sourced.", scheduledAt: null });
@@ -150,14 +152,14 @@ describe("draft writer dispatch", () => {
 });
 
 describe("draft format", () => {
-  it("gives a signal post its 5 steps: type, size, trigger with its date, each driver's turn with its date, conclusion", () => {
+  it("gives a signal post its 3 lines: the market's belief, the real reported figure with both values, why in one sentence; never a fair value", () => {
     const prompt = draftPrompt(
       { symbol: "CCLD", companyName: "CareCloud", news: null, worthJudgmentId: null, worth: null, thesis: null, driver: null, chart: null, idea: { id: "i1", title: "Margin turn", angle: "Q3", sources: [] } },
       {
         narrative: "A shrinking billing shop.",
         signal: "BUY (strong inflection)",
         signalSince: "2026-11-10",
-        fairValue: "4.6 USD; quote 3.1 on 2026-11-12, -33% vs fair value",
+        figures: [{ title: "Operating margin per quarter (Operating margin)", values: "Sep-25 12.1%, Sep-26 19.6%" }],
         evidence: [],
         drivers: [
           { title: "Margins in decline", summary: null, state: { word: "Strong inflection", since: "2026-11-10", headline: "Q3 operating margin 19.6%", pricedIn: "Not in the price yet" } },
@@ -169,9 +171,13 @@ describe("draft format", () => {
     expect(prompt).toContain("Signal: BUY (strong inflection), since 2026-11-10");
     expect(prompt).toContain("- Margins in decline. Now: Strong inflection since 2026-11-10, Q3 operating margin 19.6% (Not in the price yet)");
     expect(prompt).toMatch(/^- Debt load$/m);
+    expect(prompt).toContain("Reported figures (the only numbers a post may compare):\n- Operating margin per quarter (Operating margin): Sep-25 12.1%, Sep-26 19.6%");
+    expect(prompt).not.toMatch(/fair value/i);
     const system = draftSystem("x-post", null, null);
-    expect(system).toMatch(/1\. Signal type/);
-    expect(system).toMatch(/5\. Conclusion/);
+    expect(system).toMatch(/1\. What the market believes/);
+    expect(system).toMatch(/2\. The real figure that contradicts it/);
+    expect(system).toMatch(/3\. Why it breaks the story, in ONE sentence/);
+    expect(system).not.toMatch(/4\. |5\. |quote vs the fair value|under fair value/);
     expect(system).toMatch(/at most 250 characters/);
   });
   it("asks for a Note as one small paragraph with a chart, an X post smaller still", () => {

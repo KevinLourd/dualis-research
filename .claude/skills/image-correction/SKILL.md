@@ -8,7 +8,7 @@ description: Corrects each Dualis post picture after it is drawn - looks at the 
 Kevin: « c'est surtout une skill de correction d'image que je voulais ». Every picture is LOOKED AT once drawn and corrected until it reads clean, before the post review. The writer wrote the picture's spec; this skill fixes that spec when the drawn result fails, and the code draws it again.
 
 ## Look at the picture as the reader does
-Read every word and number to its last character: the title, the label under it, the axis values, the arrow's note and its « VS price narrative » line, the value at the line's end, and the small inset cards (the news card, the price card top right with its pill and « opportunity » line). Then answer: in five seconds, do I know which company, what is measured (unit, period), and the post's conclusion?
+Read every word and number to its last character: the title, the label under it, the axis values, the arrow's note and its « VS price narrative » line, the change written between two boxed periods, the value at the line's end, and the news card. Then answer: in five seconds, do I know which company, what is measured (unit, period), and the post's conclusion?
 
 ## Defects (each one = the picture fails)
 - A word or number cut (« … », a missing first digit), hidden behind a box, or overlapping another text.
@@ -17,16 +17,17 @@ Read every word and number to its last character: the title, the label under it,
 - The title or label is a bare label with no claim when the style shows it, or repeats what another line says.
 - Jargon a retail reader must decode (EPS, YoY, net income, guide, 8-K).
 - The picture contradicts the text (other number, other side, other period).
+- A fair value, a gap to it, a range, an upside or the word « opportunity » anywhere on it: correct the spec to the chart of the text's reported figure.
 
 ## Levers (change only the spec)
 - **Shorter words**: title 4 to 9 words, chartLabel 3 to 8 words with its unit, note 3 to 7 words with its number, priceSays 3 to 8 words.
-- **Another point**: the one whose value IS the post's number (or `latest`).
+- **Another point**: the one whose value IS the post's number (or `latest`); `from` = the period the text compares it to.
 - **Another chart**: from the charts listed for that post, the one that shows the post's claim.
-- **Another style**: `pro` when the news or price card crowds the picture or the news card says nothing new.
+- **Another style**: `pro` when the news card crowds the picture or says nothing new.
 Keep the tone skill's Image section and `content-matrix` « The picture »: a correction never breaks them.
 
-## The opportunity frame
-A picture headed by the price against its fair value and « The market believes » is drawn from the analysis (narrative + reversing drivers), never from the spec: only « Drawing: » defects apply to it, image null.
+## The story-break frame
+A picture headed by the signal's words and NARRATIVE / REALITY blocks is drawn from the analysis (narrative + reversing drivers), never from the spec: only « Drawing: » defects apply to it, image null.
 
 ## A defect no spec change can fix
 The drawing code itself is wrong (a card cut whatever the words, a box over the line on every point): say it in one line starting « Drawing: », give no new spec, and the run reports it so the code gets fixed.

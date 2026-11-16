@@ -1,10 +1,13 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
-import { evidence, exhibits, type ExhibitPoint, type ExhibitSeries, fairValues, narrativeDrivers, narratives, signals, type ThesisSide } from "@/db/schema/analysis";
+import { evidence, exhibits, type ExhibitPoint, type ExhibitSeries, narrativeDrivers, narratives, signals, type ThesisSide } from "@/db/schema/analysis";
 import * as content from "@/db/schema/content";
 import { companyProfiles, priceBars } from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 
-/** What the visuals of one Idea are drawn from, read from gold when they are made. */
+/**
+ * What the visuals of one Idea are drawn from, read from gold when they are made. Reported figures and the share price
+ * only: the fair value is never read (Thierry 2026-11-16: not confident in our fair values, none in published pictures).
+ */
 export type VisualInput = {
   symbol: string;
   companyName: string | null;
@@ -13,7 +16,6 @@ export type VisualInput = {
   /** Closes of the last 12 months, oldest first. */
   bars: { date: string; close: number }[];
   priceSources: string[];
-  fair: { value: number; currency: string | null; low: number | null; high: number | null } | null;
   /** The first news the Idea cites that has a link: what a capture shows. */
   newsUrl: string | null;
   /** The news items the Idea cites (headline + publisher): the chart's headline strip shows the most prestigious one. */
@@ -21,7 +23,7 @@ export type VisualInput = {
   /** The drivers the Idea rests on, each with its thesis side, and the narrative of each side: what the price says. */
   drivers: { title: string; summary: string | null; side: ThesisSide }[];
   narratives: { side: ThesisSide; text: string }[];
-  /** The ticker's current Signal (gold.signals): the price card's arrow says it. */
+  /** The ticker's current Signal (gold.signals): the picture's colour when its drivers do not say it. */
   signal: "BUY" | "SELL" | null;
   /** How the Idea is told: the chart judge reads it with the title. */
   angle: string;
@@ -58,10 +60,9 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
   const since = new Date(now.getTime() - 365 * 86400_000).toISOString().slice(0, 10);
   const evidenceIds = idea.sourceRefs.filter((r) => r.kind === "evidence").map((r) => r.ref.slice("evidence:".length));
   const citedDrivers = idea.sourceRefs.filter((r) => r.kind === "driver").map((r) => r.ref.slice("driver:".length));
-  const [[profile], bars, [fair], items] = await Promise.all([
+  const [[profile], bars, items] = await Promise.all([
     db.select({ name: companyProfiles.name }).from(companyProfiles).where(eq(companyProfiles.symbol, symbol)),
     db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(and(eq(priceBars.symbol, symbol), gte(priceBars.date, since))).orderBy(asc(priceBars.date)),
-    db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
     evidenceIds.length ? db.select({ id: evidence.id, url: evidence.url, driverId: evidence.driverId, kind: evidence.kind, headline: evidence.headline, publisher: evidence.publisher, at: evidence.eventAt, why: evidence.why, citedSentence: evidence.citedSentence }).from(evidence).where(inArray(evidence.id, evidenceIds)) : [],
   ]);
   // The drivers the Idea rests on: the ones it names, then the ones its Evidence moves.
@@ -81,7 +82,6 @@ export async function visualInput(db: Db, idea: content.SilverContentIdea, now =
     title: idea.title,
     bars: bars.map((b) => ({ date: b.date, close: b.close })),
     priceSources: [...new Set(bars.flatMap((b) => b.sources))].map((s) => PRICE_SOURCE_LABEL[s] ?? s),
-    fair: fair ? { value: fair.value, currency: fair.currency, low: fair.low, high: fair.high } : null,
     newsUrl,
     news: evidenceIds
       .map((id) => items.find((e) => e.id === id))

@@ -8,10 +8,10 @@ description: X in the URGENT tone - breaking-news, clickbait-style X post and X 
 The « BREAKING » style of the biggest finance accounts: a headline, a cashtag, a chart (the Kobeissi Letter pattern, observed: https://superx.so/creators/KobeissiLetter). It wins attention; studies show clickbait headlines cost credibility, most for small, unknown sources (https://mospace.umsystem.edu/xmlui/handle/10355/56080). It is in the Sandbox so Thierry can judge that trade-off on our own Ideas. Every house rule stays (skill `content-matrix`): the number must be in the inputs, the claim must be true.
 
 ## X post
-- **Signal post (BUY or SELL)**: the 5 spaced lines of skill `angle-signal` instead, at most 250 characters, ending « Source: Dualis Research »; never the one-line 🚨 form.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead (belief, real figure with both values, why), at most 250 characters, ending « Source: Dualis Research »; never the one-line 🚨 form.
 - **Length**: at most 200 characters.
 - **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
-- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »); if that line says the price is high or low, it carries the fair value gap with its number (« $7220.T trades 13% above our fair value. »). `$TICKER` once. ONE measure only, the one the picture shows, copied digit for digit from its note; no claim without its number. A macro post names the exposure with its own figure and unit (« borrowings minus cash $38.2M »).
+- **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »), never a fair value or gap. `$TICKER` once. ONE measure only, the one the picture shows, copied digit for digit from its note; no claim without its number. A macro post names the exposure with its own figure and unit (« borrowings minus cash $38.2M »).
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
 - **Visual**: see Image below.
 - Example:
@@ -31,8 +31,8 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 - Don't: drop the risk section; fake scarcity (« last chance »); jargon (« dilute », « 200-day average »: say more shares sold, average price of the last 200 days); a line on the signal's own strength (« Our signal is weak »).
 
 ## Image
-- **style**: `breaking` (news card + price card).
+- **style**: `breaking` (news card when a news item is listed, else the big title).
 - **title**: the alarm with its shock number, one word in CAPS allowed (« Profit QUADRUPLED in a year »).
 - **newsLine**: when a news item is listed, the fact that triggered the post, with its number.
 - **note**: the shock number itself, on the point that shows it; the box sits in the empty half of the chart and never covers the line or a bar.
-- **chart**: the series where the move is biggest, of the SAME measure as the shock number (a revenue text gets the quarterly revenue chart, never `price`); a BUY or SELL post follows content-matrix (chart `price`, note the step-2 gap). The note and priceSays never contradict the text, and a macro post ends on its exposure figure.
+- **chart**: the series where the move is biggest, of the SAME measure as the shock number (a revenue text gets the quarterly revenue chart, never `price`); a BUY or SELL post: the chart of its line-2 figure, `from` = the compared period (content-matrix « The picture »). The note and priceSays never contradict the text.

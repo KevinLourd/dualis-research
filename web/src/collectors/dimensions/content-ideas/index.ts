@@ -30,9 +30,10 @@ const HISTORY_DAYS = 90;
 const HISTORY_MAX = 40;
 const EVIDENCE_PER_TICKER = 8;
 
-const pct = (x: number) => `${x > 0 ? "+" : ""}${Math.round(x * 100)}%`;
-
-/** Every analysed ticker in words, with what an Idea may cite: signal, fair value, Signal Changes, Evidence, drivers, report. */
+/**
+ * Every analysed ticker in words, with what an Idea may cite: signal, Signal Changes, Evidence, drivers, report. Never the
+ * fair value (Thierry 2026-11-16: not confident in our fair values; an Idea is published, so it rests on reported figures).
+ */
 export async function tickerBriefs(db: Db, now = new Date()): Promise<TickerBrief[]> {
   const scope = await db.select().from(tickers).where(eq(tickers.analysed, true)).orderBy(asc(tickers.symbol));
   const symbols = scope.map((t) => t.symbol);
@@ -62,16 +63,6 @@ export async function tickerBriefs(db: Db, now = new Date()): Promise<TickerBrie
     if (s) {
       const call = s.signal === "none" ? "no signal" : `${s.signal}, ${s.strength}`;
       offered.push({ ref: `signal:${t.symbol}`, kind: "signal", symbol: t.symbol, label: `${who}: ${call}`, detail: `Signal: ${call}. Narrative: ${n?.text ?? (side === null && narrs.some((x) => x.symbol === t.symbol) ? "two stories compete, neither signals" : "not written yet")}` });
-      if (s.fairValue !== null && s.quote !== null) {
-        const gap = s.gapPct !== null ? ` (${pct(s.gapPct)} vs fair value)` : "";
-        offered.push({
-          ref: `fair-value:${t.symbol}`,
-          kind: "fair-value",
-          symbol: t.symbol,
-          label: `${who}: fair value ${s.fairValue.toPrecision(4)} ${s.currency ?? ""}, quote ${s.quote.toPrecision(4)}${gap}`,
-          detail: `Fair value ${s.fairValue} ${s.currency ?? ""}${s.fairValueLabel ? ` (${s.fairValueLabel})` : ""}, quote ${s.quote} on ${s.quoteDate ?? "?"}${gap}.`,
-        });
-      }
     }
     for (const c of changes.filter((x) => x.symbol === t.symbol)) {
       const label = `${who}: signal ${c.fromSignal} ${c.fromStrength} to ${c.toSignal} ${c.toStrength} on ${utcDay(c.at)}`;
@@ -204,7 +195,7 @@ export async function promoteIdeas(db: Db, rows: BronzeFetch[]): Promise<Promote
 
 export const contentIdeas: Dimension = {
   name: IDEAS_DIMENSION,
-  description: "Ideas worth a post, proposed once a day from the signals, evidence, drivers and fair values, and scored per channel and format against what was already published.",
+  description: "Ideas worth a post, proposed once a day from the signals, evidence and drivers, and scored per channel and format against what was already published.",
   sources: [claudeIdeas],
   subjects: (db: Db) => pickIdeaSubjects(db),
   expand: expandToScores,

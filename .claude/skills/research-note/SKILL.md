@@ -6,7 +6,7 @@ description: Format and rules for a Dualis Research equity note (thesis, drivers
 # Research note
 
 ## Thierry's frame (call 2026-11-04, `docs/thierry-method.md`)
-Price = the market's **narrative**; **fundamental value** = what the business is worth if the plan works (comparables, normalized earnings, e.g. 10x EV/EBITDA → share price). Long = price below fundamental, the bad narrative inflects; short = price above, the hyped narrative cracks. Every note says: price vs fundamental (above/below), the narrative behind the gap, what would crack or inflect it. Claude never invents a price target, upside % or horizon: those are Thierry's numbers; Claude gives the narrative, the evidence and KPIs vs analyst consensus.
+Price = the market's **narrative**; **fundamental value** = what the business is worth if the plan works (comparables, normalized earnings, e.g. 10x EV/EBITDA → share price). Long = price below fundamental, the bad narrative inflects; short = price above, the hyped narrative cracks. Every note says: the narrative the market prices, the reported figures that crack or inflect it, what would prove us wrong. A published note never prints a fair value, a price target, an upside % or a horizon (Thierry 2026-11-16: not confident in our fair values; real figures + the shortest convincing why of the narrative break); Claude gives the narrative, the evidence and KPIs vs analyst consensus.
 
 ## Thesis card (watchlist, one per ticker)
 - **Ticker / company / sector / market cap** (as of date)
@@ -25,9 +25,8 @@ Price = the market's **narrative**; **fundamental value** = what the business is
 4. Our view + drivers, with 1-2 charts.
 5. Catalysts and timeline.
 6. Risks / kill criteria.
-7. Valuation: scenarios (bear / base / bull) with the math shown.
-8. Paywall sits after section 3 or 4.
-9. Disclaimer (always): "Not investment advice. For information only. Author may hold positions in securities discussed."
+7. Paywall sits after section 3 or 4.
+8. Disclaimer (always): "Not investment advice. For information only. Author may hold positions in securities discussed."
 
 ## Rules
 - Numbers carry date + source. No figure without a source.

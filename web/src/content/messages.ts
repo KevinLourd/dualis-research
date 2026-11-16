@@ -53,9 +53,11 @@ export function publishMessage(d: GoldContentDraft): string {
 }
 
 /** A Signal Change: the new signal, its one-line Update Note, the page that shows why. */
-export function signalAlert(c: { symbol: string; fromSignal: string; fromStrength: string; toSignal: string; toStrength: string; updateNote: string | null }, name: string | null): string {
+export function signalAlert(c: { symbol: string; fromSignal: string; fromStrength: string; toSignal: string; toStrength: string; updateNote: string | null }, name: string | null, figure: string | null = null): string {
   return [
     `*${c.symbol}*${name ? ` (${name})` : ""}: ${signalWords(c.toSignal, c.toStrength)}, was ${signalWords(c.fromSignal, c.fromStrength)}.`,
+    // The reported figure that breaks the story, never a fair value or a gap (Thierry 2026-11-16).
+    figure ? `Reported figure: ${figure}` : "",
     c.updateNote ?? "",
     `Why: ${CONSOLE_URL}/tickers/${encodeURIComponent(c.symbol)}`,
   ]

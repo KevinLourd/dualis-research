@@ -4,6 +4,7 @@ import * as sandbox from "@/db/schema/sandbox";
 import type { SandboxImage, SandboxImageCheck } from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
+import { STORY_CAPTION } from "../content-visuals/story-break";
 import { FORMAT_NAME, parseImage, readSkill, shortHash, type SlotPlan, stripFrontmatter } from "../sandbox-posts";
 import { postKey } from "../sandbox-visuals";
 
@@ -19,7 +20,7 @@ import { postKey } from "../sandbox-visuals";
 export const SANDBOX_IMAGE_FIX_DIMENSION = "sandbox-image-fix";
 export const CLAUDE_SOURCE = "claude";
 export const IMAGE_SKILL = "image-correction";
-export const IMAGE_FIX_VERSION = "image-fix-v1";
+export const IMAGE_FIX_VERSION = "image-fix-v2";
 export const MAX_IMAGE_PASSES = 3;
 
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
@@ -117,8 +118,8 @@ export const claudeImageFix: Source = {
       let picture: string;
       if (v?.status === "ok" && v.file) {
         images.push({ mime: v.mime ?? "image/png", data: v.file });
-        // The opportunity frame is drawn from the analysis, never from the spec: only its drawing can be wrong.
-        picture = v.caption?.startsWith("Opportunity:") ? `its picture is image ${images.length} above, the opportunity frame drawn from the analysis (the spec below is NOT used): report only « Drawing: » defects, image null` : `its picture is image ${images.length} above`;
+        // The story-break frame is drawn from the analysis, never from the spec: only its drawing can be wrong.
+        picture = v.caption?.startsWith(STORY_CAPTION) ? `its picture is image ${images.length} above, the story-break frame drawn from the analysis (the spec below is NOT used): report only « Drawing: » defects, image null` : `its picture is image ${images.length} above`;
       } else picture = `its picture could not be drawn (${v?.error ?? "no picture"}): correct the spec so it can be`;
       const plan = plans.find((pl) => pl.slot === p.slot)!;
       return [
@@ -136,7 +137,7 @@ export const claudeImageFix: Source = {
       "",
       ...blocks,
       "",
-      `Answer with ONE JSON object only, no prose, no code fence: {"posts": [${posts.length} items, in order: {"post": <n>, "ok": true|false, "defects": ["<one line each>"], "image": <null when ok or only « Drawing: » defects, else the corrected spec: {"chart", "point", "style", "title", "chartLabel", "note", "priceSays", "newsLine", "news"}>}]}.`,
+      `Answer with ONE JSON object only, no prose, no code fence: {"posts": [${posts.length} items, in order: {"post": <n>, "ok": true|false, "defects": ["<one line each>"], "image": <null when ok or only « Drawing: » defects, else the corrected spec: {"chart", "point", "from", "style", "title", "chartLabel", "note", "priceSays", "newsLine", "news"}>}]}.`,
     ].join("\n");
     const system = [`You correct the pictures of Dualis Research posts (a sandbox, nothing is published). Follow the skill ${IMAGE_SKILL}; the picture rules are content-matrix « The picture » and the tone's Image section.`, "", stripFrontmatter(skill), "", "=== content-matrix ===", stripFrontmatter(matrix), "", `=== ${account.platform}-${account.tone} ===`, stripFrontmatter(tone)].join("\n");
     const { text, model } = await ctx.complete({ system, prompt, images });

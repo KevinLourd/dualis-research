@@ -4,12 +4,16 @@ import { Resvg } from "@resvg/resvg-js";
 import * as echarts from "echarts";
 import { PRICED_WORD, signalWords, tagWord } from "@/content/signal-words";
 import { COLOR } from "@/design/tokens";
+import { formatUnit, periodLabel, seriesPeriod } from "@/console/exhibit-format";
+import { sourceNote } from "@/console/source-labels";
 import type { AlertInput } from "./data";
 
 /**
  * The Signal Change alert as one PNG (Kevin 2026-11-09: « un mix entre le chart et la table des drivers avec la colonne
- * status »): the console's level B panel in one picture, light theme of the design tokens. Node only: loaded by URL
- * from the dimension so the console bundle never sees resvg. Every text wraps whole (never cut by code).
+ * status »; Thierry 2026-11-16: no fair value, the real figure that breaks the story instead): the signal, what the market
+ * believes, the reported figure against it with its chart (both compared periods coloured), then the drivers' Status.
+ * Light theme of the design tokens. Node only: loaded by URL from the dimension so the console bundle never sees resvg.
+ * Every text wraps whole (never cut by code).
  */
 
 export const W = 1080;
@@ -29,7 +33,6 @@ const C = {
   short: COLOR.short.light,
   longSoft: COLOR["long-soft"].light,
   shortSoft: COLOR["short-soft"].light,
-  bandSoft: COLOR["accent-soft"].light,
   bench: COLOR["chart-light-bench"].light,
   /** The console's "warning" dot for a weak turn. */
   weak: COLOR["chart-line"].light,
@@ -37,7 +40,6 @@ const C = {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const fmt = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: Math.abs(v) >= 100 ? 0 : 2, maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2 });
-const ts = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const dayLabel = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 /** Rough IBM Plex Sans advance per character, in em (semibold is wider). */
@@ -83,60 +85,50 @@ function badge(out: Svg, xRight: number, yTop: number, effect: string, strength:
   return w;
 }
 
-function chartSvg(a: AlertInput, width: number, height: number): string {
-  const closes = a.bars.map((b) => b.close);
-  const levels = [...closes, ...(a.fair ? [a.fair.value, a.fair.low, a.fair.high].filter((v): v is number => v !== null) : [])];
-  const lo = Math.min(...levels);
-  const hi = Math.max(...levels);
-  const pad = (hi - lo) * 0.08 || hi * 0.05;
-  // Round axis bounds on a 1/2/5 step, so the zones fill the plot edge to edge.
-  const raw = (hi - lo + 2 * pad) / 5;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= raw) ?? 10 * mag;
-  const yMin = Math.floor((lo - pad) / step) * step;
-  const yMax = Math.ceil((hi + pad) / step) * step;
-  const f = a.fair;
-  const label = (s: string, position: string) => ({ show: true, formatter: s, position, color: C.muted, fontSize: 18, fontFamily: FONT });
-  const markLines = f
-    ? [
-        { yAxis: f.value, lineStyle: { color: C.brand, type: "dashed", width: 2 }, label: { ...label(`Fair value ${fmt(f.value)}`, "insideEndTop"), color: C.brand } },
-        ...(f.high !== null ? [{ yAxis: f.high, lineStyle: { color: C.bench, type: "dotted", width: 1.5 }, label: label(`High ${fmt(f.high)}`, "insideEndTop") }] : []),
-        ...(f.low !== null ? [{ yAxis: f.low, lineStyle: { color: C.bench, type: "dotted", width: 1.5 }, label: label(`Low ${fmt(f.low)}`, "insideEndBottom") }] : []),
-      ]
-    : [];
-  const top = f ? (f.high ?? f.value) : null;
-  const bottom = f ? (f.low ?? f.value) : null;
-  const areas =
-    top !== null && bottom !== null
-      ? [
-          [{ yAxis: top, itemStyle: { color: C.shortSoft }, label: { show: true, position: "insideTopLeft", formatter: "SELL zone", color: C.short, fontSize: 18, fontFamily: FONT } }, { yAxis: yMax }],
-          [{ yAxis: bottom, itemStyle: { color: C.bandSoft } }, { yAxis: top }],
-          [{ yAxis: yMin, itemStyle: { color: C.longSoft }, label: { show: true, position: "insideBottomLeft", formatter: "BUY zone", color: C.long, fontSize: 18, fontFamily: FONT } }, { yAxis: bottom }],
-        ]
-      : [];
+type Break = AlertInput["breaks"][number];
+
+/**
+ * The comparison the reality line makes, in reported values: « Q3-25 6.2M → Q3-26 7.5M (+21%) » when the judge named the
+ * earlier period, else the latest value alone (never a comparison nobody made).
+ */
+export function comparison(b: Break): { text: string; periods: string[] } | null {
+  const lead = b.chart.series[0];
+  if (!lead) return null;
+  const pts = b.chart.points.filter((p) => typeof p.values[lead.key] === "number");
+  const last = pts.at(-1);
+  if (!last) return null;
+  const per = seriesPeriod(lead.key);
+  const v = last.values[lead.key] as number;
+  const show = (x: number) => formatUnit(x, lead.unit, lead.currency);
+  const base = b.base ? pts.find((p) => p.period === b.base && p.period !== last.period) : undefined;
+  if (!base) return { text: `${periodLabel(last.period, per)}: ${show(v)}`, periods: [last.period] };
+  const v0 = base.values[lead.key] as number;
+  const change = v0 !== 0 ? Math.round((v / v0 - 1) * 100) : null;
+  return { text: `${periodLabel(base.period, per)} ${show(v0)} → ${periodLabel(last.period, per)} ${show(v)}${change === null ? "" : ` (${change >= 0 ? "+" : ""}${change}%)`}`, periods: [base.period, last.period] };
+}
+
+/** The Exhibit of the reported figure, lead series only: the compared periods in the signal's colour, the others grey. */
+function breakChartSvg(b: Break, lit: string[], accent: string, width: number, height: number): string {
+  const lead = b.chart.series[0];
+  const per = seriesPeriod(lead.key);
+  const bars = b.chart.chart === "bar";
+  const data = b.chart.points.map((p) => {
+    const v = p.values[lead.key] ?? null;
+    const on = lit.includes(p.period);
+    return { value: v, itemStyle: { color: on ? accent : C.bench }, label: { show: bars && on, position: "top", color: accent, fontSize: 20, fontWeight: 600, fontFamily: FONT, formatter: () => (v === null ? "" : formatUnit(v, lead.unit, lead.currency)) } };
+  });
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width, height });
   chart.setOption({
     backgroundColor: "#fff",
     animation: false,
     textStyle: { fontFamily: FONT },
-    grid: { left: 92, right: 16, top: 12, bottom: 40 },
-    xAxis: {
-      type: "time",
-      axisLine: { lineStyle: { color: C.rule } },
-      axisTick: { show: false },
-      splitLine: { show: false },
-      axisLabel: { color: C.muted, fontSize: 18, fontFamily: FONT, hideOverlap: true, formatter: (v: number) => `{m|${new Date(v).toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", "-")}}`, rich: { m: { color: C.muted, fontSize: 18, fontFamily: FONT } } },
-    },
-    yAxis: { type: "value", min: yMin, max: yMax, interval: step, axisLabel: { color: C.muted, fontSize: 18, fontFamily: FONT, formatter: (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 2 }) }, splitLine: { lineStyle: { color: C.rule } } },
+    grid: { left: 110, right: 24, top: 36, bottom: 44 },
+    xAxis: { type: "category", data: b.chart.points.map((p) => periodLabel(p.period, per)), axisLine: { lineStyle: { color: C.rule } }, axisTick: { show: false }, axisLabel: { color: C.muted, fontSize: 18, fontFamily: FONT, hideOverlap: true } },
+    yAxis: { type: "value", scale: !bars, splitNumber: 4, axisLabel: { color: C.muted, fontSize: 18, fontFamily: FONT, formatter: (v: number) => formatUnit(v, lead.unit, lead.currency) }, splitLine: { lineStyle: { color: C.rule } } },
     series: [
-      {
-        type: "line",
-        data: a.bars.map((b) => [ts(b.date), b.close]),
-        symbol: "none",
-        lineStyle: { color: C.brand, width: 2.5 },
-        markLine: { symbol: "none", silent: true, data: markLines },
-        markArea: { silent: true, data: areas },
-      },
+      bars
+        ? { type: "bar", data, barMaxWidth: 56 }
+        : { type: "line", data: data.map((d) => ({ ...d, symbol: lit.length ? "circle" : "none", symbolSize: d.itemStyle.color === accent ? 14 : 0, label: { ...d.label, show: d.itemStyle.color === accent } })), connectNulls: true, lineStyle: { color: C.brand, width: 3 } },
     ],
   });
   const svg = chart.renderToSVGString();
@@ -163,37 +155,29 @@ export function alertSvg(a: AlertInput): string {
   const bw = badge(out, P + callW + 16 + Math.round(textWidth(tagWord("reversal", a.toStrength, a.side), 22) * 0.9 + 52), y + 2, "reversal", a.toStrength, a.side);
   text(out, P + callW + 16 + bw + 20, y + 30, `was ${signalWords(a.fromSignal, a.fromStrength)}`, { size: 24, color: C.muted });
 
-  // Fair value and quote cards.
-  y += 76;
-  const cardW = (INNER - 24) / 2;
-  const cardH = 150;
-  out.push(`<rect x="${P}" y="${y}" width="${cardW}" height="${cardH}" rx="12" fill="#fff" stroke="${C.rule}" stroke-width="2"/>`);
-  out.push(`<rect x="${P + cardW + 24}" y="${y}" width="${cardW}" height="${cardH}" rx="12" fill="#fff" stroke="${C.rule}" stroke-width="2"/>`);
-  const cur = a.currency ? ` ${a.currency}` : "";
-  text(out, P + 24, y + 40, "Fair value", { size: 22, color: C.muted });
-  text(out, P + 24, y + 92, a.fair ? `${fmt(a.fair.value)}${cur}` : "Not set", { size: 40, weight: "semibold" });
-  if (a.fair?.low != null && a.fair.high != null) text(out, P + 24, y + 128, `Range ${fmt(a.fair.low)} to ${fmt(a.fair.high)}`, { size: 22 });
-  const qx = P + cardW + 48;
-  text(out, qx, y + 40, "Quote", { size: 22, color: C.muted });
-  text(out, qx, y + 92, a.quote !== null ? `${fmt(a.quote)}${cur}` : "No quote", { size: 40, weight: "semibold" });
-  if (a.quote !== null && a.fair) {
-    const gap = a.quote / a.fair.value - 1;
-    text(out, qx, y + 128, `${Math.round(Math.abs(gap) * 100)}% ${gap < 0 ? "below" : "above"} fair value`, { size: 22, color: gap < 0 ? C.long : C.short });
+  // What the market believes, then the reported figure that breaks it, with its chart.
+  y += 44;
+  const accent = a.side === "long" ? C.long : C.short;
+  if (a.narrative) {
+    y += 48;
+    text(out, P, y, "THE MARKET BELIEVES", { size: 20, color: C.muted, spacing: 2 });
+    y = lines(out, P, y + 40, a.narrative, INNER, { size: 28, lead: 38 });
   }
-
-  // Price vs fair value, 12 months.
-  y += cardH + 64;
-  text(out, P, y, `${a.symbol}: price vs fair value`, { size: 26, weight: "semibold" });
-  y += 32;
-  text(out, P, y, `Daily close${a.currency ? `, ${a.currency}` : ""}, last 12 months`, { size: 20, color: C.muted });
-  y += 20;
-  const chartH = 440;
-  if (a.bars.length > 1) {
-    out.push(chartSvg(a, INNER, chartH).replace(/^<\?xml[^>]*>/, "").replace("<svg ", `<svg x="${P}" y="${y}" `));
+  for (const b of a.breaks) {
+    y += 64;
+    text(out, P, y, "THE REPORTED FIGURE", { size: 20, color: accent, spacing: 2 });
+    y = lines(out, P, y + 42, b.headline ?? b.chart.title, INNER, { size: 30, weight: "semibold", lead: 40 });
+    const cmp = comparison(b);
+    y += 40;
+    text(out, P, y, b.chart.title, { size: 22, color: C.muted });
+    if (cmp) {
+      y += 36;
+      text(out, P, y, cmp.text, { size: 26, weight: "semibold", color: accent });
+    }
+    y += 16;
+    const chartH = 380;
+    out.push(breakChartSvg(b, cmp?.periods ?? [], accent, INNER, chartH).replace(/^<\?xml[^>]*>/, "").replace("<svg ", `<svg x="${P}" y="${y}" `));
     y += chartH;
-  } else {
-    text(out, P, y + 40, "No price history yet.", { size: 22, color: C.muted });
-    y += 60;
   }
 
   // Narrative Drivers with their Status, like the panel's table.
@@ -249,8 +233,8 @@ export function alertSvg(a: AlertInput): string {
 
   // Source line + disclaimer.
   y = ry + 52;
-  const sources = [...a.priceSources, "Dualis Research"].join(", ");
-  y = lines(out, P, y, `Source: ${sources}. Not investment advice.`, INNER, { size: 19, color: C.muted });
+  const source = sourceNote([...new Set(a.breaks.flatMap((b) => b.chart.sources)), "dualis"]) ?? "Source: Dualis Research.";
+  y = lines(out, P, y, `${source} Not investment advice.`, INNER, { size: 19, color: C.muted });
   const H = Math.ceil(y + 48);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${out.join("")}</svg>`;
 }

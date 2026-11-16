@@ -8,13 +8,14 @@ import { signalAlert } from "@/content/messages";
 import { isUpgrade } from "@/content/signal-alert";
 import { allowlist, normalizePhone } from "@/whatsapp/allowlist";
 import { enqueue } from "@/whatsapp/outbox";
-import type { Dimension, PromoteResult, Source } from "../../types";
+import type { Dimension, PromoteResult, Source, SourceContext } from "../../types";
 import { type AlertInput, alertInput } from "./data";
 
 /**
  * Signal Change alerts on WhatsApp (Kevin 2026-11-09): only when a STRONG signal appears (`isUpgrade`, Thierry
- * 2026-11-11: no signal or weak -> strong, a side flip landing strong; a weak signal never sends), to Kevin AND Thierry, each with one picture of the level B panel
- * (price vs fair value + the Narrative Drivers and their Status, `render.ts`) and the Update Note as caption.
+ * 2026-11-11: no signal or weak -> strong, a side flip landing strong; a weak signal never sends), to Kevin AND Thierry, each with one picture
+ * (the story the market holds, the reported figure that breaks it with its chart, the Narrative Drivers and their Status,
+ * `render.ts`; never a fair value: Thierry 2026-11-16) and the signal, that figure and the Update Note as caption.
  * Runs right after `signals` in every collect (GitHub Actions), never on the box.
  * Bronze = what the picture is drawn from (one fetch per change x recipient); silver.content_messages = one row per
  * queued message (purpose alert, transition_id = the Signal Change id); the outbox row holds the PNG.
@@ -50,7 +51,7 @@ export const alertPlan: Source = {
 
 export const signalAlertsDim: Dimension = {
   name: SIGNAL_ALERTS_DIMENSION,
-  description: "WhatsApp to Kevin and Thierry when a strong signal appears (no signal or weak -> strong, a side flip landing strong; a weak signal never sends), with the chart and the drivers' Status in one picture.",
+  description: "WhatsApp to Kevin and Thierry when a strong signal appears (no signal or weak -> strong, a side flip landing strong; a weak signal never sends), with the reported figure that breaks the story and the drivers' Status in one picture.",
   sources: [alertPlan],
   subjects: planAlerts,
   promote: promoteAlerts,
@@ -65,7 +66,7 @@ function recipients(): string[] {
 }
 
 /** Every upgrade of the last day not yet queued for a recipient; nothing while the device is unlinked (a queue would burst once linked). */
-export async function planAlerts(db: Db, _ctx?: unknown, now = new Date()): Promise<string[]> {
+export async function planAlerts(db: Db, ctx?: Pick<SourceContext, "complete">, now = new Date()): Promise<string[]> {
   planned.clear();
   const [link] = await db.select({ status: whatsappLink.status }).from(whatsappLink).where(eq(whatsappLink.id, "default"));
   if (link?.status !== "linked") return [];
@@ -91,8 +92,8 @@ export async function planAlerts(db: Db, _ctx?: unknown, now = new Date()): Prom
     const todo = to.filter((r) => !sent.some((s) => s.transitionId === c.id && s.recipient === r) && !got.has(reading(r, c)));
     for (const r of todo) got.add(reading(r, c));
     if (todo.length === 0) continue;
-    const input = await alertInput(db, c, now);
-    const text = signalAlert(c, input.name);
+    const input = await alertInput(db, c, ctx?.complete);
+    const text = signalAlert(c, input.name, input.breaks[0]?.headline ?? null);
     for (const recipient of todo) {
       const key = `signal:${c.id}:${recipient}`;
       planned.set(key, { changeId: c.id, recipient, text, input });

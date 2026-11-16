@@ -9,20 +9,46 @@ import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-
 import { visualInput, type VisualExhibit, type VisualInput } from "./data";
 
 /**
- * The opportunity story of a ticker (Kevin 2026-11-12, the frame of every Sandbox picture, all 6 accounts): the narrative
- * that explains why the price sits below (or above) its fair value, and the 1-3 drivers of that narrative that are
- * reversing NOW (weak or strong), each with its chart. Read from gold only; null when there is nothing to show (no
- * narrative, no fair value, or no driver reversing: then there is no opportunity to draw).
+ * The story break of a ticker (Kevin 2026-11-12, the frame of every Sandbox picture, all 6 accounts; Thierry 2026-11-16:
+ * real reported figures, never our fair value): the narrative the market holds and the 1-3 drivers of that narrative
+ * reversing NOW (weak or strong), each with the chart of its reported figure. Read from gold only; null when there is
+ * nothing to show (no narrative, or no driver reversing). The fair value is never read here.
  */
-export type OpportunityStory = {
+export type StoryBreak = {
   input: VisualInput;
   side: ThesisSide;
   narrative: string;
+  /** The ticker's live signal in words (« BUY, strong inflection »), null when none. */
+  signal: { signal: "BUY" | "SELL"; strength: string } | null;
   /** `base` = the earlier period the reality line compares the latest value to (null: no comparison). */
   drivers: { title: string; tag: string; headline: string | null; exhibit: VisualExhibit; base: string | null }[];
 };
 
 export const MAX_PANELS = 3;
+
+/** Caption prefix of a story-break picture (sandbox-image-fix reads it: that picture is drawn from the analysis). */
+export const STORY_CAPTION = "Story break:";
+
+/**
+ * The line under the company, per tone: the signal's words, never a price or a fair value (Thierry 2026-11-16). With no
+ * live signal on that thesis, the strongest reversing driver's tag stands in.
+ */
+export function storyHeadline(story: Pick<StoryBreak, "signal" | "drivers">, tone: "urgent" | "balanced" | "neutral"): string {
+  const tag = story.signal ? tagWord("reversal", story.signal.strength, story.signal.signal === "BUY" ? "long" : "short") : (story.drivers[0]?.tag ?? "");
+  const word = tag.charAt(0).toUpperCase() + tag.slice(1).toLowerCase();
+  const n = story.drivers.length;
+  const figures = `${n} reported figure${n > 1 ? "s" : ""} against the story`;
+  if (tone === "urgent") return `${word.toUpperCase()}${story.signal ? `: ${story.signal.signal}` : ""}`;
+  if (tone === "neutral") return `${story.signal ? `${story.signal.signal}, ${word.toLowerCase()}` : word}. ${figures}.`;
+  return `${story.signal ? `${story.signal.signal} · ` : ""}${word} · ${figures}`;
+}
+
+/** The line above the panels, per tone: what the market believes, then the reported figures. */
+export function storyIntro(up: boolean, tone: "urgent" | "balanced" | "neutral"): string {
+  if (tone === "urgent") return up ? "The market is still pricing the old story. The numbers say otherwise:" : "The market is still pricing the dream. The numbers say otherwise:";
+  if (tone === "neutral") return "The story behind the price, and the latest reported data:";
+  return up ? "What the market believes, and the reported figures turning it:" : "What the market believes, and the reported figures breaking it:";
+}
 
 export const NO_COMPARISON = "none";
 
@@ -54,28 +80,30 @@ export async function comparedPeriod(db: Db, complete: Complete, driverId: strin
   return j.verdict === NO_COMPARISON || !earlier.includes(j.verdict) ? null : j.verdict;
 }
 
-export async function opportunityStory(db: Db, symbol: string, complete?: Complete): Promise<OpportunityStory | null> {
+/** `side` = the thesis to read (a signal alert names it); else the signalling thesis, else the one whose drivers reverse. */
+export async function storyBreak(db: Db, symbol: string, complete?: Complete, only?: ThesisSide): Promise<StoryBreak | null> {
   const idea = { id: crypto.randomUUID(), symbol, title: symbol, angle: "", sourceRefs: [] } as unknown as content.SilverContentIdea;
-  const input = await visualInput(db, idea);
-  const last = input.bars.at(-1);
-  if (!input.fair || !last) return null;
-  const [sig] = await db.select({ side: signals.side }).from(signals).where(eq(signals.symbol, symbol));
-  // The signalling thesis, else the one the price's side of fair value tells (below = the pessimistic story, long).
-  const side: ThesisSide = sig?.side ?? (last.close < input.fair.value ? "long" : "short");
+  const [input, [sig], reversing] = await Promise.all([
+    visualInput(db, idea),
+    db.select({ side: signals.side, signal: signals.signal, strength: signals.strength }).from(signals).where(eq(signals.symbol, symbol)),
+    db
+      .select({ driverId: narrativeStates.driverId, side: narrativeStates.side, strength: narrativeStates.strength, headline: narrativeStates.headline })
+      .from(narrativeStates)
+      .where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.level, "driver"), eq(narrativeStates.effect, "reversal"), inArray(narrativeStates.strength, ["strong", "weak"])))
+      .orderBy(asc(narrativeStates.strength), desc(narrativeStates.asOf)),
+  ]);
+  const side: ThesisSide | undefined = only ?? (sig?.signal !== "none" ? (sig?.side ?? undefined) : undefined) ?? reversing[0]?.side;
+  if (!side) return null;
   const [story] = await db.select({ text: narratives.text }).from(narratives).where(eq(narratives.id, `${symbol}:${side}`));
   if (!story) return null;
-  const states = await db
-    .select({ driverId: narrativeStates.driverId, strength: narrativeStates.strength, headline: narrativeStates.headline })
-    .from(narrativeStates)
-    .where(and(eq(narrativeStates.symbol, symbol), eq(narrativeStates.side, side), eq(narrativeStates.level, "driver"), eq(narrativeStates.effect, "reversal"), inArray(narrativeStates.strength, ["strong", "weak"])))
-    .orderBy(asc(narrativeStates.strength), desc(narrativeStates.asOf));
+  const states = reversing.filter((s) => s.side === side);
   const ids = states.flatMap((s) => (s.driverId ? [s.driverId] : []));
   if (ids.length === 0) return null;
   const [drivers, charts] = await Promise.all([
     db.select({ id: narrativeDrivers.id, title: narrativeDrivers.title }).from(narrativeDrivers).where(inArray(narrativeDrivers.id, ids)),
     db.select().from(exhibits).where(inArray(exhibits.driverId, ids)).orderBy(asc(exhibits.rank)),
   ]);
-  const out: OpportunityStory["drivers"] = [];
+  const out: StoryBreak["drivers"] = [];
   for (const s of states) {
     const d = drivers.find((x) => x.id === s.driverId);
     // Its first chart that carries numbers (a driver with no chart cannot be shown).
@@ -86,5 +114,6 @@ export async function opportunityStory(db: Db, symbol: string, complete?: Comple
     out.push({ title: d.title, tag: tagWord("reversal", s.strength, side).toUpperCase(), headline: s.headline, exhibit, base });
     if (out.length === MAX_PANELS) break;
   }
-  return out.length ? { input, side, narrative: story.text, drivers: out } : null;
+  const signal = sig && sig.signal !== "none" && sig.side === side ? { signal: sig.signal, strength: sig.strength } : null;
+  return out.length ? { input, side, narrative: story.text, signal, drivers: out } : null;
 }
