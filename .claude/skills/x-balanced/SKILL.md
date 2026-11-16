@@ -8,7 +8,7 @@ description: X in the BALANCED tone (today's Dualis house style) - X post and X 
 The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). The voice: a sharp analyst warning a friend who holds the stock. Urgent, direct, certain, sober words. Conviction comes from one specific, dated fact; paid research businesses sell specific calls, never hype (The Bear Cave, Citrini: https://on.substack.com/p/going-paid-the-bear-cave, https://www.citriniresearch.com/about).
 
 ## X post
-- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note; never the one-sentence 🚨 form for a signal (RCM failed 2026-11-13).
+- **Signal post (BUY or SELL)**: the 5 lines of skill `angle-signal` instead, spaced, at most 250 characters on X, 600 on a Note; never the one-sentence 🚨 form for a signal (RCM failed 2026-11-13, Monro 2026-11-16: one 🚨 line with "margin collapse" and no number).
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
 - **Hook**: without a BUY or SELL signal only (a signal post uses the 5 lines of angle-signal and never opens 🚨), opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number; when the picture is the driver frame, that number is the first block's REALITY number digit for digit (block « Revenue up 8.6% »: open on 8.6%, never on the price fall or another block's margin).
 - **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »), also when the price is above fair value. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
@@ -36,6 +36,6 @@ X Articles carry a title, a cover image, headers, images and embedded posts (htt
 - Don't: a heading with no new fact under it, a price target we did not compute, finance jargon in the body (« price to earnings », « operating profit before depreciation »: say profit multiple, operating profit).
 
 ## Image
-- **style**: `breaking` for every BUY or SELL post (ONE `price` chart, title and note = the step-2 gap, as in content-matrix « The picture »); `pro` only for a post with no signal. The **note** carries the conclusion with its number (« 24% under fair value »).
+- **style**: the answer starts `{"image":{"style":"breaking","chart":"price"`; a picture with NARRATIVE/REALITY blocks, an EPS title or a "+N-M% opportunity" header fails (SuperCom, CareCloud, Enviri 2026-11-16). `breaking` for every BUY or SELL post (ONE `price` chart, title and note = the step-2 gap, as in content-matrix « The picture »); `pro` only for a post with no signal. The **note** carries the conclusion with its number (« 24% under fair value »).
 - **chart**: the Exhibit that proves the claim; the price only for a post about the price. An Article's cover is the chart of the measure in its title (a net debt title gets the net debt chart, never the share price chart).
 - **title**: the conclusion anyway (kept with the post).
