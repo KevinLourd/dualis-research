@@ -1,0 +1,12 @@
+{
+  "name": "dualis-bell",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  // Public URL https://dualis-bell.dualis-research.workers.dev (web/src/whatsapp/bell.ts BELL_URL).
+  "workers_dev": true,
+  // One Durable Object holds the WhatsApp service's open WebSocket: POST /ring pushes "ring" down it at once.
+  "durable_objects": { "bindings": [{ "name": "BELL", "class_name": "Bell" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Bell"] }],
+  "observability": { "enabled": true }
+  // Runtime secret (set by .github/workflows/deploy-bell.yml): BELL_TOKEN = the BELL_TOKEN repo secret.
+}

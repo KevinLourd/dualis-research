@@ -19,6 +19,8 @@ jobs:
     env:
       DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
       WHATSAPP_ALLOWLIST: ${{ secrets.WHATSAPP_ALLOWLIST }}
+      # Rings the WhatsApp service when a message is queued, so it leaves at once (web/src/whatsapp/bell.ts).
+      BELL_TOKEN: ${{ secrets.BELL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
