@@ -22,6 +22,10 @@ export async function openAuth(db: Db, dir: string) {
       known.set(r.key, text);
     }
     if (rows.length > 0) console.log(`[wa] auth restored from Neon (${rows.length} files)`);
+  } else {
+    // The volume was snapshotted at the last stop (SIGTERM): count its files as known, so the first snapshot after a
+    // restart writes only what changed. Without this it re-sent all ~39K files (~4.7 MB) and held the outbox for minutes.
+    for (const f of await readdir(dir)) known.set(f, await readFile(join(dir, f), "utf8"));
   }
   const { state, saveCreds } = await useMultiFileAuthState(dir);
 
