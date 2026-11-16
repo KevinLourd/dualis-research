@@ -15,7 +15,9 @@ devices; another assistant uses one and keeps every chat but ours). Baileys (Typ
   (`send:<outbox id>`) then silver/gold; delivery receipts (`receipt:<wa id>`) move `delivery` forward.
 - **Neon budget**: free compute sleeps after 5 idle minutes, so the service only touches the DB when an allowlisted
   chat moves, plus one idle tick every 30 min (outbox poll, heartbeat, session snapshot). After any activity it polls
-  the outbox every 10 s for 15 min. A row queued while idle goes out within 30 min (on time if `scheduled_at` is set).
+  the outbox every 10 s for 15 min. A queued row rings the `dualis-bell` Worker (`bell/`, `web/src/whatsapp/bell.ts`):
+  the service keeps a WebSocket open on it and reads the outbox at once, the database still sleeping in between
+  (on time if `scheduled_at` is set). The idle tick is only the backstop when the bell is down.
 - **Hosted dimensions** (`wa/src/hosted.ts`): `content-replies` runs 20 s after Thierry's messages settle (a voice
   note after its transcript), `content-dispatch` on each idle tick (first one a minute after boot). Same context as
   `pnpm collect`: `ctx.complete` = Kevin's Claude subscription (`CLAUDE_OAUTH_TOKEN` in the box env), never the paid

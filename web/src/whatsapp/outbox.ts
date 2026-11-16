@@ -3,6 +3,7 @@ import { fetches } from "../db/schema/bronze";
 import { type OutboxRow, whatsappOutbox } from "../db/schema/whatsapp";
 import type { Db } from "../db/types";
 import { contactByPhone, normalizePhone, phoneJid } from "./allowlist";
+import { type RingResult, ringBell } from "./bell";
 import { DIMENSION, ingest, SOURCE_WHATSAPP } from "./store";
 
 /** Every message Dualis sends opens with this line, so Thierry never mistakes it for the number's other assistant. */
@@ -29,11 +30,16 @@ export type OutgoingMessage = {
 export type Sender = { send(jid: string, message: OutgoingMessage): Promise<{ key: { id?: string | null } } & Record<string, unknown>> };
 
 /** Queues a message. Any dimension calls this (or INSERTs the same row). */
+/** Queues a message and rings the WhatsApp service's bell, so it leaves within seconds (bell.ts). */
 export async function enqueue(
   db: Db,
   row: { recipient: string; text?: string | null; imageUrl?: string | null; image?: Buffer | null; imageMime?: string | null; replyToWaId?: string | null; scheduledAt?: Date; requestedBy: string },
+  ring: () => Promise<RingResult> = () => ringBell(),
 ): Promise<OutboxRow> {
   const [out] = await db.insert(whatsappOutbox).values({ ...row, recipient: normalizePhone(row.recipient) }).returning();
+  const r = await ring();
+  if (!r.rung) console.warn(`[whatsapp] outbox ${out.id} queued, bell not rung (${r.reason}): it leaves on the service's next idle tick`);
+  else if (r.listeners === 0) console.warn(`[whatsapp] outbox ${out.id} queued, the WhatsApp service is not listening on the bell: it leaves on its next idle tick`);
   return out;
 }
 

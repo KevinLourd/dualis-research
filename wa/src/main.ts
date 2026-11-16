@@ -10,6 +10,7 @@ import type { Db } from "../../web/src/db/types";
 import { allowlist, jidUser, phoneJid } from "../../web/src/whatsapp/allowlist";
 import { pairingDue } from "../../web/src/whatsapp/pairing";
 import { inboundEntry, receiptEntry } from "../../web/src/whatsapp/inbound";
+import { listenBell } from "../../web/src/whatsapp/bell";
 import { failInterrupted, nextDueAt, processOutbox, type Sender } from "../../web/src/whatsapp/outbox";
 import { type BronzeEntry, DIMENSION, ingest, SOURCE_WHATSAPP, SOURCE_WHISPER } from "../../web/src/whatsapp/store";
 import { openAuth } from "./auth";
@@ -21,6 +22,8 @@ import { transcribe } from "./transcribe";
  * the service touches the database only (a) when an allowlisted chat moves and (b) on an idle tick every
  * IDLE_TICK_MS (outbox poll + heartbeat + auth snapshot). After any allowlisted activity it polls the outbox every
  * ACTIVE_TICK_MS for ACTIVE_WINDOW_MS so a conversation feels live; a row scheduled later wakes it on time.
+ * A queued message rings the dualis-bell Worker (web/src/whatsapp/bell.ts), which this service listens to over a
+ * WebSocket: the outbox is read within a second, never after a 30-minute wait (Kevin 2026-11-16).
  */
 const IDLE_TICK_MS = Number(process.env.IDLE_TICK_MS ?? 30 * 60_000);
 const ACTIVE_TICK_MS = 10_000;
@@ -290,6 +293,9 @@ async function main() {
   if (interrupted > 0) console.warn(`[wa] ${interrupted} outbox row(s) were mid-send at the last stop: marked failed, not re-sent`);
   await setLink({ status: "starting" });
   start();
+  const bellToken = process.env.BELL_TOKEN;
+  if (bellToken) listenBell({ token: bellToken, onRing: () => schedule(0) });
+  else console.warn("[wa] BELL_TOKEN is not set: queued messages wait for the idle tick (30 min)");
   setInterval(() => {
     if (!linked && qrSocket) void serial(pairingTick);
   }, PAIRING_POLL_MS);

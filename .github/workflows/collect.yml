@@ -41,6 +41,8 @@ jobs:
       COMPANIES_HOUSE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API_KEY }}
       CLAUDE_OAUTH_TOKEN: ${{ secrets.CLAUDE_OAUTH_TOKEN }}
       WHATSAPP_ALLOWLIST: ${{ secrets.WHATSAPP_ALLOWLIST }}
+      # Rings the WhatsApp service when a message is queued, so it leaves at once (web/src/whatsapp/bell.ts).
+      BELL_TOKEN: ${{ secrets.BELL_TOKEN }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ONEDRIVE_TOKEN_KEY: ${{ secrets.ONEDRIVE_TOKEN_KEY }}

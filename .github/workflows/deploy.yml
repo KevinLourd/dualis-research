@@ -94,11 +94,12 @@ jobs:
       DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
       CLAUDE_OAUTH_TOKEN: ${{ secrets.CLAUDE_OAUTH_TOKEN }}
       WHATSAPP_ALLOWLIST: ${{ secrets.WHATSAPP_ALLOWLIST }}
+      BELL_TOKEN: ${{ secrets.BELL_TOKEN }}
     steps:
       - name: Required secrets are set
         run: |
           missing=""
-          for name in WA_DEPLOY_KEY WA_DEPLOY_HOST WA_DEPLOY_KNOWN_HOSTS DATABASE_URL_UNPOOLED CLAUDE_OAUTH_TOKEN WHATSAPP_ALLOWLIST; do
+          for name in WA_DEPLOY_KEY WA_DEPLOY_HOST WA_DEPLOY_KNOWN_HOSTS DATABASE_URL_UNPOOLED CLAUDE_OAUTH_TOKEN WHATSAPP_ALLOWLIST BELL_TOKEN; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -116,6 +117,8 @@ jobs:
           printf 'CLAUDE_OAUTH_TOKEN=%s\n' "$CLAUDE_OAUTH_TOKEN" >> wa/box.env
           # The only numbers the device talks to (personal numbers: a secret, never in the public repo).
           printf 'WHATSAPP_ALLOWLIST=%s\n' "$WHATSAPP_ALLOWLIST" >> wa/box.env
+          # The doorbell (dualis-bell Worker): a queued message is read at once, not on the 30-minute idle tick.
+          printf 'BELL_TOKEN=%s\n' "$BELL_TOKEN" >> wa/box.env
           tar czf "$RUNNER_TEMP/wa.tgz" --exclude=wa/node_modules --exclude=wa/dist wa web/src
           rm wa/box.env
           set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
