@@ -20,7 +20,7 @@ import { postKey } from "../sandbox-visuals";
 export const SANDBOX_REVIEW_DIMENSION = "sandbox-review";
 export const CLAUDE_SOURCE = "claude";
 export const REVIEW_SKILL = "content-review";
-export const REVIEW_VERSION = "review-v1";
+export const REVIEW_VERSION = "review-v2";
 
 // A variable specifier: the console bundle imports this file and must not bundle node:fs (CLAUDE.md, collector runner).
 const nodeImport = (href: string): Promise<unknown> => import(/* webpackIgnore: true */ href);
@@ -98,7 +98,9 @@ export const claudeReview: Source = {
       `Account: « ${account.displayName} », ${account.platform === "x" ? "X" : "Substack"}, ${account.tone.toUpperCase()} tone. Day ${day}, round ${round} of ${MAX_ROUNDS}.`,
       "",
       "The writing skills it wrote with (an edit's `old` must be copied from one of them, character for character):",
-      ...skills.map((n, i) => `\n=== skill ${n} ===\n${writing[i]}`),
+      ...skills.map((n, i) => `\n=== skill ${n} (${Buffer.byteLength(writing[i], "utf8")} of ${SKILL_MAX_BYTES} bytes) ===\n${writing[i]}`),
+      "",
+      `An edit replaces a rule with its one general statement: no date, no « round N », no company of the day, no history of past failures; it grows its skill by at most ${MAX_EDIT_GROWTH} characters and never past ${SKILL_MAX_BYTES} bytes, else it is refused.`,
       "",
       "Its posts:",
       ...blocks,
@@ -116,13 +118,34 @@ export const claudeReview: Source = {
   },
 };
 
-/** Applies one edit to its skill file: `old` must appear exactly once (else it is kept as not applied, with why). */
+/**
+ * The writer reads every skill on every call (Kevin's subscription): an edit replaces a rule, never appends the history
+ * of the rounds that broke it (2026-11-16: content-matrix had grown to 27 KB of « round N of <day> drew <companies> »).
+ */
+export const SKILL_MAX_BYTES = 10_000;
+export const MAX_EDIT_GROWTH = 300;
+const HISTORY = /\b20\d\d-\d\d-\d\d\b|\bround \d+\b|\brounds \d+ (?:to|and) \d+\b/gi;
+const historyCount = (s: string) => s.match(HISTORY)?.length ?? 0;
+
+/** Why an edit may not land on its skill text (null = it may). */
+export function refuseEdit(text: string, e: { old: string; new: string }): string | null {
+  const count = text.split(e.old).length - 1;
+  if (count !== 1) return count === 0 ? "old text not found in the skill (it may have changed)" : `old text found ${count} times`;
+  if (historyCount(e.new) > historyCount(e.old)) return "adds dated history (a date or « round N »): state the rule once, with no record of when it failed";
+  const growth = e.new.length - e.old.length;
+  if (growth > MAX_EDIT_GROWTH) return `grows the skill by ${growth} characters (at most ${MAX_EDIT_GROWTH}): rewrite the rule shorter and cut what it supersedes`;
+  const size = Buffer.byteLength(text.replace(e.old, () => e.new), "utf8");
+  if (growth > 0 && size > SKILL_MAX_BYTES) return `takes the skill to ${size} bytes, past its ${SKILL_MAX_BYTES}-byte ceiling: replace a rule, never add one`;
+  return null;
+}
+
+/** Applies one edit to its skill file, unless refused (kept as not applied, with why). */
 async function applyEdit(e: Omit<SandboxSkillEdit, "applied" | "reason">): Promise<SandboxSkillEdit> {
   const { readFile, writeFile } = (await nodeImport("node:fs/promises")) as typeof import("node:fs/promises");
   const file = skillFile(e.skill);
   const text = await readFile(file, "utf8");
-  const count = text.split(e.old).length - 1;
-  if (count !== 1) return { ...e, applied: false, reason: count === 0 ? "old text not found in the skill (it may have changed)" : `old text found ${count} times` };
+  const reason = refuseEdit(text, e);
+  if (reason) return { ...e, applied: false, reason };
   await writeFile(file, text.replace(e.old, () => e.new));
   return { ...e, applied: true, reason: null };
 }
