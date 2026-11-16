@@ -9,7 +9,7 @@ test("each slot starts collect.yml on main with its dimension, marked as a sched
     inputs: { dimension: "growth-outreach,substack-network,growth-brief", trigger: "schedule" },
   });
   assert.equal(dispatchBody("15 5 * * *").inputs.dimension, "all");
-  assert.equal(dispatchBody("15 1,9,13,17,21 * * *").inputs.dimension, "core");
+  assert.equal(dispatchBody("15 13 * * *").inputs.dimension, "core");
 });
 
 test("an unknown cron fails loud", () => {
