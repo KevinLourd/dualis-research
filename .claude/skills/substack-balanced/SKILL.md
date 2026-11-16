@@ -8,7 +8,7 @@ description: Substack in the BALANCED tone (today's Dualis house style) - Note a
 The house style (skills `daily-content`, `breaking-chart`, `research-note`, `content-drafts/format.ts`). The analyst with conviction: urgent, direct, certain, sober words.
 
 ## Note
-- **Signal post (BUY or SELL)**: the 5 spaced lines of skill `angle-signal` instead, at most 600 characters, opening « 📈 RCM Technologies: BUY, inflection. » (📉 for a SELL), never 🚨.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead, at most 400 characters, line 1 opening « 📈 <Company> $TICKER: » (📉 for a SELL), never 🚨.
 - **Length**: one paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks. Short Notes break out most often; 600-1,199 characters is a dead zone (Eden, 473k Notes: https://eden.so/blog/how-to-grow-on-substack-notes/).
 - **Hook** (a post with no BUY or SELL): `🚨 <short name>: ` then the alarm with its number and period (« Q3 profit $4.7M »). Never a label or question (« Trade alert », « Here Is What Happened Next »); every claim carries a number.
 - **Structure**: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch.
@@ -27,9 +27,9 @@ Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim 
 - **Structure** (`##` headings): `## Key takeaways` (3 bullets), `## What the market believes`, `## What changed`, `## Bull vs bear`, `## What would prove us wrong`.
 - **Visual**: see Image below.
 - Do: numbers with date and source; the paywall would sit before « Bull vs bear » (Substack's examples put it before the payoff: https://on.substack.com/p/free-vs-paid).
-- Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know, a valuation method name (« enterprise value to operating profit », « price to earnings »): say « built on profit multiples ».
+- Don't: a topic title (« CareCloud update »), a guessed figure: write what we would need to know, a valuation method name (« enterprise value to operating profit », « price to earnings »), a fair value or a price target.
 
 ## Image
-- **style**: ALWAYS `breaking` (skill `breaking-chart`) with ONE chart of the text's lead number: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim). A BUY or SELL post follows content-matrix « The picture » (chart `price`, title and note = the step-2 gap).
+- **style**: ALWAYS `breaking` (skill `breaking-chart`) with ONE chart of the text's lead number: news card when a news item is listed, else the big title (any other style prints the chartLabel as the heading, a label with no claim). A BUY or SELL post follows content-matrix « The picture » (the chart of the line-2 figure, `from` = the compared period).
 - **title**: ALWAYS set, the claim with its number and period, never a label and never the chartLabel (« Musashi profit rose to 2.9B yen in the Sep quarter »).
 - **note**: the proof with its number on the point. An Article cover's note prints the title's number with its unit, and the Article text uses that same number.

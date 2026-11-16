@@ -7,12 +7,13 @@ import type { VisualExhibit, VisualInput } from "./data";
 export type ChartChoice = { kind: "price"; reason: string | null } | { kind: "exhibit"; exhibit: VisualExhibit; reason: string | null };
 
 export const PRICE_CHOICE = "price";
-export const CHART_QUESTION_VERSION = "visual-chart@v1";
+export const CHART_QUESTION_VERSION = "visual-chart@v2";
 
+/** Thierry 2026-11-16: the picture proves the story is breaking with a REPORTED figure, never with our fair value. */
 export const CHART_QUESTION = [
-  "This Idea becomes a post with ONE chart: the key graph that shows why the analyst sees an opportunity, the most striking one.",
-  "Pick the Exhibit (by id) that shows the driver the Idea talks about most strikingly: the economics of the business, the trend that turns, the gap that matters.",
-  `Pick "${PRICE_CHOICE}" only when the Idea is about the share price itself (its gap to fair value, a price move), never by default.`,
+  "This Idea becomes a post with ONE chart: the reported figure that shows most strikingly why the market's story on the stock is breaking.",
+  "Pick the Exhibit (by id) whose reported numbers contradict the story most clearly: the economics of the business, the trend that turns.",
+  `Pick "${PRICE_CHOICE}" only when the Idea is about a share price move itself, never by default.`,
 ].join(" ");
 
 const fmt = (v: number) => (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString("en-US") : String(Number(v.toPrecision(4))));
@@ -32,7 +33,7 @@ function describe(e: VisualExhibit): string {
 export function chartJudgeInput(input: VisualInput): string {
   const last = input.bars.at(-1);
   const price = last
-    ? `Choice ${PRICE_CHOICE}: ${input.companyName ?? input.symbol} share price over 12 months, last ${fmt(last.close)}${input.fair ? `, fair value ${fmt(input.fair.value)}` : ""}.`
+    ? `Choice ${PRICE_CHOICE}: ${input.companyName ?? input.symbol} share price over 12 months, last ${fmt(last.close)}.`
     : `Choice ${PRICE_CHOICE}: the share price.`;
   return [`Idea: ${input.title}`, `Angle: ${input.angle}`, "", price, "", ...input.exhibits.map(describe)].join("\n");
 }
@@ -68,6 +69,8 @@ export type CalloutPoint = { id: string; label: string };
 export type Callout = {
   /** The point the arrow hits: one of `calloutPoints`. */
   point: string;
+  /** The earlier point of the same chart the claim compares it to (both are boxed, the change drawn between them); null: none. */
+  from?: string | null;
   /** The note on the arrow, a few words. */
   note: string;
   /** The chart's headline: the claim, never a neutral label. */
@@ -91,12 +94,12 @@ export const CALLOUT_SYSTEM = [
   "1. newsLine (in the BREAKING box): what just happened, the one fact in the news that matters, with its number. Faithful to the news, never a fact it does not state.",
   "2. title (big, over the chart): what it means for the stock, the alarm.",
   "3. chartLabel (small, under the title): what the bars or line measure, in plain words, e.g. Profit left for shareholders, per quarter.",
-  "4. note (on the arrow, on the point of the chart): the proof in the numbers. The arrow hits the point you pick, so the note's main number IS that point's value as listed (a note about today's price points at the latest close; « down from X » names another listed point's value, never a number missing from the list).",
+  "4. note (on the arrow, on the point of the chart): the proof in the numbers, a reported figure with its period. The arrow hits the point you pick, so the note's main number IS that point's value as listed. When the claim compares two periods, from = the earlier point's id: both get boxed and the change is drawn between them.",
   "5. priceSays: what the share price still assumes, the belief this proves wrong.",
   "The lines tell ONE story: each says something the others do not, none repeats another, and a number appears on one line only. NEVER copy a headline, a driver title or a narrative sentence: say what is interesting in it, in your own short words a retail investor gets at once (no accounting jargon like EPS, net income, common shareholders, preferred dividends or income available to common: say profit, profit per share, shareholders, payments to other investors).",
   "Answer with JSON only, no prose, no code fence:",
-  '{"point": "<id of the ONE point that proves it>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, the claim itself, no prefix like Look: or Signal:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
-  "No em or en dash, no emoji. Use only numbers you can read below.",
+  '{"point": "<id of the ONE point that proves it>", "from": "<id of the earlier point it is compared to, or null>", "newsLine": "<6 to 12 words, or null when no news is listed>", "title": "<4 to 9 words, the claim itself, no prefix like Look: or Signal:>", "chartLabel": "<3 to 8 words>", "note": "<3 to 6 words with its number>", "priceSays": "<3 to 8 words>", "news": <null, or {"index": <the most prestigious source among the news listed, e.g. Reuters or Bloomberg over a blog>, "domain": "<that publisher\'s own web domain, e.g. reuters.com>"}>}',
+  "No em or en dash, no emoji. Use only numbers you can read below. Never a fair value, a gap to it, an upside, a price target or the word opportunity.",
 ].join("\n");
 
 export function calloutPoints(input: VisualInput, choice: ChartChoice): CalloutPoint[] {
@@ -126,12 +129,10 @@ export function calloutPoints(input: VisualInput, choice: ChartChoice): CalloutP
 }
 
 export function calloutPrompt(input: VisualInput, choice: ChartChoice, points: CalloutPoint[]): string {
-  const last = input.bars.at(-1);
   const chart = choice.kind === "exhibit" ? `${choice.exhibit.title}. ${choice.exhibit.takeaway}` : `${input.companyName ?? input.symbol} share price over 12 months, one daily close per day`;
   return [
     `Idea: ${input.title}`,
     `Angle: ${input.angle}`,
-    input.fair && last ? `Share price ${fmt(last.close)}, fair value ${fmt(input.fair.value)}` : "",
     "",
     ...input.narratives.map((n) => `What the price says (${n.side === "long" ? "pessimistic" : "optimistic"} narrative): ${n.text}`),
     ...(input.drivers.length ? ["Drivers of that narrative (index: title: summary):", ...input.drivers.map((d, i) => `- ${i}: ${d.title}${d.summary ? `: ${d.summary}` : ""}`)] : []),
@@ -164,7 +165,8 @@ export function parseCallout(text: string, points: CalloutPoint[], newsCount: nu
     news = { index: n.index, domain: str(n.domain, "news domain").replace(/^https?:\/\//, "").replace(/\/.*$/, "") };
   }
   const newsLine = newsCount > 0 ? str(o.newsLine, "newsLine") : null;
-  return { point, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), news };
+  const from = typeof o.from === "string" && o.from !== point && points.some((p) => p.id === o.from) ? o.from : null;
+  return { point, from, note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), news };
 }
 
 /** One call per chart drawn (the render is made once per visuals version; the answer is kept in its bronze request). */

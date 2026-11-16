@@ -30,7 +30,7 @@ export const SANDBOX_POSTS_DIMENSION = "sandbox-posts";
 export const CLAUDE_SOURCE = "claude";
 export const POSTS_PER_DAY = 5;
 /** Bump to rewrite the next day's posts with a new prompt frame; the skills' own text is hashed on top. */
-export const SANDBOX_VERSION = "sandbox-v4";
+export const SANDBOX_VERSION = "sandbox-v5";
 /** A day is written at most this many times: the first writing + one per failed review (skill content-review). */
 export const MAX_ROUNDS = 3;
 /**
@@ -90,7 +90,7 @@ async function ideaCharts(db: Db, ideaId: string): Promise<{ charts: ChartOption
   if (!idea) throw new Error(`idea ${ideaId} not found`);
   const input = await visualInput(db, idea);
   const charts: ChartOption[] = [
-    ...(input.bars.length >= MIN_BARS ? [{ id: "price", label: `${input.companyName ?? input.symbol} share price, last 12 months, vs fair value${input.fair ? ` ${input.fair.value} ${input.fair.currency ?? ""}`.trimEnd() : ""}`, points: calloutPoints(input, { kind: "price", reason: null }) }] : []),
+    ...(input.bars.length >= MIN_BARS ? [{ id: "price", label: `${input.companyName ?? input.symbol} share price, daily close, last 12 months`, points: calloutPoints(input, { kind: "price", reason: null }) }] : []),
     ...input.exhibits.map((e) => ({ id: e.id, label: `Exhibit of the driver « ${e.driverTitle} »: ${e.title}. ${e.takeaway}`, points: calloutPoints(input, { kind: "exhibit", exhibit: e, reason: null }) })),
   ];
   return { charts, news: input.news.map((n) => `${n.publisher}: ${n.headline}${n.citedSentence ? `. Key sentence: ${n.citedSentence}` : ""}`) };
@@ -171,7 +171,7 @@ export function sandboxPrompt(plans: SlotPlan[], platform: SandboxPlatform): str
     "",
     `Answer with ONE JSON object only, no prose, no code fence, no second attempt: {"posts": [...]} with exactly ${plans.length} items, one per post, each carrying its post number:`,
     `{"post": <n>, "text": "...", "image": IMAGE} for each ${FORMAT_NAME[SHORT[platform]]}${article ? `, and {"post": ${article.slot + 1}, "title": "...", "subtitle": "...", "body": "<markdown with ## headings>", "image": IMAGE} for Post ${article.slot + 1}, the ${FORMAT_NAME[ARTICLE[platform]]}` : ""}.`,
-    `IMAGE = every word of that post's picture, written by you as your Image section says: {"chart": "<a chart id listed for that post>", "point": "<a point id listed under that chart>", "style": "breaking" | "pro", "title": "...", "chartLabel": "...", "note": "...", "priceSays": "...", "newsLine": "<text, or null>", "news": <null, or {"index": <a news index listed for that post>, "domain": "<that publisher's web domain>"}>}.`,
+    `IMAGE = every word of that post's picture, written by you as your Image section says: {"chart": "<a chart id listed for that post>", "point": "<a point id listed under that chart>", "from": "<the earlier point id of that chart the claim compares to, or null>", "style": "breaking" | "pro", "title": "...", "chartLabel": "...", "note": "...", "priceSays": "...", "newsLine": "<text, or null>", "news": <null, or {"index": <a news index listed for that post>, "domain": "<that publisher's web domain>"}>}.`,
   ].join("\n\n");
 }
 
@@ -200,7 +200,9 @@ export function parseImage(raw: unknown, plan: Pick<SlotPlan, "slot" | "charts" 
   }
   const newsLine = typeof o.newsLine === "string" && o.newsLine.trim() ? stripDashes(o.newsLine.trim()) : null;
   if (news && !newsLine) throw new Error(`post ${n} image cites a news item with no newsLine`);
-  return { chart: chart.id, point, style: o.style, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine: news ? newsLine : null, news };
+  // The compared earlier period: kept only when it is another point of the same chart (a wrong one draws no comparison).
+  const from = typeof o.from === "string" && o.from !== point && chart.points.some((p) => p.id === o.from) ? o.from : null;
+  return { chart: chart.id, point, from, style: o.style, title: str(o.title, "title"), chartLabel: str(o.chartLabel, "chartLabel"), note: str(o.note, "note"), priceSays: str(o.priceSays, "priceSays"), newsLine: news ? newsLine : null, news };
 }
 
 /**

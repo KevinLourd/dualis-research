@@ -26,7 +26,7 @@ Tones, formats (X Article, Substack Article) and angles side by side: skill `con
 
 ## Text tone (Kevin 2026-11-09: « trop confus, pas assez straight to the point, pas assez alarmist »; `content-drafts/format.ts`)
 - Breaking news: `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. » nor the ticker) then the alarm with its number.
-- ONE claim: what just happened and why the price is wrong now; the single strongest fact, the rest dropped.
+- ONE claim: the real reported figure and why the market's story is wrong now; the single strongest figure, the rest dropped. A signal post is the 3 lines of skill `angle-signal`. Never a fair value, a gap or an upside (Thierry 2026-11-16).
 - Note = 2 or 3 short sentences, 150-300 characters: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch. X: skill `x-post`.
 - Plain words, subject verb object: « profit for shareholders », never « income available to common », EPS, preferred dividends.
 - No hedge: never « in my view », « not proven yet », « it remains to be seen », a « but » walking the claim back. No em/en dash, no hashtag, no other emoji. Never a figure absent from the inputs.
@@ -35,7 +35,7 @@ Tones, formats (X Article, Substack Article) and angles side by side: skill `con
 ```
 
 ## The post image
-- **Substack Note** = the BREAKING chart: skill `breaking-chart` (news card, price card, coloured point + arrow).
+- **Substack Note** = the BREAKING chart: skill `breaking-chart` (news card, the reported figure's chart, coloured point + arrow).
 - **X post** = the professional chart, BREAKING spirit in the text only: skill `x-post`.
 
 **Other references**: Kobeissi Letter, Unusual_Whales (speed), Citrini, Aurelion (depth). See `docs/references.md` (private).

@@ -5,8 +5,8 @@ import * as gold from "@/db/schema/gold";
 import * as sandbox from "@/db/schema/sandbox";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
-import { coverPng, drawCallout, drawOpportunity } from "../content-visuals";
-import { opportunityStory } from "../content-visuals/opportunity";
+import { coverPng, drawCallout, drawStoryBreak } from "../content-visuals";
+import { storyBreak } from "../content-visuals/story-break";
 import type { ChartChoice } from "../content-visuals/choose";
 import { visualInput, type VisualInput } from "../content-visuals/data";
 import { rebuildGoldPosts } from "../sandbox-posts";
@@ -31,7 +31,7 @@ const since = (now: Date) => new Date(now.getTime() - 86400_000).toISOString().s
  * Bump when the drawing code changes what a picture looks like: the pictures of today and yesterday are drawn again
  * (render only, no Claude call). 2 = 2026-11-12, the defects image-correction found (ring on the end value, note boxes).
  */
-export const DRAW_VERSION = 6;
+export const DRAW_VERSION = 7;
 /** A post's picture key: `post:<id>[:v<n> once corrected n-1 times]:d<drawing code version>`. */
 export const postKey = (postId: string, version = 1) => `post:${postId}${version > 1 ? `:v${version}` : ""}:d${DRAW_VERSION}`;
 
@@ -107,16 +107,16 @@ export const renderSource: Source = {
     const { input, symbol } = await inputOf(db, post);
     // The frame of every account (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
     // Only when no driver of the ticker reverses does the writer's own chart stand in.
-    const story = await opportunityStory(db, symbol, ctx.complete);
+    const story = await storyBreak(db, symbol, ctx.complete);
     if (story) {
       // The account's look: its tone and its channel (Kevin 2026-11-12: « les 6 versions, du plus alarmiste au moins, X x Substack »).
       const [account] = await db.select({ tone: sandbox.sandboxAccounts.tone, platform: sandbox.sandboxAccounts.platform }).from(sandbox.sandboxAccounts).where(eq(sandbox.sandboxAccounts.id, post.accountId));
-      const pic = await drawOpportunity(story, { tone: account?.tone ?? "balanced", channel: account?.platform ?? "x" });
+      const pic = await drawStoryBreak(story, { tone: account?.tone ?? "balanced", channel: account?.platform ?? "x" });
       if (post.format === "x-article") {
         const cover = await coverPng(pic.file, pic.width, pic.height);
         rendered.set(subject, { file: cover.file, mime: "image/png", width: cover.width, height: cover.height, caption: pic.caption, kindOf: "x-cover", symbol });
       } else rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, caption: pic.caption, kindOf: "chart", symbol });
-      return { request: { ...request, opportunity: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { sizeBytes: rendered.get(subject)!.file.length, symbol } };
+      return { request: { ...request, storyBreak: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { sizeBytes: rendered.get(subject)!.file.length, symbol } };
     }
     let choice: ChartChoice;
     if (image.chart === "price") choice = { kind: "price", reason: null };
@@ -130,7 +130,7 @@ export const renderSource: Source = {
     const point = image.point !== "latest" ? image.point : choice.kind === "exhibit" ? choice.exhibit.points.filter((p) => typeof p.values[lead!] === "number").at(-1)?.period : input.bars.at(-1)?.date;
     if (!point) return { request, httpStatus: null, error: `${symbol} has no data to draw` };
     if (choice.kind === "price" && input.bars.length < 2) return { request, httpStatus: null, error: `${symbol} has no closes to draw` };
-    const chart = await drawCallout(input, choice, image.style, { point, note: image.note, title: image.title, chartLabel: image.chartLabel, priceSays: image.priceSays, newsLine: image.newsLine, news: image.news }, ctx.fetch);
+    const chart = await drawCallout(input, choice, image.style, { point, from: image.from ?? null, note: image.note, title: image.title, chartLabel: image.chartLabel, priceSays: image.priceSays, newsLine: image.newsLine, news: image.news }, ctx.fetch);
     const kindOf = image.style === "pro" ? ("x-chart" as const) : ("chart" as const);
     if (post.format === "x-article") {
       const cover = await coverPng(chart.file, 1280, 720);

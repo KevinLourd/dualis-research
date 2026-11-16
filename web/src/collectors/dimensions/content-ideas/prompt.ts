@@ -3,8 +3,8 @@ import { DRAFT_FORMATS, FORMAT_LABEL, PROPOSED_FORMATS, stripDashes } from "../c
 
 /** Pure prompts and parsers of the Ideas dimension (proposal, then score per channel x format). */
 
-export const IDEAS_PROMPT_VERSION = "ideas-v2";
-export const SCORES_PROMPT_VERSION = "idea-scores-v2";
+export const IDEAS_PROMPT_VERSION = "ideas-v3";
+export const SCORES_PROMPT_VERSION = "idea-scores-v3";
 export const MIN_IDEAS = 3;
 export const MAX_IDEAS = 10;
 
@@ -20,9 +20,9 @@ export type PastPost = { format: string; title: string; tickers: string[]; publi
 const GAME = [
   "You plan what an independent equity research writer publishes next (Thierry Matin, Dualis Research: small and mid caps, long/short).",
   "The game: grow paid Substack subscribers. A reader follows a writer who tells them, early and with evidence, where the market's story on a stock is wrong or turning, in plain words with numbers.",
-  "An Idea is ONE thing worth one post: a claim a reader can check, tied to the evidence below. Never an idea the evidence does not support; never a price target, upside or rating.",
+  "An Idea is ONE thing worth one post: a claim a reader can check, tied to the evidence below, resting on a REPORTED figure that breaks the market's story. Never an idea the evidence does not support; never a fair value, a gap to it, a price target, upside or rating.",
   "An Idea does not have to be an inflection or a crack: an interesting update on the company (a result, a filing, a figure that moved) is a good post too.",
-  "Fresh beats repeated: a topic already published in the last 14 days comes back only with a new fact. A Signal Change, a strong piece of evidence or a fair value far from the price is worth more than a quiet driver.",
+  "Fresh beats repeated: a topic already published in the last 14 days comes back only with a new fact. A Signal Change or a strong piece of evidence with a reported figure is worth more than a quiet driver.",
   "No em dash or en dash, no emojis, no hype words.",
 ].join("\n");
 

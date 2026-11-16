@@ -8,10 +8,10 @@ description: Substack in the URGENT tone - breaking-news Note and Article, one s
 Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so judge this tone by signups, never by likes (https://escapethecubicle.substack.com/p/substack-changed-their-algorithm). Every house rule stays (skill `content-matrix`).
 
 ## Note
-- **Signal post (BUY or SELL)**: the 5 spaced lines of skill `angle-signal` instead, at most 600 characters, line 1 « 📈 BUY, inflection: <name> $TICKER » (📉 SELL, crack for a SELL), never 🚨 and never an urging line. Example (RCM, 5% gap): « 📈 BUY, inflection: RCM $RCMT » / « 🔎 $31.54 vs $33.18 fair value: 5% under » / ⚡ the dated trigger with its figure / 📉 the belief with its figure / ✅ what the price still has wrong / « Source: Dualis Research (analysisparalysis888.substack.com) », one line each, a blank line between.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead, at most 400 characters, never 🚨. Example: « 📈 SuperCom $SPCB: the market still prices a shrinking business. » / « Q3 revenue $7.5M, up 21% from $6.2M a year earlier. » / « A shrinking business does not grow sales 21%. » / « Source: Dualis Research (analysisparalysis888.substack.com) », a blank line between.
 - **Length** (a post with no BUY or SELL): under 200 characters when possible (the length that breaks out most: https://eden.so/blog/how-to-grow-on-substack-notes/), 300 at most, no line breaks.
 - **Hook** (a post with no BUY or SELL only): `🚨 BREAKING: <short name>` then ONE shock number.
-- **Structure**: shock number, then one line of urgency. ONE idea only: the urgency line adds no second figure or measure, even without a number (no price, no fair value gap, no « profit dropped »); it says only what the shock number means for a holder, no « Here is what happened: » filler.
+- **Structure**: shock number, then one line of urgency. ONE idea only: the urgency line adds no second figure or measure, even without a number (no price, no « profit dropped »); it says only what the shock number means for a holder, no « Here is what happened: » filler.
 - **Allowed**: one word in CAPS, one exclamation mark.
 - **Visual**: see Image below.
 - Example (a plain company update only):
@@ -29,7 +29,7 @@ Breaking-news alarm on Substack. Viral Notes rarely convert to paid readers, so 
 - Don't: drop the risk section; fake scarcity.
 
 ## Image
-- **style**: `breaking` (skill `breaking-chart`), ONE chart, for every Note and Article; a BUY or SELL post follows content-matrix « The picture » (chart `price`, title and note = the step-2 gap). Otherwise the chart of the text's first number (a margin text: the single margin chart).
+- **style**: `breaking` (skill `breaking-chart`), ONE chart, for every Note and Article: the chart of the text's lead figure (a margin text: the single margin chart); a BUY or SELL post: its line-2 figure, `from` = the compared period (content-matrix « The picture »).
 - **title**: the alarm with its number, one word in CAPS allowed.
 - **newsLine**: the triggering fact when a news item is listed.
 - **note**: the shock number on its point, in the chart's own unit, digit for digit as the text's lead number.

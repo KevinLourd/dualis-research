@@ -8,8 +8,8 @@ import type { Complete } from "@/llm/complete";
 import { type Callout, type ChartChoice, chooseChart, writeCallout } from "./choose";
 import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
 import { MIN_BARS, type VisualInput, visualInput } from "./data";
-import { type OpportunityStory, opportunityStory } from "./opportunity";
-import type { OpportunityLook } from "./render";
+import { STORY_CAPTION, type StoryBreak, storyBreak, storyHeadline, storyIntro } from "./story-break";
+import type { StoryLook } from "./render";
 
 export const VISUALS_DIMENSION = "content-visuals";
 /** Bump to render every Idea again (a new look). */
@@ -27,7 +27,9 @@ export const VISUALS_DIMENSION = "content-visuals";
 // v12 (Kevin 2026-11-09): the price chart takes the driver charts' pasted price card; month axis « Sep-25 », one per tick.
 // v13 (Kevin 2026-11-09): the price callout picks among what the line shows (latest close, 12-month high and low), its number = the point it hits.
 // v14 (Kevin 2026-11-10): + the X post chart (`x-chart`, skill x-post): professional, point + arrow + note, no news or price card.
-export const VISUALS_VERSION = "visuals-v14";
+// v15 (Thierry 2026-11-16: not confident in our fair values): no fair value, gap, range or « opportunity » on any picture;
+// the price card is gone, the story-break frame heads with the signal words, a chart boxes the two periods it compares.
+export const VISUALS_VERSION = "visuals-v15";
 export const RENDER_SOURCE = "render";
 export const CAPTURE_SOURCE = "capture";
 const RETRY_FAILED_AFTER_MS = 20 * 3600_000;
@@ -68,7 +70,6 @@ function summary(input: VisualInput) {
     closes: input.bars.length,
     first: input.bars[0]?.date ?? null,
     last: input.bars.at(-1)?.date ?? null,
-    fair: input.fair,
     newsUrl: input.newsUrl,
     exhibits: input.exhibits.map((e) => e.id),
   };
@@ -92,7 +93,7 @@ async function banner(input: VisualInput, callout: Callout, fetchImpl: typeof fe
 
 /**
  * One chart (`chart` = the Note's BREAKING look, `x-chart` = the X professional look) of a VisualInput: its most striking
- * Exhibit, else price vs fair value; the arrow and note written by Claude. Shared with the Sandbox (sandbox-visuals).
+ * Exhibit, else the share price; the arrow and note written by Claude. Shared with the Sandbox (sandbox-visuals).
  * Returns the PNG, or the reason it cannot be drawn.
  */
 export async function drawChart(input: VisualInput, choice: ChartChoice, kind: "chart" | "x-chart", ctx: { complete?: Complete; fetch: typeof fetch }): Promise<{ file: Buffer; caption: string; callout: Callout } | { error: string }> {
@@ -104,21 +105,25 @@ export async function drawChart(input: VisualInput, choice: ChartChoice, kind: "
 /** Draws a chart whose words are already written (the callout's, or a Sandbox writer's image): `breaking` = news card + price card, `pro` = chart, arrow and note. */
 export async function drawCallout(input: VisualInput, choice: ChartChoice, style: "breaking" | "pro", callout: Callout, fetchImpl: typeof fetch): Promise<{ file: Buffer; caption: string }> {
   const r = await renderModule();
-  const annotation = { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, tone: r.toneOf(input, choice.kind === "exhibit" ? choice.exhibit : null), banner: style === "pro" ? null : await banner(input, callout, fetchImpl, r.timeAgo), style };
+  const annotation = { ...annotationOf(callout, choice), tone: r.toneOf(input, choice.kind === "exhibit" ? choice.exhibit : null), banner: style === "pro" ? null : await banner(input, callout, fetchImpl, r.timeAgo), style };
   if (choice.kind === "exhibit") return { file: r.png(r.exhibitSvg(input, choice.exhibit, annotation)), caption: `Exhibit: ${choice.exhibit.title}` };
   return { file: r.png(r.chartSvg(input, undefined, annotation)), caption: `Prices: ${input.priceSources.join(", ")}` };
 }
 
+/** The words of a callout on the chart; an Exhibit compared to an earlier period boxes both and draws the change between them. */
+function annotationOf(callout: Callout, choice: ChartChoice) {
+  const from = choice.kind === "exhibit" && callout.from && callout.from !== callout.point ? callout.from : null;
+  return { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, ...(from ? { highlight: [from, callout.point], compareFrom: from } : {}) };
+}
+
 /**
- * The opportunity picture of a story (opportunity.ts): one panel per reversing driver, its chart drawn full size with the
- * arrow on its latest value and a note (`notes[i]` from the writer, else the judge's headline of the driver's state).
+ * The story-break picture (story-break.ts): one panel per reversing driver, the chart of its reported figure drawn full
+ * size, both compared periods boxed and the change on the arrow between them, under the judge's reality line.
  */
-export async function drawOpportunity(story: OpportunityStory, look: OpportunityLook = { tone: "balanced", channel: "x" }): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
+export async function drawStoryBreak(story: StoryBreak, look: StoryLook = { tone: "balanced", channel: "x" }): Promise<{ file: Buffer; width: number; height: number; caption: string }> {
   const r = await renderModule();
   const { input } = story;
-  const last = input.bars.at(-1)!;
-  const fair = input.fair!;
-  const up = last.close < fair.value;
+  const up = story.side === "long";
   const panels = story.drivers.map((d) => {
     const lead = d.exhibit.series[0];
     const point = [...d.exhibit.points].reverse().find((p) => typeof p.values[lead.key] === "number")!;
@@ -128,25 +133,8 @@ export async function drawOpportunity(story: OpportunityStory, look: Opportunity
     const a = { point: point.period, note, priceSays: "", title: "", chartLabel: d.exhibit.title, tone: story.side, banner: null, style: "panel" as const, highlight: [...(d.base ? [d.base] : []), point.period], compareFrom: d.base ?? undefined };
     return { narrative: d.title, reality: d.headline ?? d.exhibit.takeaway, tag: d.tag, png: r.png(r.exhibitSvg(input, d.exhibit, a)) };
   });
-  const cur = fair.currency ?? "";
-  const opp = r.opportunity(last.close, fair.low ?? fair.value, fair.high ?? fair.value, up);
-  // The same facts in each tone's words: the urgent one leads with the opportunity, the neutral one states the gap.
-  const priceLine = (
-    look.tone === "urgent"
-      ? `${opp.toUpperCase()} · price ${r.fmt(last.close)} ${cur}, fair value ${r.fmt(fair.value)} ${cur}`
-      : look.tone === "neutral"
-        ? `Share price ${r.fmt(last.close)} ${cur}, fair value ${r.fmt(fair.value)} ${cur} (Dualis estimate)`
-        : `Share price ${r.fmt(last.close)} ${cur} · fair value ${r.fmt(fair.value)} ${cur} · ${opp}`
-  ).replace(/ {2,}/g, " ");
-  const intro =
-    look.tone === "urgent"
-      ? up ? "The market is still pricing the old story:" : "The market is still pricing the dream:"
-      : look.tone === "neutral"
-        ? up ? "The story behind the price, and the latest data:" : "The story behind the price, and the latest data:"
-        : up ? "Why the price sits below its fair value, and what is changing now:" : "Why the price sits above its fair value, and what is breaking now:";
-  const sources = `Source: ${[...new Set(story.drivers.flatMap((d) => d.exhibit.sources))].join(", ")}, Dualis Research`;
-  const { svg, width, height } = r.opportunitySvg({ company: input.companyName ?? input.symbol, priceLine, up, intro, panels, sources, look });
-  return { file: r.png(svg), width, height, caption: `Opportunity: ${story.drivers.map((d) => d.title).join(", ")}` };
+  const { svg, width, height } = r.storyBreakSvg({ company: input.companyName ?? input.symbol, headline: storyHeadline(story, look.tone), up, intro: storyIntro(up, look.tone), panels, sources: `Source: ${[...new Set(story.drivers.flatMap((d) => d.exhibit.sources))].join(", ")}, Dualis Research`, look });
+  return { file: r.png(svg), width, height, caption: `${STORY_CAPTION} ${story.drivers.map((d) => d.title).join(", ")}` };
 }
 
 /** The whole chart at X's 5:2 Article cover ratio (never cropped). */
@@ -168,12 +156,12 @@ export const renderSource: Source = {
     // `x-chart` = the same chart in the professional style of X posts (skill x-post): no news card, no price card.
     const charted = kind === "chart" || kind === "x-chart";
     // The same frame as the Sandbox (Kevin 2026-11-12): the narrative and its 1-3 drivers reversing now, one chart each.
-    const story = charted && input.symbol ? await opportunityStory(ctx.db, input.symbol, ctx.complete) : null;
+    const story = charted && input.symbol ? await storyBreak(ctx.db, input.symbol, ctx.complete) : null;
     if (story) {
       // WhatsApp drafts: the house look, an X post in the X format, a Note in the Substack one.
-      const pic = await drawOpportunity(story, { tone: "balanced", channel: kind === "x-chart" ? "x" : "substack" });
+      const pic = await drawStoryBreak(story, { tone: "balanced", channel: kind === "x-chart" ? "x" : "substack" });
       rendered.set(subject, { file: pic.file, mime: "image/png", width: pic.width, height: pic.height, sourceUrl: null, caption: pic.caption });
-      return { request: { version: VISUALS_VERSION, ideaId, kind, input: summary(input), opportunity: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { mime: "image/png", width: pic.width, height: pic.height, sizeBytes: pic.file.length } };
+      return { request: { version: VISUALS_VERSION, ideaId, kind, input: summary(input), storyBreak: story.drivers.map((d) => `${d.title}: ${d.tag}`) }, httpStatus: null, payload: { mime: "image/png", width: pic.width, height: pic.height, sizeBytes: pic.file.length } };
     }
     const choice = charted ? await chooseChart(ctx.db, ideaId, input, ctx.complete) : null;
     const callout = choice && (choice.kind === "exhibit" || input.bars.length >= MIN_BARS) ? await writeCallout(input, choice, ctx.complete) : null;
@@ -186,7 +174,7 @@ export const renderSource: Source = {
       ...(callout ? { callout } : {}),
     };
     const r0 = callout ? await renderModule() : null;
-    const annotation = callout && r0 ? { point: callout.point, note: callout.note, priceSays: callout.priceSays, title: callout.title, chartLabel: callout.chartLabel, tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: kind === "x-chart" ? null : await banner(input, callout, ctx.fetch, r0.timeAgo), style: kind === "x-chart" ? ("pro" as const) : ("breaking" as const) } : null;
+    const annotation = callout && r0 && choice ? { ...annotationOf(callout, choice), tone: r0.toneOf(input, choice?.kind === "exhibit" ? choice.exhibit : null), banner: kind === "x-chart" ? null : await banner(input, callout, ctx.fetch, r0.timeAgo), style: kind === "x-chart" ? ("pro" as const) : ("breaking" as const) } : null;
     if (choice?.kind === "exhibit") {
       const r = await renderModule();
       const file = r.png(r.exhibitSvg(input, choice.exhibit, annotation));
@@ -384,7 +372,7 @@ export async function rebuildGoldVisuals(db: Db): Promise<void> {
 
 export const contentVisuals: Dimension = {
   name: VISUALS_DIMENSION,
-  description: "Visuals of every drafted Idea: the chart of the driver it cites (its most striking Exhibit, or price vs fair value when the Idea is about price), 16:9 post card, the card as a short video, and a capture of the news it cites.",
+  description: "Visuals of every drafted Idea: the chart of the driver it cites (its most striking Exhibit, or the share price when the Idea is about price), 16:9 post card, the card as a short video, and a capture of the news it cites.",
   sources: [renderSource, captureSource],
   subjects: pickVisualSubjects,
   promote: promoteVisuals,

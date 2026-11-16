@@ -18,29 +18,27 @@ export const ARTICLE_DISCLAIMER =
 
 export const X_LIMIT = 280;
 
-export const PROMPT_VERSION = "drafts-v9";
+export const PROMPT_VERSION = "drafts-v10";
 
 /**
- * Every post on a live signal (BUY or SELL) walks the reader through the same 5 steps, X and Substack alike (Kevin
- * 2026-11-13: the reader must get the signal type, its size, the trigger and its date, the rationale driver by driver,
- * then the conclusion). Skill `angle-signal` holds the same skeleton for the Sandbox writer.
+ * Every post on a live signal (BUY or SELL) is 3 lines, X and Substack alike (Thierry 2026-11-16: not confident in our
+ * fair values; real reported figures + the shortest convincing why of the narrative break). Skill `angle-signal` holds
+ * the same shape for the Sandbox writer. The writer is never given a fair value, so it cannot print one.
  */
 export const SIGNAL_SKELETON = [
-  "When the Signal below is BUY or SELL, the post follows these 5 steps in order, each on its own line with a blank line between, a short emoji may open a line (📈 📉 ⚡ 🔎 ✅):",
-  "1. Signal type: inflection (a gloomy story turning, BUY) or crack (a loved story breaking, SELL) and its strength, in words.",
-  "2. Size: the quote vs the fair value, both figures, and the gap in %.",
-  "3. Trigger and date: the fact that set it off and its date (the signal's since date or the newest evidence).",
-  "4. Rationale, point by point: the share price trades under (or above) fair value because the market believes <the drivers, a few words each>; then one line per driver that turned: \"<date>: <driver> turned, <its number>\".",
-  "5. Conclusion: one sentence, what the price still has wrong.",
-  "Only dates and figures given in the inputs; a step with no input is left out. With no BUY or SELL signal, write one claim as below.",
+  "When the Signal below is BUY or SELL, the post is 3 lines with a blank line between (one emoji may open a line: 📈 for a BUY, 📉 for a SELL):",
+  "1. What the market believes: the story in a few plain words (« The market still prices a shrinking business »).",
+  "2. The real figure that contradicts it: ONE reported figure from the inputs with its period and its comparison, both values (« Q3 revenue $7.5M, up 21% from $6.2M a year earlier »).",
+  "3. Why it breaks the story, in ONE sentence.",
+  "Every number is a reported, dated figure from the inputs (Reported figures, Evidence, the drivers' Now lines). Never a fair value, a gap to it, an upside, a price target or the word opportunity. With no reported figure that contradicts the story, write no figure: never make one up.",
 ].join("\n");
 
 export const GAME = [
   "You write for an independent equity research writer (Thierry Matin, small and mid caps, long/short, eight markets). Brand: Dualis Research.",
   "The game: grow paid Substack subscribers. The reader is a self-directed, experienced small-cap investor who reads filings and pays for ideas the big funds miss.",
-  "A post earns a follow when it gives ONE sharp, dated fact and says, bluntly, what it means for holders, so readers feel they must act before the market catches up.",
-  "The post tells ONE Idea, given below with the evidence behind it. One claim only: what just happened and why the price is wrong now. Pick the single strongest fact, drop the rest.",
-  "Tone: alarm. Sound the warning a sharp analyst sends a friend who holds the stock: urgent, direct, certain. Name the danger or the missed opportunity in plain words and say the market has not priced it.",
+  "A post earns a follow when it gives ONE sharp, dated, reported figure and says, in as few words as possible, why it breaks the story the market tells.",
+  "The post tells ONE Idea, given below with the evidence behind it. One claim only: the real figure and why the market's story is wrong now. Pick the single strongest figure, drop the rest.",
+  "Tone: alarm. Sound the warning a sharp analyst sends a friend who holds the stock: urgent, direct, certain. Name what the market believes and the figure that says otherwise, in plain words.",
   "Plain words: subject, verb, object. Short sentences. No accounting jargon a retail investor must decode (say \"profit for shareholders\", never \"income available to common\"). No hedging: never \"in my view\", \"not proven yet\", \"it remains to be seen\", never a \"but\" that walks the claim back.",
   "An Idea is not always a turn in the story: an update on the company is worth a post too. Say what is new and why a holder must care today.",
   "Never write a disclaimer, it is added after you. Never invent a figure that is not in the inputs. Never an em dash or en dash, no hashtags, no hype words, no emoji except the opening siren (and the line emojis of a signal post).",
@@ -51,13 +49,13 @@ export const GAME = [
 
 export const FORMAT_RULES: Record<DraftFormat, string> = {
   "x-post": [
-    "Format: one X post, much smaller than a Note: one or two short sentences, at most 160 characters, the ticker as a $cashtag once after the opening. A signal post (BUY or SELL) takes the 5 steps instead, one short line each, at most 250 characters (the disclaimer is added after, X stops at 280).",
-    "Lead with the alarm and its number. The chart attached is a sober exhibit with no news card and no signal on it, so the words carry the breaking news: name its source when it is a big publisher (\"per Reuters\"), and the live signal when there is one (\"Shares 28% under fair value\"). Answer with the post text only.",
+    "Format: one X post, much smaller than a Note: one or two short sentences, at most 160 characters, the ticker as a $cashtag once after the opening. A signal post (BUY or SELL) takes the 3 lines instead, at most 250 characters (the disclaimer is added after, X stops at 280).",
+    "Lead with the alarm and its reported figure. The chart attached is a sober exhibit with no news card, so the words carry the breaking news: name its source when it is a big publisher (\"per Reuters\"). Answer with the post text only.",
   ].join("\n"),
   "linkedin-post": "Format: one LinkedIn post, 600 to 1200 characters, short paragraphs, ends with one question to the reader. Answer with the post text only.",
   "substack-note": [
-    "Format: one Substack Note = one small paragraph with a chart. The chart of the Idea (price against fair value, or the figure the Idea rests on) is attached under the text, so never describe it point by point.",
-    "Write ONE paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks, no headings, no list. It reads as a warning, never a report. A signal post (BUY or SELL) takes the 5 steps instead, one line each with blank lines between, at most 600 characters.",
+    "Format: one Substack Note = one small paragraph with a chart. The chart of the reported figure the Idea rests on is attached under the text, so never describe it point by point.",
+    "Write ONE paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks, no headings, no list. It reads as a warning, never a report. A signal post (BUY or SELL) takes the 3 lines instead, blank lines between, at most 400 characters.",
     "Sentence 1 = the alarm with its number. Sentence 2 = why the market has it wrong. Optional sentence 3 = what holders should watch next.",
     "Answer with the note text only.",
   ].join("\n"),
@@ -81,11 +79,15 @@ export function draftSystem(format: DraftFormat, voiceGuide: string | null, acco
   ].join("\n");
 }
 
-/** What the writer gets beside the Idea: the ticker's story and the evidence the Idea rests on, in words. */
+/**
+ * What the writer gets beside the Idea: the ticker's story, the evidence the Idea rests on and the reported figures of its
+ * drivers, in words. Never the fair value or a gap to it (Thierry 2026-11-16): the writer cannot print what it is not given.
+ */
 export type IdeaContext = {
   narrative: string | null;
   signal: string | null;
-  fairValue: string | null;
+  /** Reported figures of the drivers' Exhibits, each value with its period (lead series, newest last). */
+  figures: { title: string; values: string }[];
   evidence: { headline: string; publisher: string | null; day: string; why: string | null; url: string | null }[];
   /** The day the current signal started (its trigger), when there is one. */
   signalSince: string | null;
@@ -104,11 +106,11 @@ export function draftPrompt(inputs: DraftInputs, ctx: IdeaContext, exhibits: { i
     "",
     `What the market believes: ${ctx.narrative ?? "not written yet"}`,
     ctx.signal ? `Signal: ${ctx.signal}${ctx.signalSince ? `, since ${ctx.signalSince}` : ""}` : "",
-    ctx.fairValue ? `Fair value: ${ctx.fairValue}` : "",
     ...(ctx.signalChanges.length ? ["", "Signal changes:", ...ctx.signalChanges.map((c) => `- ${c.label}${c.note ? `: ${c.note}` : ""}`)] : []),
     ...(ctx.evidence.length
       ? ["", "Evidence:", ...ctx.evidence.map((e) => `- ${e.day} ${e.publisher ?? ""}: ${e.headline}${e.why ? `. ${e.why}` : ""}${e.url ? ` (${e.url})` : ""}`)]
       : []),
+    ...(ctx.figures.length ? ["", "Reported figures (the only numbers a post may compare):", ...ctx.figures.map((f) => `- ${f.title}: ${f.values}`)] : []),
     ...(ctx.drivers.length ? ["", "Narrative drivers (why the market holds its story):", ...ctx.drivers.map((d) => `- ${d.title}${d.summary ? `: ${d.summary}` : ""}${d.state ? `. Now: ${d.state.word}${d.state.since ? ` since ${d.state.since}` : ""}${d.state.headline ? `, ${d.state.headline}` : ""}${d.state.pricedIn ? ` (${d.state.pricedIn})` : ""}` : ""}`)] : []),
     exhibits.length ? ["", "Exhibits you may use:", ...exhibits.map((x) => `- ${x.id}: ${x.label}`)].join("\n") : "",
   ];

@@ -27,7 +27,7 @@ async function main() {
       const [, symbol, fromSignal, fromStrength, toSignal, toStrength] = m;
       const input = await alertInput(db, { symbol, fromSignal, fromStrength, toSignal, toStrength });
       const png = alertPng(input);
-      const text = signalAlert({ symbol, fromSignal, fromStrength, toSignal, toStrength, updateNote: "Test: the Update Note sits here." }, input.name);
+      const text = signalAlert({ symbol, fromSignal, fromStrength, toSignal, toStrength, updateNote: "Test: the Update Note sits here." }, input.name, input.breaks[0]?.headline ?? null);
       if (outDir) {
         writeFileSync(`${outDir}/${symbol}.png`, png);
         console.log(`[signal-alert-test] ${symbol}: ${png.length} bytes\n${text}\n`);

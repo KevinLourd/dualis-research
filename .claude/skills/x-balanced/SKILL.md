@@ -8,12 +8,12 @@ description: X in the BALANCED tone (today's Dualis house style) - X post and X 
 The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). The voice: a sharp analyst warning a friend who holds the stock. Urgent, direct, certain, sober words. Conviction comes from one specific, dated fact; paid research businesses sell specific calls, never hype (The Bear Cave, Citrini: https://on.substack.com/p/going-paid-the-bear-cave, https://www.citriniresearch.com/about).
 
 ## X post
-- **Signal post (BUY or SELL)**: the 5 spaced lines of skill `angle-signal` instead, at most 250 characters; never the one-sentence 🚨 form.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead (belief, real figure with both values, why), at most 250 characters; never the one-sentence 🚨 form.
 - **Length**: 1 or 2 short sentences, at most 160 characters. 100-200 characters earns the best engagement rate on X (Ordinal 2026: https://www.tryordinal.com/blog/twitter-x-engagement-data-study).
 - **Hook** (a post with no BUY or SELL): opens `🚨 <short name>: ` (« CareCloud », never « CareCloud Inc. »), then the fact with its number.
-- **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »), also when the price is above fair value. `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
+- **Structure**: the fact, then why the price has it wrong: the second sentence always says what the price assumes (« Shares price in a rebound that is still ahead »). `$TICKER` once after the opening: a cashtag opens a live chart and its posts on X (https://www.theblock.co/post/397470/x-rolls-out-cashtags).
 - **Visual**: see Image below.
-- **Say in words** what the image no longer says: the news source when it is a big name (« per Reuters »), the live signal (« Shares 28% under fair value »).
+- **Say in words** what the image no longer says: the news source when it is a big name (« per Reuters »).
 - Example:
 ```
 🚨 CareCloud $CCLD: profit for shareholders jumped 4x in Q3, to $4.7M. Shares still price it as leaking to preferred holders.
@@ -33,9 +33,9 @@ X Articles carry a title, a cover image, headers, images and embedded posts (htt
   4. `## What would prove us wrong`: the kill criterion.
 - **Visual**: see Image below.
 - Do: short paragraphs (2-3 sentences), one figure per sentence. The cover is ONE chart of the title's measure.
-- Don't: a heading with no new fact under it, a price target we did not compute, finance jargon in the body (« price to earnings », « operating profit before depreciation »: say profit multiple, operating profit).
+- Don't: a heading with no new fact under it, a fair value, a price target or an upside, finance jargon in the body (« price to earnings », « operating profit before depreciation »: say profit multiple, operating profit).
 
 ## Image
-- **style**: `breaking` for every BUY or SELL post (content-matrix « The picture »: chart `price`, title and note = the step-2 gap); `pro` only for a post with no signal. The **note** carries the conclusion with its number (« 24% under fair value »).
+- **style**: `breaking` for every BUY or SELL post (content-matrix « The picture »: the chart of the line-2 figure, `from` = the compared period); `pro` only for a post with no signal. The **note** carries the reported figure with its period (« Q3 revenue $7.5M »).
 - **chart**: the Exhibit that proves the claim; the price only for a post about the price. An Article's cover is the chart of the measure in its title.
 - **title**: the conclusion anyway (kept with the post).

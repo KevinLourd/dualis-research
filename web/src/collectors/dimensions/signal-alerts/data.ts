@@ -1,25 +1,31 @@
-import { and, asc, eq, gte } from "drizzle-orm";
-import { fairValues, narrativeDrivers, narrativeStates, signals, type ThesisSide } from "@/db/schema/analysis";
-import { companyProfiles, priceBars } from "@/db/schema/gold";
+import { and, asc, eq } from "drizzle-orm";
+import { type ExhibitPoint, type ExhibitSeries, narrativeDrivers, narratives, narrativeStates, type ThesisSide } from "@/db/schema/analysis";
+import { companyProfiles } from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import { sideOfSignal, type SignalStep } from "@/content/signal-alert";
+import type { Complete } from "@/llm/complete";
+import { storyBreak } from "../content-visuals/story-break";
 
 /**
- * What the alert image shows, read from gold when the alert is planned (it lands in bronze as the plan's payload):
- * the level B panel in one picture (Kevin 2026-11-09): the signal, fair value and quote, the price vs fair value
- * chart, and the Narrative Drivers with their Status.
+ * What the alert shows, read from gold when the alert is planned (it lands in bronze as the plan's payload): the signal,
+ * the story the market holds, the reported figure that breaks it (the strongest driver reversing now, with its chart and
+ * the two periods it compares), and the Narrative Drivers with their Status. Never the fair value, the quote vs it or a
+ * gap (Thierry 2026-11-16: not confident in our fair values; real figures + the shortest convincing why of the break).
  */
 export type AlertInput = SignalStep & {
   symbol: string;
   name: string | null;
   side: ThesisSide;
-  quote: number | null;
-  quoteDate: string | null;
-  currency: string | null;
-  fair: { value: number; low: number | null; high: number | null } | null;
-  /** Closes of the last 12 months, oldest first. */
-  bars: { date: string; close: number }[];
-  priceSources: string[];
+  /** The story the market holds on the signal's thesis (one sentence). */
+  narrative: string | null;
+  /** The reported figure that breaks the story: the judge's reality line + the Exhibit it reads, latest vs `base`. */
+  breaks: {
+    driver: string;
+    tag: string;
+    headline: string | null;
+    chart: { title: string; chart: "bar" | "line"; series: ExhibitSeries[]; points: ExhibitPoint[]; sources: string[] };
+    base: string | null;
+  }[];
   drivers: {
     category: string;
     title: string;
@@ -28,18 +34,17 @@ export type AlertInput = SignalStep & {
   }[];
 };
 
-const PRICE_SOURCE_LABEL: Record<string, string> = { yahoo: "Yahoo Finance", nasdaq: "Nasdaq", cnbc: "CNBC", naver: "Naver Finance" };
+/** Panels of the alert: the strongest reversing driver's figure first (one picture stays short on a phone). */
+export const ALERT_BREAKS = 1;
 
-export async function alertInput(db: Db, c: SignalStep & { symbol: string }, now = new Date()): Promise<AlertInput> {
+export async function alertInput(db: Db, c: SignalStep & { symbol: string }, complete?: Complete): Promise<AlertInput> {
   const side = sideOfSignal(c.toSignal);
-  const since = new Date(now.getTime() - 365 * 86400_000).toISOString().slice(0, 10);
-  const [[profile], [sig], [fair], bars, drivers, states] = await Promise.all([
+  const [[profile], [story], drivers, states, broken] = await Promise.all([
     db.select({ name: companyProfiles.name }).from(companyProfiles).where(eq(companyProfiles.symbol, c.symbol)),
-    db.select({ quote: signals.quote, quoteDate: signals.quoteDate, currency: signals.currency }).from(signals).where(eq(signals.symbol, c.symbol)),
-    db.select().from(fairValues).where(eq(fairValues.symbol, c.symbol)),
-    db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(and(eq(priceBars.symbol, c.symbol), gte(priceBars.date, since))).orderBy(asc(priceBars.date)),
+    db.select({ text: narratives.text }).from(narratives).where(eq(narratives.id, `${c.symbol}:${side}`)),
     db.select().from(narrativeDrivers).where(and(eq(narrativeDrivers.symbol, c.symbol), eq(narrativeDrivers.side, side))).orderBy(asc(narrativeDrivers.rank)),
     db.select().from(narrativeStates).where(and(eq(narrativeStates.symbol, c.symbol), eq(narrativeStates.side, side), eq(narrativeStates.level, "driver"))),
+    storyBreak(db, c.symbol, complete, side),
   ]);
   const rows = drivers.map((d) => {
     const s = states.find((x) => x.driverId === d.id);
@@ -55,12 +60,14 @@ export async function alertInput(db: Db, c: SignalStep & { symbol: string }, now
     toStrength: c.toStrength,
     name: profile?.name ?? null,
     side,
-    quote: sig?.quote ?? null,
-    quoteDate: sig?.quoteDate ?? null,
-    currency: fair?.currency ?? sig?.currency ?? null,
-    fair: fair ? { value: fair.value, low: fair.low, high: fair.high } : null,
-    bars: bars.map((b) => ({ date: b.date, close: b.close })),
-    priceSources: [...new Set(bars.flatMap((b) => b.sources))].map((s) => PRICE_SOURCE_LABEL[s] ?? s),
+    narrative: story?.text ?? null,
+    breaks: (broken?.drivers ?? []).slice(0, ALERT_BREAKS).map((d) => ({
+      driver: d.title,
+      tag: d.tag,
+      headline: d.headline,
+      chart: { title: d.exhibit.title, chart: d.exhibit.chart, series: d.exhibit.series, points: d.exhibit.points, sources: d.exhibit.sources },
+      base: d.base,
+    })),
     drivers: [...rows].sort((a, b) => turn(b).localeCompare(turn(a))),
   };
 }

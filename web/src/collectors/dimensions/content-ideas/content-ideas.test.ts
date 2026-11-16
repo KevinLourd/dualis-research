@@ -14,7 +14,7 @@ import { ideasSystem, parseIdeas, parseScores, scoresSystem } from "./prompt";
 const IDEAS = JSON.stringify({
   ideas: [
     { symbol: "CCLD", title: "CareCloud replaced the client the market thinks it lost.", angle: "Reuters reports a new hospital client.", sources: ["evidence:CCLD|news:n1", "driver:CCLD:long:1"] },
-    { symbol: "CCLD", title: "CareCloud trades a third below its fair value.", angle: "4 USD vs 6.", sources: ["fair-value:CCLD"] },
+    { symbol: "CCLD", title: "CareCloud revenue grew while the market priced a loss.", angle: "Q3 revenue up.", sources: ["signal:CCLD"] },
     { symbol: null, title: "Small caps with a new client beat the story.", angle: "One example this week.", sources: ["signal:CCLD", "not-offered:1"] },
     { symbol: "NOPE", title: "Unknown ticker.", angle: "Dropped.", sources: ["signal:CCLD"] },
     { symbol: "CCLD", title: "No source.", angle: "Dropped.", sources: ["made-up"] },
@@ -68,6 +68,8 @@ describe("content-ideas dimension", () => {
     const prompt = complete.mock.calls[0][0].prompt;
     expect(prompt).toContain("[evidence:CCLD|news:n1]");
     expect(prompt).toContain("[change:");
+    // No fair value is offered: an Idea is published, so it rests on reported figures (Thierry 2026-11-16).
+    expect(prompt).not.toMatch(/fair.value/i);
 
     // Same day: nothing asked again.
     const again = fakeComplete();

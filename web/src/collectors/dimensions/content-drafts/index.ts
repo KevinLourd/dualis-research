@@ -1,5 +1,6 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { evidence, narrativeDrivers, narratives, narrativeStates, signalChanges, signals } from "@/db/schema/analysis";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { evidence, type ExhibitPoint, type ExhibitSeries, exhibits, narrativeDrivers, narratives, narrativeStates, signalChanges, signals } from "@/db/schema/analysis";
+import { formatUnit, periodLabel, seriesPeriod } from "../../../console/exhibit-format";
 import { PRICED_WORD, signalWords, tagWord } from "@/content/signal-words";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as content from "@/db/schema/content";
@@ -47,6 +48,22 @@ async function accountFor(db: Db, format: DraftFormat) {
   return { account, voiceGuide: account ? ((await voiceGuides(db)).get(account.id) ?? null) : null };
 }
 
+/** Exhibits read per Idea, values per Exhibit: enough for a before/after comparison, short enough for the prompt. */
+const MAX_FIGURES = 6;
+const VALUES_PER_FIGURE = 8;
+
+/** The lead series of each Exhibit as « Q3-25 $6.2M, Q3-26 $7.5M »: reported values with their period, newest last. */
+export function figureLines(rows: { title: string; series: ExhibitSeries[]; points: ExhibitPoint[] }[]): IdeaContext["figures"] {
+  return rows.slice(0, MAX_FIGURES).flatMap((e) => {
+    const lead = e.series[0];
+    if (!lead || lead.key === "price") return [];
+    const pts = e.points.filter((p) => typeof p.values[lead.key] === "number").slice(-VALUES_PER_FIGURE);
+    if (pts.length === 0) return [];
+    const values = pts.map((p) => `${periodLabel(p.period, seriesPeriod(lead.key))} ${formatUnit(p.values[lead.key] as number, lead.unit, lead.currency)}`).join(", ");
+    return [{ title: `${e.title} (${lead.label})`, values }];
+  });
+}
+
 /** The ticker's story and the evidence an Idea rests on, in words, read from gold at draft time. */
 export async function ideaContext(db: Db, idea: content.SilverContentIdea, symbol: string): Promise<IdeaContext> {
   const refs = (kind: string) => idea.sourceRefs.filter((r) => r.kind === kind).map((r) => r.ref.slice(kind.length + 1));
@@ -63,16 +80,15 @@ export async function ideaContext(db: Db, idea: content.SilverContentIdea, symbo
   ]);
   const side = publicSide(s, narrs);
   const n = narrs.find((x) => x.side === side);
+  const shown = drv.filter((d) => driverIds.length > 0 || d.side === side);
+  const charts = shown.length ? await db.select().from(exhibits).where(inArray(exhibits.driverId, shown.map((d) => d.id))).orderBy(asc(exhibits.number)) : [];
   return {
     narrative: n?.detail ? `${n.text} ${n.detail}` : (n?.text ?? null),
     signal: s ? signalWords(s.signal, s.strength) : null,
     signalSince: s && s.signal !== "none" ? utcDay(s.since) : null,
-    fairValue:
-      s && s.fairValue !== null
-        ? `${s.fairValue} ${s.currency ?? ""}${s.fairValueLabel ? ` (${s.fairValueLabel})` : ""}; quote ${s.quote ?? "?"} on ${s.quoteDate ?? "?"}${s.gapPct !== null ? `, ${Math.round(s.gapPct * 100)}% vs fair value` : ""}`
-        : null,
+    figures: figureLines(charts),
     evidence: ev.map((e) => ({ headline: e.headline, publisher: e.publisher, day: e.eventDay, why: e.why, url: e.url })),
-    drivers: drv.filter((d) => driverIds.length > 0 || d.side === side).map((d) => {
+    drivers: shown.map((d) => {
       const st = states.find((x) => x.driverId === d.id);
       return {
         title: d.title,

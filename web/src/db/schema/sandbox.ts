@@ -28,6 +28,8 @@ export type SandboxInput = { kind: SandboxAngle; label: string; url: string | nu
 export type SandboxImage = {
   chart: string;
   point: string;
+  /** The earlier point the claim compares `point` to: both boxed, the change drawn between them (Thierry 2026-11-16). */
+  from?: string | null;
   style: "breaking" | "pro";
   title: string;
   chartLabel: string;

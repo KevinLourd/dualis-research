@@ -13,8 +13,9 @@ import type { VisualExhibit, VisualInput } from "./data";
 /**
  * Node only (loaded by URL from the dimension: the console bundle never sees resvg or ffmpeg). Three pictures of an
  * Idea in the Dualis look: `chart` = the most striking Exhibit of the driver the Idea cites (`exhibitSvg`), or the
- * price against the fair value (`chartSvg`), as a Notes and X chart (design tokens: white data on deep indigo), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
- * corner, `video` = the same card with the line drawing itself, then the fair value and the gap (MP4, H.264).
+ * share price (`chartSvg`), as a Notes and X chart (design tokens: white data on deep indigo), `montage` = a 16:9 card on deep indigo with the idea in words above the chart and the mark in the
+ * corner, `video` = the same card with the line drawing itself, then the last close (MP4, H.264). No fair value anywhere
+ * (Thierry 2026-11-16: not confident in our fair values; published pictures show reported figures only).
  */
 
 export const W = 1280;
@@ -65,16 +66,10 @@ export function monthTicks(from: number, to: number): number[] {
 export type Frame = {
   /** Share of the closes drawn (0..1]. */
   progress: number;
-  /** Opacity of the fair value line and the gap label (0..1). */
+  /** Opacity of the card's last-close line (0..1). */
   reveal: number;
 };
 const FULL: Frame = { progress: 1, reveal: 1 };
-
-/** The gap in words: "32% below fair value". */
-export function gapWords(price: number, fair: number): string {
-  const g = price / fair - 1;
-  return `${Math.abs(Math.round(g * 100))}% ${g < 0 ? "below" : "above"} fair value`;
-}
 
 function series(input: VisualInput, frame: Frame, onCard: boolean) {
   const n = Math.max(2, Math.ceil(input.bars.length * frame.progress));
@@ -91,45 +86,11 @@ function series(input: VisualInput, frame: Frame, onCard: boolean) {
       z: 3,
     },
   ];
-  if (input.fair && frame.reveal > 0) {
-    const f = input.fair;
-    out.push({
-      type: "line",
-      data: [
-        [ts(input.bars[0].date), f.value],
-        [ts(input.bars[input.bars.length - 1].date), f.value],
-      ],
-      symbol: "none",
-      lineStyle: { color: onCard ? LAVENDER : NOTE.muted, width: 2, type: "dashed", opacity: frame.reveal },
-      // The Note chart shades the fair value range, low to high (Kevin 2026-11-09), like the console and the site.
-      ...(!onCard && f.low != null && f.high != null && f.high > f.low
-        ? { markArea: { silent: true, itemStyle: { color: "rgba(255,255,255,0.08)" }, label: { show: false }, data: [[{ yAxis: f.low }, { yAxis: f.high }]] } }
-        : {}),
-      endLabel: {
-        show: true,
-        // Close to the price's end value, the two labels would overlap: the fair value's steps away from it.
-        offset: [0, nearEnd(input, f.value) ? (last.close > f.value ? 26 : -26) : 0],
-        formatter: `Fair value ${fmt(f.value)}`,
-        color: onCard ? LAVENDER : NOTE.muted,
-        fontSize: 20,
-        fontFamily: FONT,
-        opacity: frame.reveal,
-      },
-      z: 2,
-    });
-  }
   return out;
 }
 
-/** Whether a level sits within 10% of the chart's height of the last close (their end labels would overlap). */
-function nearEnd(input: VisualInput, level: number): boolean {
-  const { min, max } = yRange(input);
-  return Math.abs((input.bars.at(-1)?.close ?? level) - level) < (max - min) * 0.1;
-}
-
 function yRange(input: VisualInput) {
-  const f = input.fair;
-  const values = [...input.bars.map((b) => b.close), ...(f ? [f.value, f.low ?? f.value, f.high ?? f.value] : [])];
+  const values = input.bars.map((b) => b.close);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const pad = (hi - lo) * 0.12 || hi * 0.1;
@@ -168,7 +129,7 @@ function axes(input: VisualInput, onCard: boolean) {
 
 /**
  * What the Note chart says out loud (Kevin 2026-11-09: « une flèche dessus, un texte de note, orienté regardez »): the
- * claim as its headline, ONE point in colour (green when the story turns up below fair value, red when it cracks above),
+ * claim as its headline, ONE point in colour (green when a gloomy story turns up, red when a loved one cracks),
  * an arrow with a short note on it, and the headline of the news it rests on with its publisher's logo above.
  */
 export type Annotation = {
@@ -184,8 +145,8 @@ export type Annotation = {
   /** The breaking-news inset: `ago` is when the news came out, said as « 2h ago ». */
   banner: { headline: string; publisher: string; logo: string | null; ago: string } | null;
   /**
-   * `breaking` (Substack Notes, skill breaking-chart): news card + pasted price card. `pro` (X posts, skill x-post, Kevin
-   * 2026-11-10): the same chart, point, arrow and note, no news card, no price card, a factual title.
+   * `breaking` (Substack Notes, skill breaking-chart): news card + the claim as headline. `pro` (X posts, skill x-post,
+   * Kevin 2026-11-10): the same chart, point, arrow and note, no news card, a factual title.
    */
   style?: "breaking" | "pro" | "panel";
   /** Periods the claim compares (Kevin 2026-11-12: « encadre les deux »): each gets a box, its colour and a big ring. */
@@ -204,7 +165,7 @@ function heading(a: Annotation, company: string): { title: string; sub: string |
   const label = `${company}: ${a.chartLabel}`;
   // The professional chart heads with what it shows, never the alarm (that lives in the X post's text).
   if (a.style === "pro") return { title: label, sub: null };
-  // A panel of the opportunity picture: the header above it names the company, the chart says what it measures.
+  // A panel of the story-break picture: the header above it names the company, the chart says what it measures.
   if (a.style === "panel") return { title: a.chartLabel, sub: null };
   return a.banner ? { title: label, sub: null } : { title: a.title, sub: label };
 }
@@ -212,15 +173,13 @@ const toneColour = (t: Annotation["tone"]) => (t === "long" ? COLOR.long.dark : 
 
 /**
  * The tone comes from the thesis (CLAUDE.md « Two theses »): a long driver's turn is an inflection (green), a short
- * one's a crack (red). The price chart takes its drivers' side when they agree, else where the price sits.
+ * one's a crack (red). The price chart takes its drivers' side when they agree, else the live Signal's.
  */
 export function toneOf(input: VisualInput, exhibit: VisualExhibit | null = null): Annotation["tone"] {
   if (exhibit) return exhibit.side;
   const sides = [...new Set(input.drivers.map((d) => d.side))];
   if (sides.length === 1) return sides[0];
-  const last = input.bars.at(-1);
-  if (!input.fair || !last) return "neutral";
-  return last.close < input.fair.value ? "long" : "short";
+  return input.signal === "BUY" ? "long" : input.signal === "SELL" ? "short" : "neutral";
 }
 
 /** « 2h ago », « 3d ago »: how long before the chart was drawn the news came out. */
@@ -284,7 +243,7 @@ function calloutGraphics(px: number, py: number, a: Annotation, colour: string, 
   if (!candidates.some(fits)) {
     const scan: { x: number; y: number }[] = [];
     for (let y = plot.top; y + boxH <= plot.bottom; y += 16) for (let x = plot.left; x + boxW <= plot.right; x += 24) scan.push({ x, y });
-    // Above the point first: the empty headroom is up there, the fair value band below.
+    // Above the point first: the empty headroom is up there.
     const dist = (c: { x: number; y: number }) => Math.hypot(c.x + boxW / 2 - px, c.y + boxH / 2 - py) + (c.y + boxH > py ? 2000 : 0);
     candidates.push(...scan.sort((a, b) => dist(a) - dist(b)));
   }
@@ -357,42 +316,39 @@ function withMark(svg: string, x: number, y: number, size: number): string {
   return svg.replace("</svg>", `<image href="data:image/svg+xml;base64,${MARK}" x="${x}" y="${y}" width="${size}" height="${size}"/></svg>`);
 }
 
-/** The professional chart's grey line (skill x-post): where the share price sits against the fair value, in plain words. */
-function proSubtitle(input: VisualInput): string {
-  const last = input.bars.at(-1);
-  if (!input.fair || !last) return "";
-  const cur = input.fair.currency ?? "";
-  return `Share price ${fmt(last.close)} ${cur} · ${gapWords(last.close, input.fair.value)} ${fmt(input.fair.value)} ${cur}`.trim();
+/** The professional chart's grey line (skill x-post): the periods the Exhibit covers, reported figures only. */
+function proSubtitle(e: VisualExhibit): string {
+  const lead = e.series[0];
+  const pts = e.points.filter((p) => typeof p.values[lead.key] === "number");
+  if (pts.length === 0) return "";
+  const per = seriesPeriod(lead.key);
+  return pts.length === 1 ? periodLabel(pts[0].period, per) : `${periodLabel(pts[0].period, per)} to ${periodLabel(pts.at(-1)!.period, per)}, as reported`;
 }
 
-/** Price vs fair value as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow, news card and the pasted price card. */
+/** The share price as a Notes and X chart (`NOTE`); with an annotation, its claim, arrow and news card. No fair value. */
 export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation | null = null): string {
   const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: W, height: H });
   const last = input.bars[input.bars.length - 1];
   const company = input.companyName ?? input.symbol;
-  const subtitle = input.fair ? `Last 12 months · ${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}` : "Last 12 months";
-  // Same layout as the driver charts (Kevin 2026-11-09): the big BREAKING card top left, the Signal and the way to the fair
-  // value range top right, the chart label small above the chart, the mark bottom right.
+  const subtitle = "Daily close, last 12 months";
+  // Same layout as the driver charts (Kevin 2026-11-09): the big BREAKING card top left, the chart label small above the
+  // chart, the mark bottom right.
   const pro = a?.style === "pro";
   const news = !!a?.banner && !pro;
-  // The same pasted price card as the driver charts (Kevin 2026-11-09: « tu ne respectes pas du tout », his reference).
-  const card = !!a && !pro && !!input.fair && input.bars.length >= 20;
-  const cardY = news ? 34 : 22;
-  const newsBox = { x: 40, y: 28, w: card ? W - 40 - CARD_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
+  const newsBox = { x: 40, y: 28, w: W - 80 - 100, h: 200, big: true };
   const labelTop = newsBox.y + newsBox.h + 26;
   const head = a ? heading(a, company) : null;
-  const titleW = card ? W - 56 - CARD_W - 40 - 40 : pro ? W - 112 : W - 112 - 96;
+  const titleW = pro ? W - 112 : W - 112 - 96;
   // Words wrap, never cut with « … », and the period is said once (the chart label carries it): the reviewer read
   // « · Last 12 m... » as a picture that does not stand alone (2026-11-11).
-  const titleText = news ? "" : head ? head.title : `${company} share price vs fair value`;
-  const gap = input.fair ? `${gapWords(last.close, input.fair.value)} · fair value ${fmt(input.fair.value)} ${input.fair.currency ?? ""}`.trim() : "";
-  const subText = news && head ? [head.title, gap].filter(Boolean).join(" · ") : head ? [head.sub, gap].filter(Boolean).join(" · ") : subtitle;
+  const titleText = news ? "" : head ? head.title : `${company} share price`;
+  const subText = news && head ? head.title : head ? (head.sub ?? subtitle) : subtitle;
   const subSize = news ? 21 : 22;
   const subW = news ? W - 112 : titleW;
   const wraps = (text: string, size: number, width: number) => Math.min(2, Math.max(1, Math.ceil((text.length * size * 0.55) / width)));
   const titleExtra = titleText ? (wraps(titleText, 34, titleW) - 1) * 42 : 0;
   const subExtra = (wraps(subText, subSize, subW) - 1) * 28;
-  const grid = { left: 110, right: 200, top: (news ? labelTop + 28 + 44 : card ? cardY + CARD_H + 70 : 160 + titleExtra) + subExtra, bottom: 92 };
+  const grid = { left: 110, right: 200, top: (news ? labelTop + 28 + 44 : 160 + titleExtra) + subExtra, bottom: 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
@@ -402,7 +358,7 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
       {
         text: subText,
         left: 56,
-        top: news ? labelTop : card ? grid.top - 48 - subExtra : 94 + titleExtra,
+        top: news ? labelTop : 94 + titleExtra,
         textStyle: { color: NOTE.muted, fontSize: subSize, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: subW, overflow: "break" },
       },
       { text: `Source: ${input.priceSources.join(", ")}, Dualis Research`, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
@@ -424,11 +380,6 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
     // The value printed at the line's end is an obstacle too.
     const [lx, ly] = chart.convertToPixel({ seriesIndex: 0 }, [ts(last.date), last.close]) as number[];
     obstacles.push({ x: lx - 6, y: ly - 18, w: 160, h: 36 });
-    // The fair value line and its label are part of the claim: the note never covers them.
-    if (input.fair) {
-      const [, fy] = chart.convertToPixel({ seriesIndex: 0 }, [ts(last.date), input.fair.value]) as number[];
-      obstacles.push({ x: grid.left, y: fy - 14, w: W - grid.left, h: 28 });
-    }
     chart.setOption({
       graphic: [
         ...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []),
@@ -438,8 +389,7 @@ export function chartSvg(input: VisualInput, frame: Frame = FULL, a: Annotation 
   }
   const svg = chart.renderToSVGString();
   chart.dispose();
-  const marked = card || pro ? withMark(svg, W - 56 - 40, H - 62, 40) : withMark(svg, W - 56 - 72, 40, 72);
-  return card ? withCard(marked, signalCardSvg(input), W - 40 - CARD_W, cardY) : marked;
+  return pro ? withMark(svg, W - 56 - 40, H - 62, 40) : withMark(svg, W - 56 - 72, 40, 72);
 }
 
 /**
@@ -460,36 +410,32 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
   const pro = a?.style === "pro" || a?.style === "panel";
   const news = !!a?.banner && !pro;
   const off = 0;
-  // A panel of the opportunity picture: its header, source and mark live on the whole picture.
+  // A panel of the story-break picture: its header, source and mark live on the whole picture.
   const panel = a?.style === "panel";
   const hit = a ? e.points.findIndex((p) => p.period === a.point) : -1;
   if (a && hit === -1) throw new Error(`annotation point ${a.point} is not a period of exhibit ${e.id}`);
   const accent = a ? toneColour(a.tone) : NOTE.main;
-  // With an annotation and a fair value, the price card sits top right and the headline wraps beside it.
-  const card = !!a && !pro && !!input.fair && input.bars.length >= 20;
-  const cardY = news ? 34 : off + 22;
-  const newsBox = { x: 40, y: 28, w: card ? W - 40 - CARD_W - 40 - 40 : W - 80 - 100, h: 200, big: true };
-  const titleW = card ? W - 56 - CARD_W - 40 - 40 : pro ? W - 112 : W - 112 - (off ? 0 : 96);
+  const newsBox = { x: 40, y: 28, w: W - 80 - 100, h: 200, big: true };
+  const titleW = pro ? W - 112 : W - 112 - (off ? 0 : 96);
   const titleSize = a ? 34 : 32;
   const head = a ? heading(a, input.companyName ?? input.symbol) : null;
   // The title wraps (never cut with « … »): every layout below it moves down by its extra line.
   const titleLines = head && !news ? Math.min(2, Math.max(1, Math.ceil((head.title.length * titleSize * 0.55) / titleW))) : 1;
   const titleExtra = (titleLines - 1) * 42;
-  const subTop = 40 + off + (titleLines - 1) * 42 + 48;
   const labelTop = newsBox.y + newsBox.h + 26;
-  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 + (legend ? 30 : 0) : card ? Math.max(cardY + CARD_H + 30, subTop + 60) + (legend ? 30 : 0) : (panel ? 110 : legend ? 200 : 190) + off + titleExtra, bottom: panel ? 56 : 92 };
+  const grid = { left: 110, right: bars ? 56 : 170, top: news ? labelTop + 28 + 44 + (legend ? 30 : 0) : (panel ? 110 : legend ? 200 : 190) + off + titleExtra, bottom: panel ? 56 : 92 };
   chart.setOption({
     backgroundColor: NOTE.bg,
     animation: false,
     textStyle: { fontFamily: FONT },
     title: [
       { text: news ? "" : head ? head.title : `${input.companyName ?? input.symbol}: ${e.title}`, left: 56, top: 40 + off, textStyle: { color: "#fff", fontSize: titleSize, lineHeight: 42, fontWeight: 600, fontFamily: FONT, width: titleW, overflow: "break" } },
-      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : a?.style === "panel" ? "" : pro ? proSubtitle(input) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : card ? subTop : 88 + off + titleExtra, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : card ? titleW : W - 112 - 96, overflow: "break" } },
+      { text: news && a ? `${input.companyName ?? input.symbol}: ${a.chartLabel}` : a?.style === "panel" ? "" : pro ? proSubtitle(e) : head ? (head.sub ?? "") : e.takeaway, left: 56, top: news ? labelTop : 88 + off + titleExtra, textStyle: { color: NOTE.muted, fontSize: 21, lineHeight: 28, fontWeight: 400, fontFamily: FONT, width: news ? W - 112 : W - 112 - 96, overflow: "break" } },
       { text: panel ? "" : note, left: 56, bottom: 28, textStyle: { color: NOTE.muted, fontSize: 16, fontWeight: 400, fontFamily: FONT } },
     ],
     legend: legend
       ? // Legend on top, left aligned (design tokens chart rule).
-        { show: true, left: 56, top: news ? labelTop + 34 : card ? grid.top - 34 : 140 + off + titleExtra, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
+        { show: true, left: 56, top: news ? labelTop + 34 : 140 + off + titleExtra, right: 56, icon: "rect", itemWidth: 14, itemHeight: 14, itemGap: 18, textStyle: { color: NOTE.text, fontSize: 16, fontFamily: FONT }, data: e.series.map((s) => s.label) }
       : { show: false },
     grid,
     xAxis: {
@@ -605,11 +551,10 @@ export function exhibitSvg(input: VisualInput, e: VisualExhibit, a: Annotation |
     }
     chart.setOption({ graphic: [...boxes, ...compare, ...(news && a.banner ? bannerGraphics(a.banner, newsBox) : []), ...(compare.length ? [] : calloutGraphics(tx, ty, a, accent, { left: grid.left, top: grid.top, right: W - 40, bottom: H - grid.bottom }, !bars, [...obstacles, ...boxObstacles]))] });
   }
-  let svg = chart.renderToSVGString();
+  const svg = chart.renderToSVGString();
   chart.dispose();
-  // The top right belongs to the price card when there is news: the mark moves to the bottom right.
-  svg = panel ? svg : news || pro ? withMark(svg, W - 56 - 40, H - 62, 40) : off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
-  return card ? withCard(svg, signalCardSvg(input), W - 40 - CARD_W, cardY) : svg;
+  // With news the top left is the news card: the mark moves to the bottom right.
+  return panel ? svg : news || pro ? withMark(svg, W - 56 - 40, H - 62, 40) : off ? withMark(svg, W - 56 - 56, 28, 56) : withMark(svg, W - 56 - 72, 40, 72);
 }
 
 /** The 16:9 post card: the idea in words over the chart, deep indigo, the mark and the brand at the bottom. */
@@ -628,10 +573,10 @@ export function montageSvg(input: VisualInput, frame: Frame = FULL): string {
         top: 84,
         textStyle: { color: "#fff", fontSize: 40, lineHeight: 52, fontWeight: 600, fontFamily: FONT, width: W - 128, overflow: "break" },
       },
-      ...(input.fair && frame.reveal > 0
+      ...(frame.reveal > 0
         ? [
             {
-              text: `${fmt(last.close)} ${input.fair.currency ?? ""}  ·  ${gapWords(last.close, input.fair.value)}`,
+              text: `Last close ${fmt(last.close)}`,
               right: 64,
               bottom: 40,
               textStyle: { color: "#fff", fontSize: 22, fontWeight: 600, fontFamily: FONT, opacity: frame.reveal },
@@ -661,8 +606,8 @@ export function coverSvg(chartPng: Buffer, chartW = W, chartH = H): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${COVER_W}" height="${COVER_H}" viewBox="0 0 ${COVER_W} ${COVER_H}"><rect width="${COVER_W}" height="${COVER_H}" fill="${NOTE.bg}"/><image x="${(COVER_W - w) / 2}" y="0" width="${w}" height="${h}" xlink:href="data:image/png;base64,${chartPng.toString("base64")}"/></svg>`;
 }
 
-/** One panel of the opportunity picture: what the market believes (A), what is happening (not A), its tag, its chart (PNG 1280x720). */
-export type OpportunityPanel = { narrative: string; reality: string; tag: string; png: Buffer };
+/** One panel of the story-break picture: what the market believes (A), the reported figure that says not A, its tag, its chart (PNG 1280x720). */
+export type StoryPanel = { narrative: string; reality: string; tag: string; png: Buffer };
 
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 /** Words cut into lines of at most `max` characters (resvg does not wrap). */
@@ -676,9 +621,9 @@ function wrapWords(text: string, max: number): string[] {
   return out;
 }
 
-export const OPP_W = 1600;
-/** The 6 looks of the opportunity picture (Kevin 2026-11-12): tone x channel, from the most alarmist to the most sober. */
-export type OpportunityLook = { tone: "urgent" | "balanced" | "neutral"; channel: "x" | "substack" };
+export const STORY_W = 1600;
+/** The 6 looks of the story-break picture (Kevin 2026-11-12): tone x channel, from the most alarmist to the most sober. */
+export type StoryLook = { tone: "urgent" | "balanced" | "neutral"; channel: "x" | "substack" };
 const LOOK_WORDS = {
   urgent: { a: "THE MARKET THINKS", b: "THE NUMBERS SAY" },
   balanced: { a: "NARRATIVE", b: "REALITY" },
@@ -686,17 +631,18 @@ const LOOK_WORDS = {
 } as const;
 
 /**
- * The opportunity picture (Kevin 2026-11-12): the price against its fair value and the opportunity, then ONE block per
- * driver reversing now (1 to 3), each « Narrative: A » against « Reality: not A », its tag and its chart. Six looks:
- * urgent (red BREAKING band, the opportunity in a big pill), balanced (the house look), neutral (a research exhibit: no
- * filled pill, sober labels); X = landscape, panels side by side; Substack = portrait, panels stacked, bigger words.
+ * The story-break picture (Kevin 2026-11-12; Thierry 2026-11-16: not confident in our fair values, so no price vs fair
+ * value header): the company and the signal's words, then ONE block per driver reversing now (1 to 3), each « Narrative:
+ * A » against « Reality: not A », its tag and the chart of the reported figure with both compared periods boxed. Six
+ * looks: urgent (red BREAKING band, the headline in a big pill), balanced (the house look), neutral (a research exhibit:
+ * no filled pill, sober labels); X = landscape, panels side by side; Substack = portrait, panels stacked, bigger words.
  */
-export function opportunitySvg(o: { company: string; priceLine: string; up: boolean; intro: string; panels: OpportunityPanel[]; sources: string; look: OpportunityLook }): { svg: string; width: number; height: number } {
+export function storyBreakSvg(o: { company: string; headline: string; up: boolean; intro: string; panels: StoryPanel[]; sources: string; look: StoryLook }): { svg: string; width: number; height: number } {
   const { tone, channel } = o.look;
   const accent = o.up ? COLOR.long.dark : COLOR.short.dark;
   const red = COLOR.breaking.dark;
   const words = LOOK_WORDS[tone];
-  const width = channel === "x" ? OPP_W : 1200;
+  const width = channel === "x" ? STORY_W : 1200;
   const n = o.panels.length;
   const perRow = channel === "substack" || n === 1 ? 1 : 2;
   const gap = 40;
@@ -721,9 +667,9 @@ export function opportunitySvg(o: { company: string; priceLine: string; up: bool
   }
   parts.push(`<text x="40" y="${top + 36}" font-size="${tone === "neutral" ? 36 : 42}" font-weight="600" fill="#fff">${esc(o.company)}</text>`);
   if (tone === "urgent") {
-    const pillW = Math.min(width - 80, o.priceLine.length * 18 + 40);
-    parts.push(`<rect x="40" y="${top + 58}" width="${pillW}" height="56" rx="10" fill="${accent}"/><text x="60" y="${top + 96}" font-size="30" font-weight="600" fill="#fff">${esc(o.priceLine)}</text>`);
-  } else parts.push(`<text x="40" y="${top + 84}" font-size="28" font-weight="600" fill="${tone === "neutral" ? "#fff" : accent}">${esc(o.priceLine)}</text>`);
+    const pillW = Math.min(width - 80, o.headline.length * 18 + 40);
+    parts.push(`<rect x="40" y="${top + 58}" width="${pillW}" height="56" rx="10" fill="${accent}"/><text x="60" y="${top + 96}" font-size="30" font-weight="600" fill="#fff">${esc(o.headline)}</text>`);
+  } else parts.push(`<text x="40" y="${top + 84}" font-size="28" font-weight="600" fill="${tone === "neutral" ? "#fff" : accent}">${esc(o.headline)}</text>`);
   parts.push(`<text x="40" y="${introTop + 4}" font-size="${tone === "urgent" ? 28 : 24}" font-weight="${tone === "urgent" ? 600 : 400}" fill="${tone === "urgent" ? "#fff" : NOTE.muted}">${esc(o.intro)}</text>`);
   o.panels.forEach((p, i) => {
     const row = Math.floor(i / perRow);
@@ -763,7 +709,7 @@ export function png(svg: string): Buffer {
   return Buffer.from(out);
 }
 
-/** Frames of the video: the line draws in 4 s, the fair value fades in over 1 s, then 2 s still. */
+/** Frames of the video: the line draws in 4 s, the last close fades in over 1 s, then 2 s still. */
 export function videoFrames(fps = 30): Frame[] {
   const draw = 4 * fps;
   const fade = 1 * fps;
@@ -808,102 +754,4 @@ export async function video(input: VisualInput, fps = 30, ffmpeg = process.env.F
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-}
-
-const CARD_W = 400;
-const CARD_H = 210;
-
-/**
- * The price card pasted on the chart (Kevin 2026-11-09: « un collage du price et du range fair value, avec une flèche
- * directionnelle qui dit BUY signal »): white card, the 12-month price line, the fair value range as a band, and an arrow
- * from today's price toward the fair value saying the Signal (or the gap when there is none).
- */
-export function signalCardSvg(input: VisualInput): string {
-  const fair = input.fair;
-  if (!fair) throw new Error("a price card needs a fair value");
-  const last = input.bars[input.bars.length - 1];
-  const up = last.close < fair.value;
-  const colour = up ? COLOR.long.light : COLOR.short.light;
-  const soft = up ? COLOR["long-soft"].light : COLOR["short-soft"].light;
-  const lo = fair.low ?? fair.value;
-  const hi = fair.high ?? fair.value;
-  const values = [...input.bars.map((b) => b.close), lo, hi];
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const pad = (max - min) * 0.1 || max * 0.1;
-  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: CARD_W, height: CARD_H });
-  const x0 = ts(input.bars[0].date);
-  const x1 = ts(last.date);
-  chart.setOption({
-    backgroundColor: "#fff",
-    animation: false,
-    textStyle: { fontFamily: FONT },
-    // A long company name would run off the card: the ticker stands in for it (Kevin 2026-11-12: words are never cut).
-    title: { text: `${(input.companyName ?? input.symbol).length > 22 ? input.symbol : (input.companyName ?? input.symbol)}: share price vs fair value`, left: 16, top: 12, textStyle: { color: "#333", fontSize: 15, fontWeight: 600, fontFamily: FONT } },
-    grid: { left: 16, right: 196, top: 44, bottom: 46 },
-    xAxis: { type: "time", min: x0, max: x1, show: false },
-    yAxis: { type: "value", min: Math.max(0, min - pad), max: max + pad, show: false },
-    series: [
-      {
-        type: "line",
-        data: input.bars.map((b) => [ts(b.date), b.close]),
-        symbol: "none",
-        lineStyle: { color: INDIGO, width: 3 },
-        markArea: { silent: true, itemStyle: { color: soft }, data: [[{ yAxis: lo }, { yAxis: hi }]] },
-        markLine: { silent: true, symbol: "none", label: { show: false }, lineStyle: { color: colour, type: "dashed", width: 2 }, data: [{ yAxis: fair.value }] },
-        z: 3,
-      },
-    ],
-  });
-  const [px, py] = chart.convertToPixel({ seriesIndex: 0 }, [x1, last.close]) as number[];
-  const [, fy] = chart.convertToPixel({ seriesIndex: 0 }, [x1, fair.value]) as number[];
-  const ax = px + 30;
-  const pillX = ax + 18;
-  const pillW = CARD_W - pillX - 14;
-  const head = 14;
-  const dir = fy < py ? -1 : 1;
-  // No signal: the gap in two words (« 27% below »), the card already says « vs fair value »; the font shrinks until the
-  // label fits its pill (Kevin 2026-11-12: « % below fair val » cut on both sides, the number lost).
-  const label = input.signal ? `${input.signal} signal` : gapWords(last.close, fair.value).replace(/ fair value$/, "");
-  const pillFont = Math.min(18, Math.floor((pillW - 16) / (label.length * 0.58)));
-  chart.setOption({
-    graphic: [
-      { type: "circle", shape: { cx: px, cy: py, r: 6 }, style: { fill: INDIGO }, z: 10 },
-      { type: "line", shape: { x1: ax, y1: py, x2: ax, y2: fy - dir * head }, style: { stroke: colour, lineWidth: 6 }, z: 10 },
-      { type: "polygon", shape: { points: [[ax, fy], [ax - 12, fy - dir * head], [ax + 12, fy - dir * head]] }, style: { fill: colour }, z: 10 },
-      { type: "rect", shape: { x: pillX, y: (py + fy) / 2 - 20, width: pillW, height: 40, r: 6 }, style: { fill: colour }, z: 10 },
-      { type: "text", style: { text: label, x: pillX + pillW / 2, y: (py + fy) / 2, fill: "#fff", fontSize: pillFont, fontWeight: 600, fontFamily: FONT, align: "center", verticalAlign: "middle" }, z: 11 },
-      { type: "text", style: { text: "Fair value", x: 22, y: fy - 12, fill: colour, fontSize: 13, fontWeight: 600, fontFamily: FONT, verticalAlign: "middle" }, z: 11 },
-      // The gap to fair value as the opportunity (Kevin 2026-11-09: « Fair value X - X: NON, +N% opportunity en vert »).
-      { type: "text", style: { text: opportunity(last.close, lo, hi, up), x: CARD_W - 16, y: CARD_H - 22, fill: colour, fontSize: 22, fontWeight: 600, fontFamily: FONT, align: "right", verticalAlign: "middle" }, z: 11 },
-    ],
-  });
-  const svg = chart.renderToSVGString();
-  chart.dispose();
-  return svg;
-}
-
-/**
- * The way to the fair value range as whole percents (Kevin 2026-11-09: « N-M% opportunity, N et M entiers, strictement
- * différents, strictement > 0 »): below fair value « +31-85% opportunity » (to the low, to the high of the range),
- * above it « 15-40% downside ». N is rounded down, M up, at least 1 and N + 1.
- */
-export function opportunity(price: number, low: number, high: number, up: boolean): string {
-  const near = up ? low / price - 1 : 1 - high / price;
-  const far = up ? high / price - 1 : 1 - low / price;
-  const n = Math.max(1, Math.floor(near * 100));
-  const m = Math.max(n + 1, Math.ceil(far * 100));
-  return up ? `+${n}-${m}% opportunity` : `${n}-${m}% downside`;
-}
-
-/** Pastes the price card on the chart, slightly turned like a cut-out, with a shadow. */
-function withCard(svg: string, card: string, x: number, y: number): string {
-  // As a PNG: resvg draws no text inside a nested SVG image (no fonts there). Twice the size for a sharp card.
-  const b64 = Buffer.from(new Resvg(card, { fitTo: { mode: "zoom", value: 2 }, font: { loadSystemFonts: false, fontFiles: FONTS, defaultFontFamily: FONT } }).render().asPng()).toString("base64");
-  const cx = x + CARD_W / 2;
-  const cy = y + CARD_H / 2;
-  return svg.replace(
-    "</svg>",
-    `<g transform="rotate(-2 ${cx} ${cy})"><rect x="${x + 6}" y="${y + 8}" width="${CARD_W}" height="${CARD_H}" fill="#000" fill-opacity="0.45"/><image href="data:image/png;base64,${b64}" x="${x}" y="${y}" width="${CARD_W}" height="${CARD_H}"/></g></svg>`,
-  );
 }

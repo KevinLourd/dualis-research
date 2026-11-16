@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as content from "@/db/schema/content";
-import { exhibits, fairValues } from "@/db/schema/analysis";
+import { exhibits, fairValues, narrativeStates } from "@/db/schema/analysis";
 import { judgments } from "@/db/schema/silver";
 import type { Complete } from "@/llm/complete";
 import * as gold from "@/db/schema/gold";
@@ -10,7 +10,9 @@ import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
 import { contentVisuals, pickVisualSubjects, renderSource, VISUALS_VERSION } from ".";
-import { chartSvg, exhibitSvg, gapWords, monthTicks, opportunity, signalCardSvg, timeAgo, toneOf, videoFrames } from "./render";
+import { chartSvg, exhibitSvg, montageSvg, monthTicks, storyBreakSvg, timeAgo, toneOf, videoFrames } from "./render";
+import { drawStoryBreak } from ".";
+import { storyBreak, storyHeadline } from "./story-break";
 import { COLOR } from "@/design/tokens";
 import { fetches as bronzeFetches } from "@/db/schema/bronze";
 import { CALLOUT_SYSTEM, calloutPoints, chartJudgeInput, parseCallout } from "./choose";
@@ -176,9 +178,7 @@ describe("the chart of an Idea", () => {
 });
 
 describe("visual helpers", () => {
-  it("says the gap in words and plays 7 seconds", () => {
-    expect(gapWords(2.16, 3.19)).toBe("32% below fair value");
-    expect(gapWords(12, 10)).toBe("20% above fair value");
+  it("plays 7 seconds", () => {
     const frames = videoFrames(30);
     expect(frames).toHaveLength(210);
     expect(frames[0]).toMatchObject({ reveal: 0 });
@@ -194,10 +194,13 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const [chart] = await db.select().from(content.contentVisuals).where(eq(content.contentVisuals.ideaId, ideaId)).then((r) => r.filter((v) => v.kind === "chart"));
     expect(chart.status).toBe("ok");
     const rows = await db.select().from(bronzeFetches).where(eq(bronzeFetches.subject, `idea:${ideaId}#chart`));
-    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: "CareCloud wins a big hospital back", title: "Clients just hit a record", chartLabel: "Hospitals that pay us", news: { index: 0, domain: "reuters.com" } });
+    expect((rows[0].request as { callout: unknown }).callout).toEqual({ point: "2025-12-31", from: null, note: "Clients back to 45", priceSays: "The biggest client is gone", newsLine: "CareCloud wins a big hospital back", title: "Clients just hit a record", chartLabel: "Hospitals that pay us", news: { index: 0, domain: "reuters.com" } });
     // The callout saw the points and the news with its publisher.
     expect(judge.callouts[0]).toContain("- 2025-12-31: 2025-12 Hospital clients 45");
     expect(judge.callouts[0]).toContain("- 0: Reuters: CCLD signs a new hospital client");
+    // It is never given a fair value (Thierry 2026-11-16), and told never to print one.
+    expect(judge.callouts.join("\n")).not.toMatch(/fair value|3\.19/i);
+    expect(CALLOUT_SYSTEM).toContain("Never a fair value, a gap to it, an upside, a price target or the word opportunity.");
     // It knows what the price says and the drivers it could break.
     expect(judge.callouts[0]).toContain("What the price says (pessimistic narrative): The market thinks CCLD lost its biggest client.");
     expect(judge.callouts[0]).toContain("- 0: Client loss: Revenue fell 20%.");
@@ -222,41 +225,41 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     // With a news inset the claim is not repeated over the chart; without one it heads it.
     expect(svg).not.toContain("Clients just hit a record");
     expect(exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner: null })).toContain("Clients just hit a record");
-    // The price card is pasted on top (a PNG), and says the ticker's Signal.
-    expect(svg).toContain('<image href="data:image/png;base64,');
+    // No price card, no fair value anywhere on a picture (Thierry 2026-11-16): the input does not even carry one.
     expect(input.signal).toBe("BUY");
-    const card = signalCardSvg(input);
-    for (const t of ["BUY signal", "% opportunity", "+", "CareCloud: share price vs fair value"]) expect(card).toContain(t);
-    expect(card).not.toContain("Fair value 2.6 to 3.8");
-    expect(opportunity(2.6, 3.4, 4.8, true)).toBe("+30-85% opportunity");
-    // Whole, strictly different, strictly above 0: a price inside the range still reads 1 to the low.
-    expect(opportunity(3.5, 3.4, 3.51, true)).toBe("+1-2% opportunity");
-    expect(opportunity(12, 8, 10, false)).toBe("16-34% downside");
-    expect(signalCardSvg({ ...input, signal: null })).toMatch(/\d+% below</);
+    expect("fair" in input).toBe(false);
+    expect(svg).not.toContain("rotate(-2");
     expect(svg.toLowerCase()).toContain(COLOR.long.dark.toLowerCase());
-    const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "short", banner: null });
+    const price = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Shares fell 20% in two months", tone: "short", banner: null });
     expect(price).toContain("Sold off");
+    expect(price).toContain("Shares fell 20% in two months");
     expect(price.toLowerCase()).toContain(COLOR.short.dark.toLowerCase());
-    // The price chart has the driver charts' layout: the Signal and the way to the range top right, the BREAKING card.
-    expect(price).toContain("32% under fair value");
-    // The same pasted price card as the driver charts (a PNG: the card's words are inside it).
-    expect(price).toContain('<image href="data:image/png;base64,');
-    const priceNews = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "long", banner });
-    for (const t of ["BREAKING", "REUTERS", "CareCloud signs a new", "CareCloud: Hospitals that pay us", '<image href="data:image/png;base64,']) expect(priceNews).toContain(t);
+    const priceNews = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Shares fell 20% in two months", tone: "long", banner });
+    for (const t of ["BREAKING", "REUTERS", "CareCloud signs a new", "CareCloud: Hospitals that pay us"]) expect(priceNews).toContain(t);
+    for (const s of [svg, price, priceNews, montageSvg(input)]) expect(s).not.toMatch(/fair value|opportunity|upside|downside|3\.19/i);
+    // Two compared periods: both boxed, the change on the arrow between them (« 31 → 45 (+45%) »).
+    const compared = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients up 45% in two years", tone: "long", banner: null, highlight: ["2023-12-31", "2025-12-31"], compareFrom: "2023-12-31" });
+    expect(compared).toContain("31 → 45 (+45%)");
     // Month axis: « Sep-25 », every tick a different month.
     const ticks = monthTicks(Date.UTC(2025, 10, 7), Date.UTC(2026, 10, 6));
     expect(ticks.map((t) => new Date(t).toISOString().slice(0, 7))).toEqual(["2026-01", "2026-03", "2026-05", "2026-07", "2026-09", "2026-11"]);
     expect(monthTicks(Date.UTC(2026, 8, 7), Date.UTC(2026, 10, 6))).toHaveLength(2);
-    expect(priceNews).not.toContain("32% under fair value");
-    // The X post chart (skill x-post): the same point, arrow and note, no news card, no pasted price card, a factual title.
-    const xPrice = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "32% under fair value", tone: "long", banner, style: "pro" });
+    // The X post chart (skill x-post): the same point, arrow and note, no news card, a factual title.
+    const xPrice = chartSvg(input, undefined, { point: input.bars[10].date, note: "Sold off", ...say, title: "Shares fell 20% in two months", tone: "long", banner, style: "pro" });
     for (const t of ["Sold off", "VS price narrative", "CareCloud: Hospitals that pay us"]) expect(xPrice).toContain(t);
-    for (const t of ["BREAKING", "REUTERS", "32% under fair value", '<image href="data:image/png;base64,']) expect(xPrice).not.toContain(t);
+    for (const t of ["BREAKING", "REUTERS", "Shares fell 20%"]) expect(xPrice).not.toContain(t);
     const xExhibit = exhibitSvg(input, input.exhibits[0], { point: "2025-12-31", note: "Clients back to 45", ...say, title: "Clients just hit a record", tone: "long", banner, style: "pro" });
     expect(xExhibit).toContain("Clients back to 45");
-    expect(xExhibit).toContain("below fair value");
+    // Its grey line: the periods it covers, as reported (it said the gap to fair value before 2026-11-16).
+    expect(xExhibit).toContain("FY22 to FY25, as reported");
+    expect(xExhibit).not.toMatch(/fair value/i);
     for (const t of ["BREAKING", "Clients just hit a record", '<image href="data:image/png;base64,']) expect(xExhibit).not.toContain(t);
     if (process.env.RENDER_SAMPLE) (await import("node:fs")).writeFileSync(process.env.RENDER_SAMPLE, priceNews);
+    if (process.env.RENDER_DIR) {
+      const { writeFileSync } = await import("node:fs");
+      const { png } = await import("./render");
+      for (const [name, s] of Object.entries({ "breaking-exhibit": svg, "compared-exhibit": compared, "breaking-price": priceNews, "x-chart-exhibit": xExhibit, "x-chart-price": xPrice, "post-card": montageSvg(input) })) writeFileSync(`${process.env.RENDER_DIR}/${name}.png`, png(s));
+    }
     expect(() => exhibitSvg(input, input.exhibits[0], { point: "1999-12-31", note: "x", ...say, title: "y", tone: "long", banner: null })).toThrow(/not a period/);
   });
 
@@ -265,7 +268,7 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     const base = { note: "n", priceSays: "p", title: "t", chartLabel: "c" };
     expect(() => parseCallout(JSON.stringify({ ...base, point: "2020-01-01", news: null }), points, 0)).toThrow(/not on the chart/);
     expect(() => parseCallout(JSON.stringify({ ...base, point: "2025-12-31", news: null }), points, 1)).toThrow(/news index/);
-    expect(parseCallout(JSON.stringify({ ...base, note: "n — m", point: "2025-12-31", newsLine: "A hospital comes back", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1)).toEqual({ point: "2025-12-31", note: "n, m", priceSays: "p", newsLine: "A hospital comes back", title: "t", chartLabel: "c", news: { index: 0, domain: "www.ft.com" } });
+    expect(parseCallout(JSON.stringify({ ...base, from: "2025-12-31", note: "n — m", point: "2025-12-31", newsLine: "A hospital comes back", news: { index: 0, domain: "https://www.ft.com/x" } }), points, 1)).toEqual({ point: "2025-12-31", from: null, note: "n, m", priceSays: "p", newsLine: "A hospital comes back", title: "t", chartLabel: "c", news: { index: 0, domain: "www.ft.com" } });
     expect(timeAgo(new Date("2026-11-09T10:00:00Z"), new Date("2026-11-09T12:10:00Z"))).toBe("2h ago");
     expect(timeAgo(new Date("2026-11-06T10:00:00Z"), new Date("2026-11-09T12:00:00Z"))).toBe("3d ago");
     // The price callout offers what the daily line shows: the latest close (its end label), the 12-month high and low.
@@ -282,5 +285,36 @@ describe("the chart shouts (Kevin 2026-11-09)", () => {
     expect(pts.find((p) => p.id === "2026-03-05")?.label).toContain("12-month low");
     expect(pts.map((p) => p.id)).toContain("2026-02-27");
     expect(CALLOUT_SYSTEM).toContain("the note's main number IS that point's value");
+    expect(parseCallout(JSON.stringify({ ...base, from: "2024-12-31", point: "2025-12-31", news: null }), [...points, { id: "2024-12-31", label: "y" }], 0).from).toBe("2024-12-31");
+  });
+});
+
+describe("the story-break frame (Thierry 2026-11-16: real figures, never our fair value)", () => {
+  it("heads with the signal's words and the reported figures, in the 6 looks, never a price, fair value or opportunity", async () => {
+    await addExhibits();
+    await db.insert(narrativeStates).values({ id: "CCLD:long:driver:1", symbol: "CCLD", side: "long", level: "driver", driverId: "CCLD:long:1", effect: "reversal", strength: "strong", why: "w", probability: 0.9, evidenceIds: [], headline: "Hospital clients up to 45 from 31 in 2023", judgmentId: crypto.randomUUID(), asOf: new Date() });
+    // The fair value in gold (3.19) is never read by the frame.
+    const story = (await storyBreak(db, "CCLD"))!;
+    expect(story.signal).toEqual({ signal: "BUY", strength: "strong" });
+    expect(story.drivers.map((d) => d.headline)).toEqual(["Hospital clients up to 45 from 31 in 2023"]);
+    expect(storyHeadline(story, "balanced")).toBe("BUY · Strong inflection · 1 reported figure against the story");
+    expect(storyHeadline(story, "urgent")).toBe("STRONG INFLECTION: BUY");
+    expect(storyHeadline(story, "neutral")).toBe("BUY, strong inflection. 1 reported figure against the story.");
+    expect(storyHeadline({ ...story, signal: null }, "balanced")).toBe("Strong inflection · 1 reported figure against the story");
+    for (const tone of ["urgent", "balanced", "neutral"] as const) {
+      for (const channel of ["x", "substack"] as const) {
+        const { svg } = storyBreakSvg({ company: "CareCloud", headline: storyHeadline(story, tone), up: true, intro: "i", panels: [{ narrative: "Client loss", reality: "Hospital clients up to 45 from 31 in 2023", tag: "STRONG INFLECTION", png: PNG_1PX }], sources: "Source: SEC", look: { tone, channel } });
+        expect(svg).not.toMatch(/fair value|opportunity|upside|downside|3\.19/i);
+      }
+    }
+    const pic = await drawStoryBreak({ ...story, drivers: story.drivers.map((d) => ({ ...d, base: "2023-12-31" })) }, { tone: "balanced", channel: "x" });
+    expect(pic.caption).toBe("Story break: Client loss");
+    if (process.env.RENDER_DIR) {
+      const { writeFileSync } = await import("node:fs");
+      for (const tone of ["urgent", "balanced", "neutral"] as const) for (const channel of ["x", "substack"] as const) {
+        const p = await drawStoryBreak({ ...story, drivers: story.drivers.map((d) => ({ ...d, base: "2023-12-31" })) }, { tone, channel });
+        writeFileSync(`${process.env.RENDER_DIR}/story-${tone}-${channel}.png`, p.file);
+      }
+    }
   });
 });
