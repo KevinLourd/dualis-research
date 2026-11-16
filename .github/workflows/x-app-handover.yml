@@ -1,0 +1,50 @@
+# Throwaway (X-APP-HANDOVER-1116): encrypts the X app's client id + secret with
+# the distribute.you session's RSA public key and uploads ONLY the ciphertext.
+# Removed from main right after its one run.
+name: x-app-handover
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  handover:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Encrypt X app credentials
+        env:
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$X_CLIENT_ID" ] || [ -z "$X_CLIENT_SECRET" ]; then echo "missing secret"; exit 1; fi
+          cat > pub.pem <<'EOF'
+          -----BEGIN PUBLIC KEY-----
+          MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApGe5OIk2pLMUmoTgL89X
+          tnZyn9XC/YCTQiKVsCdi79pn/Q1Bqzjbiw1g6x58hP0SiHZuCxy1HtEqifskGYg/
+          IFPTEb3+6sXtlo0OvJIEgx+henX4FvGUVLrEvVfS55edo0yDP4dRJdagO07hZKhs
+          QCL5Jj48lM93Ul9bbEu8Ao0ZGlX+wpblHbm3faJCe98ppRJISpJUrc5ktqDd9WMj
+          e3xEtoxrAWdW08j+HEs6MUnN9hGsG9j1ehoR4exSXNOMKvia2lG79Yi3EY3topKd
+          MIpeq/hTOGM6XIs0Zp0GZzD2bDPAs+v0L+4KQnnUzKjbmSHLBWVOWwflkyDS2T87
+          EjreKE93PYkXkG/2zucgxTyf/SJfXUc0+mu/3P8YNDZldREJs2Nm8v+3DxBNEDEd
+          0e+CVf2x7vahKuc97vezkHM7U3qymFSa5lIh4y/ZjFGcjUsRwtrN9u3GDSJE2/jj
+          ySnGDJM5KOFHzuGFujmrsHV8IGjLKmjPaB0fSVcVeoaQmsSiEVBbDRc+epjxlhHQ
+          cBLYJUXRedNJzoRLsLGxu2GlwFVmq7nYUQRi/1IuH5uqA2ng0JcLUO8oue+fn6Yf
+          53UF7GioyDLimsYWuwV0l8Otz4YnGbsYDCpQiz7a93dD9Gym7IFyI8JxLLVme93S
+          t9QhuPe9/auu9iRiWspCMb8CAwEAAQ==
+          -----END PUBLIC KEY-----
+          EOF
+          sed -i 's/^ *//' pub.pem
+          jq -cn --arg id "$X_CLIENT_ID" --arg secret "$X_CLIENT_SECRET" '{clientId:$id,clientSecret:$secret}' > plain.json
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -in plain.json -out x-app.enc
+          rm -f plain.json
+          echo "ciphertext bytes: $(wc -c < x-app.enc)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x-app-handover
+          path: x-app.enc
+          retention-days: 1
+          if-no-files-found: error
