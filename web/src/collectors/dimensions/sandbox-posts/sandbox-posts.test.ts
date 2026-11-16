@@ -364,4 +364,34 @@ describe("sandbox-posts", () => {
     const [r] = (await db.select().from(sandbox.sandboxReviews)).filter((x) => !x.pass);
     expect(r.edits).toMatchObject([{ applied: false, reason: expect.stringMatching(/not found/) }]);
   }, 60_000);
+
+  it("review: an edit replaces a rule; one that appends dated round history or grows the skill past its bound is refused", async () => {
+    const { refuseEdit, SKILL_MAX_BYTES } = await import("../sandbox-review");
+    const skill = "# X\n- **note**: the number with its unit (Kevin 2026-11-11).\n";
+    const old = "- **note**: the number with its unit (Kevin 2026-11-11).";
+    expect(refuseEdit(skill, { old, new: "- **note**: the number with its unit and period (Kevin 2026-11-11)." })).toBeNull();
+    expect(refuseEdit(skill, { old, new: `${old} (round 3 of 2026-11-16 drew SuperCom without it)` })).toMatch(/dated history/);
+    expect(refuseEdit(skill, { old, new: `${old} SuperCom failed again in round 5.` })).toMatch(/dated history/);
+    expect(refuseEdit(skill, { old, new: `${old} ${"Say the unit. ".repeat(30)}` })).toMatch(/grows the skill by \d+ characters/);
+    const full = `${"x".repeat(SKILL_MAX_BYTES - 100)}\n${old}\n`;
+    expect(refuseEdit(full, { old, new: `${old} Name the period.`.padEnd(old.length + 200, ".") })).toMatch(/ceiling/);
+    // Shortening an oversized skill is always allowed.
+    expect(refuseEdit(full, { old, new: "- **note**: the number and unit." })).toBeNull();
+  });
+
+  it("review: a refused edit is kept in the review with its reason and leaves the skill as it was", async () => {
+    await run(sandboxAccounts);
+    reviewPlan.fail = "Siren Small Caps », X,";
+    const skill = join(skillsDir, "x-urgent/SKILL.md");
+    await writeFile(skill, `${await readFile(skill, "utf8")}\n- **test line**: the note says the number.\n`);
+    const before = await readFile(skill, "utf8");
+    reviewPlan.edit = { skill: "x-urgent", old: "- **test line**: the note says the number.", new: "- **test line**: the note says the number (round 2 of 2026-11-16 drew SuperCom without it)." };
+    await run(sandboxPosts);
+    await run(sandboxVisuals);
+    await run(sandboxImageFix);
+    await run(sandboxReview);
+    const [r] = (await db.select().from(sandbox.sandboxReviews)).filter((x) => !x.pass);
+    expect(r.edits).toMatchObject([{ applied: false, reason: expect.stringMatching(/dated history/) }]);
+    expect(await readFile(skill, "utf8")).toBe(before);
+  }, 60_000);
 });

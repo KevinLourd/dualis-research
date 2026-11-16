@@ -19,13 +19,15 @@ One sentence per post: what the reader sees, and the exact failure (« the pictu
 
 ## A drawing defect is not a writing defect
 Cut or overlapping text, a box over the line, a number lost in a card: the writer did not cause it and no skill edit fixes it. The check still FAILS, its why starts with « Drawing: » and names the exact element (« Drawing: the price card pill reads "% below fair val", its number is cut »), and no edit is made for it. The run reports every « Drawing: » line so the code gets fixed.
+**The opportunity frame is drawn by the code, never by the writer**: when the company has drivers reversing now, the picture (price vs fair value with its « +N-M% » range, then NARRATIVE / REALITY blocks) comes from the analysis whatever `image` the writer sent (content-matrix « The picture »). A failure of that picture is a « Drawing: the frame … » line, never a skill edit: no wording makes the writer avoid it.
 
 ## Edits: fix the skill, never the post
 On any failure, edit the writing skill whose rule would have prevented it:
 - A rule every tone needs (pictures standing alone, alignment, plain words) -> `content-matrix` (its « The picture » or « Rules every post keeps »).
 - A rule of one tone's look or words -> that channel x tone skill (its Image section or its format section).
 - A rule of one angle -> that angle skill.
-Each edit = `old` copied character for character from the file (enough to be unique), `new` = the replacement, `why` = the failure in one line. Prefer sharpening an existing line over adding one; keep each file about the same size (cut the line the new one supersedes). Name the observable fix (« the note names the measure: "Profit $4.7M in Q3" »), never a vague wish (« be clearer »). Never an edit that makes the writer invent data, drop the risk section, or break a house rule.
+Each edit = `old` copied character for character from the file (enough to be unique), `new` = the replacement, `why` = the failure in one line.
+**An edit REPLACES the rule, never appends its history.** `new` states the rule once, as a general principle the writer applies to any company on any day: never a date, a round number (« round 3 of … »), the day's companies (« SuperCom, CareCloud and Enviri were drawn… »), what failed before, or a « void / ignore the above » note. A rule the writer keeps breaking needs a SHORTER, clearer statement, never a louder or longer one: rewrite the line whole and cut what it supersedes. Each file stays about the same size: the code refuses (and keeps in the review with its reason) an edit that adds a date or « round N », grows its file by more than 300 characters, or takes it past 10,000 bytes. Name the observable fix (« the note names the measure: "Profit $4.7M in Q3" »), never a vague wish (« be clearer »). Never an edit that makes the writer invent data, drop the risk section, or break a house rule.
 When everything passes, edits = [].
 
 ## How it runs
