@@ -44,8 +44,10 @@ export const NARRATIVE_STATE_DIMENSION = "narrative-state";
  * v8 (Kevin 2026-11-18: « résumée très clairement et le plus concisément possible en haut »; the judge wrote ~30 words
  * against a 20-word instruction): the judge no longer writes the reason; a second call on its finished judgment does
  * (`writeReason`, at most 15 words), never a validator or a retry.
+ * v9 (2026-11-18: a reason said « temporary » beside a Structural badge): one source per fact, the reason states the
+ * business cause and the figure only; durability and size stay the judge's fields (badges), never in the sentence.
  */
-export const DRIVER_STATE_QUESTION = "driver-state@v8";
+export const DRIVER_STATE_QUESTION = "driver-state@v9";
 /** The reason at the top of the driver panel: at most this many words (stated in `writeReason`'s prompt). */
 export const REASON_WORDS = 15;
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. v3: reads each driver's durability and magnitude. */
@@ -256,19 +258,24 @@ export const memoryStore = (): JudgmentStore => {
 };
 
 const REASON_SYSTEM = "You write the one line at the top of an equity research panel. Answer with JSON only, no prose, no code fence. Plain English, no em dash.";
-/** The prompt of the reason writer: the finished judgment of one driver in, its top line out. */
-export function reasonPrompt(a: Pick<Answer, "tag" | "durability" | "magnitude" | "headline" | "explanation" | "why">): string {
+/**
+ * The prompt of the reason writer: the finished judgment of one driver in, its top line out. One source per fact
+ * (2026-11-18: a reason said « temporary » beside a Structural badge): durability and size are the judge's fields, shown
+ * as badges beside the line, so the writer never sees nor writes them; it states the business cause and the figure.
+ */
+export function reasonPrompt(a: Pick<Answer, "tag" | "magnitude" | "headline" | "explanation" | "why">): string {
   const m = a.magnitude;
   return [
     "A judge has finished reading where one reason the market holds about a company stands now. Its judgment:",
-    `State: ${a.tag}${a.durability && a.durability !== "n-a" ? `, ${a.durability}` : ""}.`,
-    m ? `Size: ${m.figure}${m.from && m.to ? ` ${m.from} to ${m.to}` : ""}${m.change ? ` (${m.change})` : ""}, ${m.size}.` : "Size: no figure.",
+    `State: ${a.tag}.`,
+    m ? `Figure: ${m.figure}${m.from && m.to ? ` ${m.from} to ${m.to}` : ""}${m.change ? ` (${m.change})` : ""}.` : "Figure: none.",
     a.headline ? `Headline: ${a.headline}` : null,
     `Explanation: ${a.explanation ?? a.why ?? ""}`,
     "",
     `Write the reason a reader sees first, summarised as clearly and as briefly as possible: ONE sentence of at most ${REASON_WORDS} words, subject verb complement.`,
-    "It says the business cause (why it moved, never only that it moved), then whether it lasts (structural or temporary) and how big, when the judgment gives them; when nothing turned, it says so about this subject.",
-    'Example: "Backlog doubled on two multi-year contracts: structural, material."',
+    "It states the business cause and the figure it moved (why it moved, never only that it moved); when nothing turned, it says so about this subject.",
+    "Whether the change lasts and how big it is are shown beside your line as their own badges, decided by the judge: never write them (no structural, temporary, lasting, one-off, material, small, big), so the page never says it twice or two ways.",
+    'Example: "Cotton cost relief lifted Q3 margin to 16.7%."',
     'JSON: {"reason": "<the sentence>"}',
   ]
     .filter((x) => x !== null)
@@ -276,7 +283,7 @@ export function reasonPrompt(a: Pick<Answer, "tag" | "durability" | "magnitude" 
 }
 
 /** The second call on a finished driver judgment: its top-line reason. Its answer is taken as written (dashes stripped). */
-export async function writeReason(complete: Complete, a: Pick<Answer, "tag" | "durability" | "magnitude" | "headline" | "explanation" | "why">): Promise<string | null> {
+export async function writeReason(complete: Complete, a: Pick<Answer, "tag" | "magnitude" | "headline" | "explanation" | "why">): Promise<string | null> {
   const r = await complete({ system: REASON_SYSTEM, prompt: reasonPrompt(a) });
   const o = JSON.parse(firstJsonObject(r.text)) as { reason?: unknown };
   return typeof o.reason === "string" && o.reason.trim() ? stripDashes(o.reason.trim()) : null;
