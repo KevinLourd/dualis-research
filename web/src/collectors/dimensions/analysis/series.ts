@@ -38,6 +38,9 @@ const METRIC_NAMES: Record<string, string> = {
   "remaining-performance-obligations-to-revenue": "Remaining performance obligations / last 12 months revenue",
   "remaining-performance-obligations-growth": "Remaining performance obligations growth",
   "book-to-bill": "Book-to-bill",
+  "net-debt-to-ebitda": "Net debt / EBITDA",
+  "total-debt-to-ebitda": "Total debt / EBITDA",
+  "interest-cover": "Interest cover (operating income / interest expense)",
 };
 
 export async function seriesCatalog(db: Db, symbol: string): Promise<Map<string, StoredSeries>> {
