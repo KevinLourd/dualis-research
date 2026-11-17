@@ -15,7 +15,7 @@ import { ExhibitChart } from "./driver-chart";
 import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
-import { day, price, relativeTime, utc } from "./format";
+import { day, numberFormat, price, relativeTime, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
 import { getThesis } from "./thesis-queries";
@@ -94,7 +94,7 @@ function Kpis({ symbol, rows }: { symbol: string; rows: GoldConsensus[] }) {
   for (const r of rows) if (r.mean !== null && !latest.has(r.metric)) latest.set(r.metric, r);
   if (latest.size === 0) return <p className="text-lg text-kumo-subtle">No free source publishes analyst estimates for this ticker.</p>;
   const fmt = (metric: string, v: number | null) =>
-    v === null ? "–" : metric === "eps" ? v.toFixed(2) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
+    v === null ? "–" : metric === "eps" ? v.toFixed(2) : numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(v);
   return (
     <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
       <KTable>

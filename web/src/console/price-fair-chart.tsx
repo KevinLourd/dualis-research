@@ -8,6 +8,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import { useMemo, useState } from "react";
 import { FONT, INK, SOURCE_LABEL } from "./driver-chart";
 import { monthYear } from "./exhibit-format";
+import { dateFormat, numberFormat } from "./format";
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
@@ -24,8 +25,8 @@ type Range = "6M" | "1Y" | "5Y";
 const MONTHS: Record<Range, number> = { "6M": 6, "1Y": 12, "5Y": 60 };
 const ZONE = { buy: "rgba(22, 128, 61, 0.06)", sell: "rgba(190, 18, 60, 0.06)", range: "rgba(43, 36, 99, 0.10)" };
 
-const fmtNum = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 });
-const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const fmtNum = (v: number) => numberFormat({ maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 }).format(v);
+const day = (d: string) => dateFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
 function startOf(last: string, months: number): string {
   const d = new Date(`${last}T00:00:00Z`);

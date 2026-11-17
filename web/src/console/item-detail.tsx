@@ -12,7 +12,7 @@ import { EvidenceRows, Exhibit, itemHref, metricLabel, PRICED_WORD } from "./ana
 import { reactionLine } from "@/collectors/dimensions/market-reaction/compute";
 import { DriverExhibit, ExhibitChart } from "./driver-chart";
 import { formatUnit } from "./exhibit-format";
-import { day, price, utc } from "./format";
+import { day, numberFormat, price, utc } from "./format";
 import { Section } from "./signal";
 import { Fact, FactList, SourceTags } from "./ui";
 import { sourceNote } from "./source-labels";
@@ -131,7 +131,7 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
   const annual = rows.filter((r) => r.periodType === "year");
   const series = (annual.some((r) => r.actual !== null) ? annual : rows.filter((r) => r.periodType === "quarter")).filter((r) => r.actual !== null);
   const period = series[0]?.periodType === "year" ? "annual" : "quarterly";
-  const fmt = (v: number | null) => (v === null ? "–" : metric === "eps" ? v.toFixed(2) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v));
+  const fmt = (v: number | null) => (v === null ? "–" : metric === "eps" ? v.toFixed(2) : numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(v));
   const sources = [...new Set(rows.flatMap((r) => Object.values(r.provenance).flatMap((p) => p.sources)))];
   const currency = rows.find((r) => r.currency)?.currency ?? null;
   return {
@@ -329,7 +329,7 @@ function peerColumn(method: string, multiple: string | undefined): { label: stri
 }
 const premium = (x: number) => (Math.abs(x) < 0.005 ? "at the median" : `${Math.round(Math.abs(x) * 100)}% ${x > 0 ? "premium" : "discount"}`);
 const ratio = (x: number | null | undefined) => (x === null || x === undefined ? "–" : `${(x * 100).toFixed(1)}%`);
-const compact = (x: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(x);
+const compact = (x: number) => numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(x);
 
 /** One Valuation Method on the ticker (level C): its range, assumptions with why, the calculation step by step, its chart, inputs and report. */
 async function methodItem(symbol: string, method: string): Promise<ItemView | null> {

@@ -1,4 +1,5 @@
 /** Exhibit labels and values, shared by server pages and the client chart (pure). */
+import { numberFormat } from "./format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const monthYear = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]}-${d.slice(2, 4)}`;
@@ -14,7 +15,7 @@ export function periodLabel(date: string, period: ExhibitPeriod): string {
 
 export function formatExhibitValue(v: number, unit: string | null, compact = true): string {
   if (unit === "%") return `${v.toFixed(1)}%`;
-  const n = new Intl.NumberFormat("en-US", compact ? { notation: "compact", maximumFractionDigits: 1 } : { maximumFractionDigits: 2 }).format(v);
+  const n = numberFormat(compact ? { notation: "compact", maximumFractionDigits: 1 } : { maximumFractionDigits: 2 }).format(v);
   return unit ? `${n} ${unit}` : n;
 }
 
@@ -23,8 +24,8 @@ export type ExhibitUnit = "currency" | "ratio" | "multiple" | "per-share" | "cou
 export function formatUnit(v: number, unit: ExhibitUnit, currency: string | null): string {
   if (unit === "ratio") return `${(v * 100).toFixed(1)}%`;
   if (unit === "multiple") return `${v.toFixed(1)}x`;
-  if (unit === "per-share") return `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}`;
-  const n = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
+  if (unit === "per-share") return `${numberFormat({ maximumFractionDigits: 2 }).format(v)}${currency ? ` ${currency}` : ""}`;
+  const n = numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(v);
   return unit === "currency" && currency ? `${n} ${currency}` : n;
 }
 

@@ -1,8 +1,29 @@
 /** Display helpers for the console. Pure, so pages and tests share them. */
 
+/**
+ * One Intl formatter per option set, built once per isolate. Building one costs ~0.1 ms of CPU and a page formats
+ * hundreds of dates and numbers: on the Workers free plan (10 ms CPU a request) that alone ended renders
+ * (2026-11-17: the fair-value panel answered 1102). Never call `new Intl.*` or `toLocale*String(locale, options)` in a
+ * render path: use these.
+ */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+export function numberFormat(options: Intl.NumberFormatOptions = {}): Intl.NumberFormat {
+  const key = JSON.stringify(options);
+  let f = numberFormats.get(key);
+  if (!f) numberFormats.set(key, (f = new Intl.NumberFormat("en-US", options)));
+  return f;
+}
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+export function dateFormat(locale: "en-GB" | "en-US", options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = locale + JSON.stringify(options);
+  let f = dateFormats.get(key);
+  if (!f) dateFormats.set(key, (f = new Intl.DateTimeFormat(locale, options)));
+  return f;
+}
+
 export function compactMoney(value: number | null, currency: string | null): string | null {
   if (value === null) return null;
-  const n = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+  const n = numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(value);
   return currency ? `${n} ${currency}` : n;
 }
 
@@ -42,7 +63,7 @@ export const MARKET_LABEL: Record<string, string> = {
 export function price(value: number | null, currency?: string | null): string | null {
   if (value === null) return null;
   const digits = Math.abs(value) < 1 ? 4 : Math.abs(value) >= 1000 ? 0 : 2;
-  const n = new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+  const n = numberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
   return currency ? `${n} ${currency}` : n;
 }
 
@@ -55,11 +76,11 @@ export function signedPct(ratio: number | null): string | null {
 
 /** "+11,149" / "-6,667". */
 export function signedCount(n: number): string {
-  return `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n).toLocaleString("en-US")}`;
+  return `${n > 0 ? "+" : n < 0 ? "-" : ""}${numberFormat().format(Math.abs(n))}`;
 }
 
 /** "4 Nov 2026" from "2026-11-04" or a Date. */
 export function day(value: string | Date): string {
   const d = typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00Z`) : value;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return dateFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(d);
 }

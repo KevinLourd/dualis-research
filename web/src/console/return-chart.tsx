@@ -1,4 +1,5 @@
 "use client";
+import { dateFormat } from "./format";
 
 import { TimeseriesChart } from "@cloudflare/kumo";
 import { LineChart } from "echarts/charts";
@@ -40,7 +41,7 @@ export function ReturnChart({ lines }: { lines: Line[] }) {
       data={data}
       yAxisTickFormat={pct}
       tooltipValueFormat={pct}
-      xAxisTickFormat={(t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}
+      xAxisTickFormat={(t) => dateFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(t))}
       tooltipTimestampFormat={(t) => new Date(t).toISOString().slice(0, 10)}
       xAxisTickCount={6}
       yAxisTickCount={5}
