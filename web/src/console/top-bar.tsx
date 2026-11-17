@@ -1,5 +1,5 @@
-import { UserButton } from "@clerk/nextjs";
 import Link from "@/console/link";
+import { UserMenu } from "./user-menu";
 import { KSidebarTrigger } from "./kumo";
 import { relativeTime, utc } from "./format";
 import { type PaletteTicker, TickerSearch } from "./command-palette";
@@ -35,7 +35,7 @@ export function TopBar({ tickers, lastRun }: { tickers: PaletteTicker[]; lastRun
             <span>No collection yet</span>
           )}
         </Link>
-        <UserButton />
+        <UserMenu />
       </div>
     </header>
   );
