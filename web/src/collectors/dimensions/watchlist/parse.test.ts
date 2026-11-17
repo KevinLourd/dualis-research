@@ -21,6 +21,10 @@ describe("marketOf", () => {
     ["EOS.AX", "AU"],
     ["ALLOG.PA", "EU"],
     ["LPK.DE", "EU"],
+    ["SMSH.TA", "IL"],
+    ["CDR.WA", "EU"],
+    ["2330.TW", "TW"],
+    ["VNM.VN", "VN"],
   ])("%s -> %s", (symbol, market) => {
     expect(marketOf(symbol)).toBe(market);
   });

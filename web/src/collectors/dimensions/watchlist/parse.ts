@@ -1,4 +1,4 @@
-export type Market = "US" | "CA" | "JP" | "KR" | "UK" | "HK" | "AU" | "EU";
+export type Market = "US" | "CA" | "JP" | "KR" | "UK" | "HK" | "AU" | "EU" | "IL" | "TW" | "VN";
 
 const SUFFIX_MARKET: Record<string, Market> = {
   T: "JP",
@@ -15,6 +15,11 @@ const SUFFIX_MARKET: Record<string, Market> = {
   AS: "EU",
   MI: "EU",
   SW: "EU",
+  WA: "EU",
+  // No free registry or profile source routed for these yet: Yahoo answers them (prices, profile, statements).
+  TA: "IL",
+  TW: "TW",
+  VN: "VN",
 };
 
 /** Market from the exchange suffix Thierry's tickers use (no suffix = US). */

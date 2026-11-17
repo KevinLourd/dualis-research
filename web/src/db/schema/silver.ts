@@ -18,7 +18,7 @@ import {
  */
 export const silver = pgSchema("silver");
 
-export const marketEnum = silver.enum("market", ["US", "CA", "JP", "KR", "UK", "HK", "AU", "EU"]);
+export const marketEnum = silver.enum("market", ["US", "CA", "JP", "KR", "UK", "HK", "AU", "EU", "IL", "TW", "VN"]);
 export const positionEnum = silver.enum("position", ["long", "short", "watch"]);
 export const authorEnum = silver.enum("author", ["thierry", "claude"]);
 export const thesisStatusEnum = silver.enum("thesis_status", ["draft", "approved"]);
