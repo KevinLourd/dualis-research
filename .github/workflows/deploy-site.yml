@@ -21,6 +21,8 @@ jobs:
         working-directory: site
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # The OpenNext build/deploy runs wrangler locally, which wants a local stand-in for the Hyperdrive binding.
+      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: ${{ secrets.DATABASE_URL }}
       SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
