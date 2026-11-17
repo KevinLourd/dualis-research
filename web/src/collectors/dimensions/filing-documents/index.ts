@@ -21,19 +21,26 @@ export const MAX_PER_TICKER = 6;
 /** Documents per run, all tickers together (each one's newest first). */
 export const MAX_PER_RUN = 120;
 export const MAX_ATTEMPTS = 3;
+/**
+ * TDnet serves a release's PDF about a month (then 404, measured 2026-11-18 on Miraial: every PDF older than ~2 months
+ * gone). An older one is never asked: it would spend the ticker's budget on a sure 404 ahead of its EDINET reports.
+ */
+export const TDNET_KEEP_DAYS = 31;
 
 /** The filings still to read: newest first per analysed ticker, interleaved so every ticker gets its latest. */
 export async function documentSubjects(db: Db, now = new Date()): Promise<string[]> {
   const symbols = await analysedSymbols(db);
   if (symbols.length === 0) return [];
   const since = new Date(now.getTime() - YEARS * 365.25 * 86_400_000);
+  const tdnetSince = now.getTime() - TDNET_KEEP_DAYS * 86_400_000;
   const rows = await db
-    .select({ id: filings.id, symbol: filings.symbol, registry: filings.registry, form: filings.form, title: filings.title, status: filingDocuments.status, attempts: filingDocuments.attempts })
+    .select({ id: filings.id, symbol: filings.symbol, registry: filings.registry, form: filings.form, title: filings.title, filedAt: filings.filedAt, status: filingDocuments.status, attempts: filingDocuments.attempts })
     .from(filings)
     .leftJoin(filingDocuments, eq(filingDocuments.filingId, filings.id))
     .where(and(inArray(filings.symbol, symbols), gte(filings.filedAt, since), isNotNull(filings.url)))
     .orderBy(desc(filings.filedAt));
-  const todo = rows.filter((r) => documentKind(r) && (r.status === null || (r.status === "failed" && (r.attempts ?? 0) < MAX_ATTEMPTS)));
+  const served = (r: (typeof rows)[number]) => r.registry !== "tdnet" || r.filedAt.getTime() >= tdnetSince;
+  const todo = rows.filter((r) => documentKind(r) && served(r) && (r.status === null || (r.status === "failed" && (r.attempts ?? 0) < MAX_ATTEMPTS)));
   const perTicker = new Map<string, typeof todo>();
   for (const r of todo) {
     const list = perTicker.get(r.symbol) ?? [];
