@@ -9,6 +9,8 @@
   // dualisresearch.com + www reach this Worker through the dualis-relay Worker on Thierry's Cloudflare account (CLAUDE.md).
   // No "routes" key: the deploy token cannot see that zone (code 10082, 2026-11-09).
   "observability": { "enabled": true },
+  // Hyperdrive config dualis-db, shared with the console (web/wrangler.jsonc).
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "c3b41dfeaac243e5bb668c58394f7c33" }],
   // Next to the database (Hetzner Nuremberg, CLAUDE.md "Database"): every page reads gold tables.
   "placement": { "region": "aws:eu-central-1" }
   // Runtime secrets (set by .github/workflows/deploy-site.yml): DATABASE_URL (read-only use: gold tables), SITE_PASSWORD (preview gate).

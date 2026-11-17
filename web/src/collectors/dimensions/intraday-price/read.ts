@@ -5,7 +5,7 @@ import type { Tick } from "@/console/live-test";
 import { INTRADAY_MINUTES } from "./index";
 
 type Raw = { symbol: string; at: string | Date; date: string; close: number | string };
-/** postgres.js returns the rows, neon-http and PGlite `{ rows }`. */
+/** postgres.js returns the rows, PGlite `{ rows }`. */
 const rowsOf = (r: unknown): Raw[] => (Array.isArray(r) ? r : (r as { rows: Raw[] }).rows);
 const tickOf = (r: Raw): Tick & { symbol: string } => ({ symbol: r.symbol, at: new Date(r.at), date: r.date, close: Number(r.close) });
 
