@@ -1,18 +1,21 @@
 "use client";
 
 import { Chart, Tabs } from "@cloudflare/kumo";
-import { LineChart } from "echarts/charts";
+import { LineChart, ScatterChart } from "echarts/charts";
 import { AriaComponent, GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import type { MoveMarker } from "./analysis-queries";
+import { openPanel } from "./item-nav";
 import { FONT, INK, SOURCE_LABEL } from "./driver-chart";
 import { monthYear } from "./exhibit-format";
 import { dateFormat, numberFormat } from "./format";
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
-echarts.use([LineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, AriaComponent, CanvasRenderer]);
+echarts.use([LineChart, ScatterChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, AriaComponent, CanvasRenderer]);
 
 /**
  * The picture above the Narrative: the daily close against the Fair Value, research-note look (same ink as the
@@ -40,14 +43,18 @@ export function PriceFairValueChart({
   fair,
   currency,
   sources,
+  moves = [],
 }: {
   symbol: string;
   bars: { date: string; close: number }[];
   fair: FairLine | null;
   currency: string | null;
   sources: string[];
+  /** Significant moves (Analysis page only): a marker each, a click opens its cause. */
+  moves?: MoveMarker[];
 }) {
   const dark = usePageDark();
+  const router = useRouter();
   const [range, setRange] = useState<Range>("1Y");
 
   const last = bars.at(-1);
@@ -88,6 +95,26 @@ export function PriceFairValueChart({
         : []),
       ]
     : [];
+
+  // A marker at the move's last close: indigo when a business fact caused it, grey otherwise (macro, technical, not found).
+  const from = shown[0]?.date ?? "";
+  const closeOn = (d: string) => {
+    let c: number | null = null;
+    for (const b of bars) {
+      if (b.date > d) break;
+      c = b.close;
+    }
+    return c;
+  };
+  const markers = moves
+    .filter((m) => m.endDay >= from)
+    .flatMap((m) => {
+      const c = closeOn(m.endDay);
+      if (c === null) return [];
+      const fundamental = m.kind === "fundamental";
+      return [{ value: [Date.parse(`${m.endDay}T00:00:00Z`), c], id: m.id, symbol: m.returnPct >= 0 ? "triangle" : "path://M0,0 L10,0 L5,10 Z", itemStyle: { color: fundamental ? ink.navy : ink.muted, opacity: fundamental ? 1 : 0.7 } }];
+    });
+  const moveHref = (id: string) => `/tickers/${encodeURIComponent(symbol)}?item=${encodeURIComponent(`move:${id}`)}`;
 
   const options = {
     animation: false,
@@ -131,6 +158,7 @@ export function PriceFairValueChart({
             }
           : undefined,
       },
+      ...(markers.length ? [{ name: "Significant move", type: "scatter", data: markers, symbolSize: 9, z: 3, cursor: "pointer" }] : []),
     ],
     aria: { enabled: true },
   };
@@ -145,11 +173,25 @@ export function PriceFairValueChart({
           <span className="text-[11px] text-kumo-subtle">
             Daily close{currency ? `, ${currency}` : ""}, {day(shown[0].date)} to {day(last.date)}
           </span>
+          {markers.length > 0 && <span className="text-[11px] text-kumo-subtle">Triangles: significant moves vs the S&amp;P 500, dark when a business fact caused it. Click one for its cause.</span>}
         </span>
         <Tabs variant="segmented" size="sm" value={range} onValueChange={(v) => setRange(v as Range)} tabs={ranges.map((r) => ({ value: r, label: r }))} />
       </figcaption>
       <div className="border-t border-kumo-line pt-1">
-        <FitWidth><Chart echarts={echarts} options={options as never} height={240} isDarkMode={dark} /></FitWidth>
+        <FitWidth><Chart
+          echarts={echarts}
+          options={options as never}
+          height={240}
+          isDarkMode={dark}
+          onEvents={{
+            click: (p) => {
+              const id = (p.data as { id?: string } | undefined)?.id;
+              if (p.seriesName !== "Significant move" || !id) return;
+              const href = moveHref(id);
+              if (!openPanel(href)) router.push(href, { scroll: false });
+            },
+          }}
+        /></FitWidth>
       </div>
       <p className="text-[12px] text-kumo-default">
         {fair && gap !== null ? (
