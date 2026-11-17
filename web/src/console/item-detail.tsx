@@ -2,7 +2,7 @@ import { ArrowSquareOutIcon } from "@phosphor-icons/react/ssr";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { Badge } from "@cloudflare/kumo";
 import Link from "@/console/link";
-import { getTickerAnalysis, getValuation } from "./analysis-queries";
+import { getPriceMove, getTickerAnalysis, getValuation } from "./analysis-queries";
 import { ArticleBody } from "./article";
 import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
 import { driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
@@ -24,7 +24,7 @@ import type { ThesisSide } from "@/db/schema/analysis";
 /**
  * Level C: the detail of one item of the analysis (`?item=` on the Analysis page): what it says, its chart, and where
  * it comes from (a research-note "Source:" line naming the providers, the original document).
- * Items: `fair-value`, `narrative` (its detail + Rationale), `news:<catalyst id>` (= its Evidence id), `driver:<id>`, `exhibit:<id>`, `kpi:<metric>`, `price`,
+ * Items: `fair-value`, `narrative` (its detail + Rationale), `news:<catalyst id>` (= its Evidence id), `driver:<id>`, `exhibit:<id>`, `kpi:<metric>`, `price`, `move:<move id>` (a significant price move and its cause),
  * `doc:<document id>:<page>[:<quote>]` (one page of a company document, the quote highlighted).
  */
 
@@ -197,6 +197,67 @@ async function priceItem(symbol: string): Promise<ItemView | null> {
         <p className="text-base text-kumo-subtle">
           {bars.length} trading days. {disagreements === 0 ? "Every source agrees on every close." : `${disagreements} day${disagreements === 1 ? "" : "s"} where a source's close differs by more than 0.5%.`}
         </p>
+        <SourceNote sources={sources} />
+      </>
+    ),
+  };
+}
+
+const MOVE_KIND: Record<string, string> = { fundamental: "Business fact", macro: "Market-wide", technical: "Trading", unknown: "Cause not found" };
+const signed = (x: number | null) => (x === null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`);
+
+/** A significant price move (Thierry 2026-11-17): what caused it, in one sentence first, then the move and its sources. */
+async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
+  const r = await getPriceMove(id);
+  if (!r || r.move.symbol !== symbol) return null;
+  const { move: m, cause: c } = r;
+  const span = m.startDay === m.endDay ? day(m.startDay) : `${day(m.startDay)} to ${day(m.endDay)}`;
+  const conclusion = c?.fact
+    ? c.fact
+    : !c
+      ? "Not judged yet: the cause is read at the next analysis run."
+      : c.candidates === 0
+        ? "No news or filing found around this move."
+        : `None of the ${c.candidates} news items and filings around this move explains it.`;
+  const sources = [...new Set((c?.cites ?? []).flatMap((x) => x.sources)), "rules"];
+  return {
+    title: `${m.direction === "up" ? "Rise" : "Fall"} of ${signed(m.returnPct)}`,
+    subtitle: span,
+    body: (
+      <>
+        <p className="text-lg leading-relaxed text-kumo-strong">{conclusion}</p>
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge variant={c?.kind === "fundamental" ? "primary" : "outline"}>{MOVE_KIND[c?.kind ?? "unknown"]}</Badge>
+          {c?.category && <Badge variant="outline">{c.category}</Badge>}
+        </span>
+        <FactList>
+          <Fact label="Stock">{signed(m.returnPct)}</Fact>
+          <Fact label="S&P 500">{signed(m.benchReturn)}</Fact>
+          <Fact label="Excess move">{`${signed(m.abnormal)}, ${Math.abs(m.z).toFixed(1)} standard deviations`}</Fact>
+          <Fact label="Closes">{`${price(m.closeBefore)} to ${price(m.closeEnd)}${m.currency ? ` ${m.currency}` : ""}`}</Fact>
+        </FactList>
+        {c && c.cites.length > 0 && (
+          <Section title="What it rests on">
+            <ul className="flex flex-col gap-4">
+              {c.cites.map((x) => (
+                <li key={`${x.kind}:${x.id}`} className="flex flex-col gap-1">
+                  {x.url ? (
+                    <a href={x.url} target="_blank" rel="noreferrer" className={external}>
+                      {x.title} <ArrowSquareOutIcon size={14} className="mt-1 shrink-0" aria-label={x.kind === "filing" ? "opens the filing" : "opens the article"} />
+                    </a>
+                  ) : (
+                    <span className="text-base font-medium text-kumo-strong">{x.title}</span>
+                  )}
+                  <span className="flex flex-wrap items-center gap-2 text-sm text-kumo-subtle">
+                    <span>{x.kind === "filing" ? "Filing" : (x.publisher ?? "News")}</span>
+                    <time title={utc(new Date(x.at))}>{day(x.at)}</time>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+        <p className="text-sm text-kumo-subtle">A significant move: beyond two standard deviations of the stock&apos;s own daily moves once the S&amp;P 500 is taken out. News and filings read: 3 days before to 1 day after it.</p>
         <SourceNote sources={sources} />
       </>
     ),
@@ -590,6 +651,7 @@ export async function itemView(symbol: string, item: string, thesis: ThesisSide 
   if (kind === "driver") return driverItem(symbol, key);
   if (kind === "exhibit") return exhibitItem(symbol, key);
   if (kind === "valuation") return methodItem(symbol, key);
+  if (kind === "move") return moveItem(symbol, key);
   if (kind === "doc") return docItem(symbol, key);
   return null;
 }

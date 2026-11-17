@@ -8,7 +8,7 @@ export default async function AnalysisPage({ params, searchParams }: { params: P
   const symbol = decodeURIComponent((await params).symbol);
   const { item, thesis: t } = await searchParams;
   const thesis = parseThesis(t);
-  const [analysis, view] = await Promise.all([analysisData(symbol, thesis), item ? itemView(symbol, item, thesis) : null]);
+  const [analysis, view] = await Promise.all([analysisData(symbol, thesis, true), item ? itemView(symbol, item, thesis) : null]);
   if (!analysis) notFound();
   const base = `/tickers/${encodeURIComponent(symbol)}`;
   return (

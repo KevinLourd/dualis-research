@@ -24,6 +24,9 @@ import {
   type GoldMarketReaction,
   type ThesisSide,
   marketReactions,
+  priceMoveCauses,
+  priceMoves,
+  type MoveCauseKind,
 } from "@/db/schema/analysis";
 import { goldMethodValuations, valuationMethods, valuationReports } from "@/db/schema/valuation";
 import { financialMetrics, goldFinancialLines, valuations, type GoldFinancialLine, type GoldFinancialMetric, type GoldValuation } from "@/db/schema/financials";
@@ -181,3 +184,23 @@ export const getValuation = cache(async (symbol: string) => {
   };
 });
 export type Valuation = Awaited<ReturnType<typeof getValuation>>;
+
+/** A significant move as the price chart marks it (Analysis page): when, how much, and whether a business fact caused it. */
+export type MoveMarker = { id: string; startDay: string; endDay: string; returnPct: number; benchReturn: number | null; kind: MoveCauseKind | null };
+
+/** The significant price moves of a ticker for the chart markers: a few columns only (Workers CPU). */
+export async function priceMoveMarkers(symbol: string): Promise<MoveMarker[]> {
+  const rows = await getDb()
+    .select({ id: priceMoves.id, startDay: priceMoves.startDay, endDay: priceMoves.endDay, returnPct: priceMoves.returnPct, benchReturn: priceMoves.benchReturn, kind: priceMoveCauses.kind })
+    .from(priceMoves)
+    .leftJoin(priceMoveCauses, eq(priceMoveCauses.id, priceMoves.id))
+    .where(eq(priceMoves.symbol, symbol))
+    .orderBy(asc(priceMoves.startDay));
+  return rows;
+}
+
+/** One significant move and its cause (the `move:` item panel). */
+export async function getPriceMove(id: string) {
+  const [r] = await getDb().select().from(priceMoves).leftJoin(priceMoveCauses, eq(priceMoveCauses.id, priceMoves.id)).where(eq(priceMoves.id, id));
+  return r ? { move: r.price_moves, cause: r.price_move_causes } : null;
+}

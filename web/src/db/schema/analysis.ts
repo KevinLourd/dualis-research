@@ -547,3 +547,64 @@ export const marketReactions = gold.table(
   (t) => [index("gold_market_reactions_symbol").on(t.symbol, t.eventDay)],
 );
 export type GoldMarketReaction = typeof marketReactions.$inferSelect;
+
+/**
+ * Significant price moves (Thierry 2026-11-17: « if the market cared at that moment, that's a driver that matters »):
+ * every day the stock moved beyond two standard deviations of its own abnormal returns vs the S&P 500 (event-study
+ * convention), consecutive same-sign days merged. Code only (`market-reaction/moves.ts`), rebuilt from
+ * gold.price_bars each run. id = `<symbol>:<start date>`.
+ */
+export const priceMoves = gold.table(
+  "price_moves",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    startDay: text("start_day").notNull(),
+    endDay: text("end_day").notNull(),
+    days: integer("days").notNull(),
+    currency: text("currency"),
+    closeBefore: doublePrecision("close_before").notNull(),
+    closeEnd: doublePrecision("close_end").notNull(),
+    /** Ratios: the stock's return, the S&P 500's over the same span, the cumulative abnormal return. */
+    returnPct: doublePrecision("return_pct").notNull(),
+    benchReturn: doublePrecision("bench_return"),
+    abnormal: doublePrecision("abnormal").notNull(),
+    z: doublePrecision("z").notNull(),
+    beta: doublePrecision("beta").notNull(),
+    direction: text("direction").$type<"up" | "down">().notNull(),
+    rebuiltAt,
+  },
+  (t) => [index("gold_price_moves_symbol").on(t.symbol, t.startDay)],
+);
+export type GoldPriceMove = typeof priceMoves.$inferSelect;
+
+/** What caused a move: the business (fundamental), the market at large (macro), trading itself (technical), or not found. */
+export const MOVE_CAUSE_KINDS = ["fundamental", "macro", "technical", "unknown"] as const;
+export type MoveCauseKind = (typeof MOVE_CAUSE_KINDS)[number];
+/** A news item or filing a cause rests on, as the panel links it. */
+export type MoveCite = { kind: "news" | "filing"; id: string; title: string; url: string | null; at: string; publisher: string | null; sources: string[] };
+
+/**
+ * The cause of each significant move: one stored judgment per move and candidate set (`silver.judgments`, subject kind
+ * `price-move`, key `move-cause@v1:<move id>:<hash of the candidate items>`), from the news and filings dated 3 days
+ * before the move to 1 day after it. No candidate = `unknown`, no call. id = the move id.
+ */
+export const priceMoveCauses = gold.table(
+  "price_move_causes",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    kind: text("kind").$type<MoveCauseKind>().notNull(),
+    /** One plain sentence: what happened in the business, or the macro event. Null when unknown with no candidate. */
+    fact: text("fact"),
+    category: text("category").$type<DriverCategory>(),
+    cites: jsonb("cites").$type<MoveCite[]>().notNull(),
+    /** News items and filings the judge saw. */
+    candidates: integer("candidates").notNull(),
+    confidence: real("confidence"),
+    judgmentId: uuid("judgment_id"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_price_move_causes_symbol").on(t.symbol)],
+);
+export type GoldPriceMoveCause = typeof priceMoveCauses.$inferSelect;

@@ -1,5 +1,5 @@
 {
-  "id": "24a5fc56-0249-4298-a0c7-fface96f10c2",
+  "id": "b5206f8d-3bc0-4f7a-a09d-2591b1a51adb",
   "prevId": "b5c3153d-c3f9-4552-9f00-7661e9b909b4",
   "version": "7",
   "dialect": "postgresql",
@@ -8812,6 +8812,222 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "gold.price_move_causes": {
+      "name": "price_move_causes",
+      "schema": "gold",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fact": {
+          "name": "fact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cites": {
+          "name": "cites",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "candidates": {
+          "name": "candidates",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "judgment_id": {
+          "name": "judgment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rebuilt_at": {
+          "name": "rebuilt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "gold_price_move_causes_symbol": {
+          "name": "gold_price_move_causes_symbol",
+          "columns": [
+            {
+              "expression": "symbol",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "gold.price_moves": {
+      "name": "price_moves",
+      "schema": "gold",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_day": {
+          "name": "start_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_day": {
+          "name": "end_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "days": {
+          "name": "days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "close_before": {
+          "name": "close_before",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "close_end": {
+          "name": "close_end",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "return_pct": {
+          "name": "return_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bench_return": {
+          "name": "bench_return",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "abnormal": {
+          "name": "abnormal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "z": {
+          "name": "z",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "beta": {
+          "name": "beta",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction": {
+          "name": "direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rebuilt_at": {
+          "name": "rebuilt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "gold_price_moves_symbol": {
+          "name": "gold_price_moves_symbol",
+          "columns": [
+            {
+              "expression": "symbol",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "gold.research_reports": {
       "name": "research_reports",
       "schema": "gold",
@@ -11580,331 +11796,6 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "gold.document_pages": {
-      "name": "document_pages",
-      "schema": "gold",
-      "columns": {
-        "document_id": {
-          "name": "document_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page": {
-          "name": "page",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "document_pages_document_id_page_pk": {
-          "name": "document_pages_document_id_page_pk",
-          "columns": [
-            "document_id",
-            "page"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "gold.documents": {
-      "name": "documents",
-      "schema": "gold",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "symbol": {
-          "name": "symbol",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registry": {
-          "name": "registry",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "form": {
-          "name": "form",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "filed_at": {
-          "name": "filed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "view_url": {
-          "name": "view_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "format": {
-          "name": "format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page_count": {
-          "name": "page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sources": {
-          "name": "sources",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rebuilt_at": {
-          "name": "rebuilt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "gold_documents_symbol_filed": {
-          "name": "gold_documents_symbol_filed",
-          "columns": [
-            {
-              "expression": "symbol",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "filed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "silver.filing_documents": {
-      "name": "filing_documents",
-      "schema": "silver",
-      "columns": {
-        "filing_id": {
-          "name": "filing_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "symbol": {
-          "name": "symbol",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registry": {
-          "name": "registry",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "document_url": {
-          "name": "document_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "view_url": {
-          "name": "view_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "format": {
-          "name": "format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "page_count": {
-          "name": "page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "chars": {
-          "name": "chars",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sources": {
-          "name": "sources",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bronze_ids": {
-          "name": "bronze_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fetched_at": {
-          "name": "fetched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "filing_documents_symbol": {
-          "name": "filing_documents_symbol",
-          "columns": [
-            {
-              "expression": "symbol",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "silver.filing_pages": {
-      "name": "filing_pages",
-      "schema": "silver",
-      "columns": {
-        "filing_id": {
-          "name": "filing_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page": {
-          "name": "page",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sources": {
-          "name": "sources",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bronze_ids": {
-          "name": "bronze_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "filing_pages_filing_id_page_pk": {
-          "name": "filing_pages_filing_id_page_pk",
-          "columns": [
-            "filing_id",
-            "page"
-          ]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

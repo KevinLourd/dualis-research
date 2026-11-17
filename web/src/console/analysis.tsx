@@ -3,7 +3,7 @@ import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, FileTextIcon, Questi
 import Link from "@/console/link";
 import type { GoldEvidence, GoldExhibit, GoldNarrativeState, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
-import { type DriverWithExhibits, getTickerAnalysis, getValuation } from "./analysis-queries";
+import { type DriverWithExhibits, getTickerAnalysis, getValuation, priceMoveMarkers } from "./analysis-queries";
 import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
@@ -34,8 +34,8 @@ export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | nul
 
 export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
 
-export async function analysisData(symbol: string, thesis: ThesisSide | null = null) {
-  const [row, data, ownFair, consensus, objects, chart, valuation] = await Promise.all([
+export async function analysisData(symbol: string, thesis: ThesisSide | null = null, page = false) {
+  const [row, data, ownFair, consensus, objects, chart, valuation, moves] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
     getThesis(symbol),
@@ -43,9 +43,11 @@ export async function analysisData(symbol: string, thesis: ThesisSide | null = n
     getTickerAnalysis(symbol, thesis),
     priceVsFairValue(symbol),
     getValuation(symbol),
+    // The significant moves' markers sit on the Analysis page's chart only (the Signals panel stays light).
+    page ? priceMoveMarkers(symbol) : [],
   ]);
   if (!row || !data) return null;
-  return { row, data, ownFair, consensus, objects, chart, valuation };
+  return { row, data, ownFair, consensus, objects, chart, valuation, moves };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
@@ -267,7 +269,7 @@ function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: D
  * one, else the long. The competition between two theses stays in the backend.
  */
 export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
-  const { row, ownFair: thesis, consensus, objects, chart, valuation } = analysis;
+  const { row, ownFair: thesis, consensus, objects, chart, valuation, moves } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const symbol = row.symbol;
   // The analysis writes the narrative; nobody edits it by hand (Kevin 2026-11-09).
@@ -286,7 +288,7 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
       <Facts row={row} wide={variant === "page"} range={objects.fairValue?.low != null && objects.fairValue?.high != null ? { low: objects.fairValue.low, high: objects.fairValue.high } : null} />
 
       {chart.bars.length > 0 && (
-        <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} />
+        <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} moves={variant === "page" ? moves : []} />
       )}
 
       <Section title="Narrative">
