@@ -4,13 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fairValues, narrativeDrivers, narratives, narrativeStates, priceMoveCauses, priceMoves, type AnalysisAnswer, type GoldNarrativeState } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import { documentPages, documents } from "@/db/schema/documents";
+import { goldFinancialLines } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
 import { testDb } from "@/test/db";
 import { movesText } from "./dimensions/analysis/facts";
+import type { StoredSeries } from "./dimensions/analysis/series";
 import { analysisPrompt, bindMoves, parseAnalysis } from "./dimensions/analysis/prompt";
-import { dbStore, judgeThesis, keepPrintedCitations, memoryStore, pagesToRead, parseAnswer, promoteNarrativeStates } from "./dimensions/narrative-state";
+import { dbStore, driverSeriesKeys, judgeThesis, keepPrintedCitations, memoryStore, pagesToRead, parseAnswer, promoteNarrativeStates, scopeMagnitude } from "./dimensions/narrative-state";
 
 // The console Link needs the Next router; a plain anchor renders the same href.
 vi.mock("@/console/link", () => ({ default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => createElement("a", { href, className }, children) }));
@@ -32,6 +34,10 @@ async function seedDocument(filedAt = new Date()) {
     { documentId: DOC, page: 1, text: "Contents\n1\n2\n3" },
     { documentId: DOC, page: 2, text: PAGE_TEXT },
   ]);
+}
+
+async function seedLines(line: string, periodType: "year" | "half" | "quarter", points: [string, number][]) {
+  await db.insert(goldFinancialLines).values(points.map(([periodEnd, value]) => ({ symbol: SYMBOL, periodType, periodEnd, line, statement: "operating" as const, value, currency: "JPY", label: line, consolidated: true, sources: ["edinet"], alternatives: [] })));
 }
 
 async function seedMoves() {
@@ -89,13 +95,16 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
       n++;
       if (prompt.includes("Where does this reason stand NOW")) {
         prompts.driver = prompt;
-        return { text: JSON.stringify({ tag: "reversal:weak", p: 0.7, durability: "temporary", magnitude: { figure: "Orders", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, since: "2026-11-10", pricedIn: "none", headline: "Orders double, one-off", reason: "Orders doubled on a one-off restocking: temporary.", explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. The restocking ends next year.", citations: [{ doc: "D1", page: 2, quote: "Orders for 300mm wafer shippers doubled" }, { doc: "D1", page: 2, quote: "Invented sentence nobody printed" }], why: "A restocking." }), model: "fake" };
+        return { text: JSON.stringify({ tag: "reversal:weak", p: 0.7, durability: "temporary", magnitude: { figure: "Orders", series: "hline:order-intake", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, since: "2026-11-10", pricedIn: "none", headline: "Orders double, one-off", reason: "Orders doubled on a one-off restocking: temporary.", explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. The restocking ends next year.", citations: [{ doc: "D1", page: 2, quote: "Orders for 300mm wafer shippers doubled" }, { doc: "D1", page: 2, quote: "Invented sentence nobody printed" }], why: "A restocking." }), model: "fake" };
       }
       prompts.thesis = prompt;
       return { text: JSON.stringify({ tag: "reversal:weak", p: 0.6, signal: "weak", since: "2026-11-10", pricedIn: "none", why: "A temporary turn." }), model: "fake" };
     };
-    const d = { side: "short" as const, version: "v1", narrative: "The market sees Miraial as a recovering wafer-carrier maker.", market: null, drivers: [{ id: `${SYMBOL}:short:1`, rank: 1, category: "Business economics", title: "Orders doubled on multi-year contracts", text: "Orders doubled.", moveIds: [`${SYMBOL}:2026-06-01`] }] };
+    await seedLines("order-intake", "half", [["2025-09-30", 4.1e9], ["2026-09-30", 8.3e9]]);
+    const d = { side: "short" as const, version: "v1", narrative: "The market sees Miraial as a recovering wafer-carrier maker.", market: null, drivers: [{ id: `${SYMBOL}:short:1`, rank: 1, category: "Business economics", title: "Orders doubled on multi-year contracts", text: "Orders doubled.", moveIds: [`${SYMBOL}:2026-06-01`], exhibits: [{ title: "Orders", series: ["hline:order-intake"] }] }] };
     const payload = await judgeThesis(db, fake, dbStore(db), SYMBOL, d);
+    expect(prompts.driver).toContain("This reason's own figures");
+    expect(prompts.driver).toContain("[hline:order-intake]");
     expect(prompts.driver).toContain("First-half orders doubled on two multi-year contracts.");
     expect(prompts.driver).toContain("[D1 page 2] Summary of results, first half FY2026");
     expect(prompts.driver).toContain("strong needs a structural change AND a material one");
@@ -114,6 +123,58 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
     await promoteNarrativeStates(db, [{ subject: `${SYMBOL}:short`, payload, error: null, fetchedAt: new Date() } as unknown as BronzeFetch]);
     const states = await db.select().from(narrativeStates);
     expect(states.find((s) => s.level === "driver")).toMatchObject({ durability: "temporary", reason: "Orders doubled on a one-off restocking: temporary.", magnitude: { figure: "Orders", size: "material" }, citations: [expect.objectContaining({ page: 2 })] });
+  });
+});
+
+describe("a driver's state reads only what that driver is about (PR-E, Kyungbang 2026-11-17)", () => {
+  async function judgeOne(answerMagnitude: Record<string, unknown> | null, exhibits: { title: string; series: string[] }[]) {
+    // Series A (operating income) barely moves; series B (net debt) moves most and belongs to another driver.
+    await seedLines("operating-income", "year", [["2024-12-31", 100e9], ["2025-12-31", 103e9]]);
+    await seedLines("net-debt", "year", [["2024-12-31", 196e9], ["2025-12-31", 92e9]]);
+    await db.insert(narratives).values({ id: `${SYMBOL}:long`, symbol: SYMBOL, side: "long", text: "Profits swing and growth is flat.", detail: null, version: "v1", asOf: new Date() });
+    let driverPrompt = "";
+    const fake: Complete = async ({ prompt }) => {
+      if (prompt.includes("Where does this reason stand NOW")) {
+        driverPrompt = prompt;
+        return { text: JSON.stringify({ tag: "continuation:weak", p: 0.6, durability: "n-a", magnitude: answerMagnitude, since: null, pricedIn: "none", headline: null, reason: "Operating income is flat at 103B.", explanation: "Flat.", citations: [], why: "Flat." }), model: "fake" };
+      }
+      return { text: JSON.stringify({ tag: "noise", p: 0.6, signal: "none", since: null, pricedIn: "none", why: "Nothing turns." }), model: "fake" };
+    };
+    const d = { side: "long" as const, version: "v1", narrative: "Profits swing and growth is flat.", market: null, drivers: [{ id: `${SYMBOL}:long:1`, rank: 1, category: "Business economics", title: "Profits swing and growth is almost flat", text: "Flat profits.", moveIds: [], exhibits }] };
+    const payload = await judgeThesis(db, fake, memoryStore(), SYMBOL, d);
+    return { driverPrompt, magnitude: payload.drivers[0].magnitude };
+  }
+
+  it("the driver's own series come first with their keys, the company's other figures as context only", async () => {
+    const { driverPrompt } = await judgeOne(null, [{ title: "Operating income by year", series: ["line:operating-income"] }]);
+    const own = driverPrompt.indexOf("This reason's own figures");
+    expect(own).toBeGreaterThan(-1);
+    expect(driverPrompt.slice(own, driverPrompt.indexOf("significant price move"))).toContain("[line:operating-income]");
+    expect(driverPrompt.slice(own, driverPrompt.indexOf("significant price move"))).not.toContain("net-debt");
+    expect(driverPrompt).toContain("You judge THIS reason only");
+    expect(driverPrompt.indexOf("context only")).toBeGreaterThan(own);
+  });
+
+  it("a magnitude read on series B (moved most, another driver's) is dropped; on series A it stays", async () => {
+    const onB = await judgeOne({ figure: "Net debt", series: "line:net-debt", from: "196B", to: "92B", change: "-53%", size: "material" }, [{ title: "Operating income by year", series: ["line:operating-income"] }]);
+    expect(onB.magnitude).toBeNull();
+    await close();
+    ({ db, close } = await testDb());
+    const onA = await judgeOne({ figure: "Operating income", series: "line:operating-income", from: "100B", to: "103B", change: "+3%", size: "small" }, [{ title: "Operating income by year", series: ["line:operating-income"] }]);
+    expect(onA.magnitude).toMatchObject({ series: "line:operating-income", change: "+3%" });
+  });
+
+  it("a driver with no quantified series (only the share price) gets no magnitude and is told so", async () => {
+    const r = await judgeOne({ figure: "Net debt", series: "line:net-debt", from: "196B", to: "92B", change: "-53%", size: "material" }, [{ title: "Share price", series: ["price"] }]);
+    expect(r.driverPrompt).toContain("This reason has no reported figure of its own");
+    expect(r.magnitude).toBeNull();
+  });
+
+  it("sibling keys of the driver's figure count as its own: other period lengths and derived ratios", () => {
+    const s = (key: string, periodType: "year" | "quarter"): [string, StoredSeries] => [key, { key, label: key, unit: "currency", currency: "KRW", sources: [], periodType, points: new Map([["2025-12-31", 1]]) }];
+    const catalog = new Map<string, StoredSeries>([s("line:revenue", "year"), s("qline:revenue", "quarter"), s("metric:revenue-growth", "year"), s("metric:net-debt", "year"), s("consensus:revenue", "year"), s("price", "year")]);
+    expect(driverSeriesKeys(catalog, [{ title: "Revenue", series: ["line:revenue", "price"] }])).toEqual(["line:revenue", "metric:revenue-growth", "qline:revenue"]);
+    expect(scopeMagnitude({ figure: "x", series: "metric:net-debt", from: null, to: null, change: null, size: "small" }, new Set(["line:revenue"]))).toBeNull();
   });
 });
 

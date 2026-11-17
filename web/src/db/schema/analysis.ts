@@ -309,8 +309,11 @@ export type GoldNarrativeState = typeof narrativeStates.$inferSelect;
  */
 export const DURABILITIES = ["structural", "temporary", "n-a"] as const;
 export type Durability = (typeof DURABILITIES)[number];
-/** How big the change is: the figure, from -> to, the change, and whether it is big enough to move the stock. */
-export type Magnitude = { figure: string; from: string | null; to: string | null; change: string | null; size: "material" | "small" };
+/**
+ * How big the change is: the figure, from -> to, the change, and whether it is big enough to move the stock. `series` =
+ * the stored series it was read on, always one of its driver's own (PR-E, driver-state@v7); absent on older readings.
+ */
+export type Magnitude = { figure: string; series?: string | null; from: string | null; to: string | null; change: string | null; size: "material" | "small" };
 /** A sentence quoted from a stored company document page (`gold.documents`, `gold.document_pages`). */
 export type DocCitation = { documentId: string; page: number; quote: string; title?: string | null; filedAt?: string | null };
 
