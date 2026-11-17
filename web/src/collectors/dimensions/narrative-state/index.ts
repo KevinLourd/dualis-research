@@ -36,8 +36,9 @@ export const NARRATIVE_STATE_DIMENSION = "narrative-state";
  * v3 (2026-11-09): + a 4-5 word headline with its number (Kevin: « YTD margin 30% vs 2023 »). v4 (2026-11-12): + its
  * last reading, key on facts + 5% buckets. v5 (INFLECTION-1117, Thierry): + durability (structural / temporary), magnitude,
  * the one-sentence reason, the full explanation quoting management from the company's documents, the moves behind it.
+ * v6 (eval 2026-11-17: reasons ran to 40 words, a consensus driver sized on net debt): reason at most 20 words, magnitude = this reason's figure.
  */
-export const DRIVER_STATE_QUESTION = "driver-state@v5";
+export const DRIVER_STATE_QUESTION = "driver-state@v6";
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. v3: reads each driver's durability and magnitude. */
 export const THESIS_STATE_QUESTION = "thesis-state@v3";
 
@@ -322,8 +323,8 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
       "Weigh the news with their dates: recent beats old, several weak reversals in a row can make a strong one, one strong continuation after a reversal can cancel it.",
       "since = the day of the first news of the CURRENT state (null for noise). pricedIn = how much of that state the price has already moved (none, partly, fully), read from the price lines.",
       "headline = the current state in 4 to 5 words with its key number, like a chart label (e.g. \"YTD margin 30% vs 2023\", \"Sales growth slows to 4%\"); null for noise.",
-      "magnitude = the figure that changed (reported, with its periods), from and to, the change, and size: material or small. null for noise.",
-      "reason = ONE short sentence, subject verb complement, for the top of the page: the business cause of the state, whether it lasts, how big (e.g. \"Backlog doubled to 2.1x revenue on two multi-year contracts: structural.\"). Never only \"profit rose\": say WHY it rose.",
+      "magnitude = the figure of THIS reason that changed (reported, with its periods), from and to, the change, and size: material or small. null for noise.",
+      "reason = ONE short sentence of at most 20 words, subject verb complement, for the top of the page (the detail goes in explanation): the business cause of the state, whether it lasts, how big (e.g. \"Backlog doubled to 2.1x revenue on two multi-year contracts: structural.\"). Never only \"profit rose\": say WHY it rose.",
       "explanation = 3 to 6 sentences: what changed in the business and why, in management's words where the documents give them (quoted), and why it lasts or not.",
       "citations = every sentence you quote, copied EXACTLY as printed in the documents below, with the label and page it sits on ([] when no document says it).",
       ...(last ? ["", last] : []),
