@@ -1,4 +1,5 @@
 "use client";
+import { numberFormat } from "./format";
 
 import { TimeseriesChart } from "@cloudflare/kumo";
 import { LineChart } from "echarts/charts";
@@ -19,7 +20,7 @@ const LINE = "#94a3b8";
 export function GoalChart({ actual, plan }: { actual: { date: string; value: number }[]; plan: { date: string; value: number }[] }) {
   const dark = usePageDark();
   const ts = (d: string) => Date.parse(`${d}T00:00:00Z`);
-  const fmt = (v: number) => new Intl.NumberFormat("en-US").format(Math.round(v));
+  const fmt = (v: number) => numberFormat().format(Math.round(v));
   const last = actual.at(-1);
   return (
     <FitWidth><TimeseriesChart

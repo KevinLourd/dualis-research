@@ -15,6 +15,7 @@ export function SlideOver({
   closeHref,
   size = "md",
   back = false,
+  onClose,
   children,
 }: {
   title: React.ReactNode;
@@ -24,11 +25,14 @@ export function SlideOver({
   size?: "md" | "lg";
   /** A back arrow beside the title: returns to the panel this one was opened from (Kevin 2026-11-06), else closes. */
   back?: boolean;
+  /** Closes without a navigation (a panel opened by `item-nav.ts`); default: go to `closeHref`. */
+  onClose?: () => void;
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const close = onClose ?? (() => router.push(closeHref, { scroll: false }));
   return (
-    <Dialog.Root open onOpenChange={(open) => !open && router.push(closeHref, { scroll: false })}>
+    <Dialog.Root open onOpenChange={(open) => !open && close()}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/20 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Dialog.Popup className={`fixed inset-y-0 right-0 z-50 flex ${size === "lg" ? "w-[min(680px,100vw)]" : "w-[min(480px,100vw)]"} flex-col bg-kumo-base shadow-2xl ring-1 ring-kumo-line outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-x-6 data-[ending-style]:opacity-0 data-[starting-style]:translate-x-6 data-[starting-style]:opacity-0`}>
@@ -41,7 +45,7 @@ export function SlideOver({
                 icon={ArrowLeftIcon}
                 aria-label="Back"
                 className="-ml-2 shrink-0"
-                onClick={() => (window.history.length > 1 ? router.back() : router.push(closeHref, { scroll: false }))}
+                onClick={() => (window.history.length > 1 ? router.back() : close())}
               />
             )}
             <div className="min-w-0 flex-1">

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { SignalCall, SignalStrength } from "@/content/signal-words";
 import { getDb } from "@/db/client";
 import { evidence as goldEvidence, exhibits, fairValues, marketReactions, narrativeDrivers, narrativeStates, signals, type ThesisSide } from "@/db/schema/analysis";
@@ -198,13 +198,25 @@ export async function exhibitDetail(symbol: string, id: string) {
  */
 export const priceVsFairValue = cache(async (symbol: string) => {
   const db = getDb();
-  const [bars, [fair]] = await Promise.all([
-    db.select({ date: priceBars.date, close: priceBars.close, sources: priceBars.sources }).from(priceBars).where(eq(priceBars.symbol, symbol)).orderBy(asc(priceBars.date)),
+  // What the chart draws, nothing more (Workers free plan: every row parsed and every point serialised costs CPU,
+  // 2026-11-17): daily closes for the last 14 months (6M / 1Y views), one close a week (the week's last) back to
+  // 5 years (5Y view), and the sources as one distinct list instead of one array per bar.
+  const [bars, sourceRows, [fair]] = await Promise.all([
+    db.execute(sql`
+      select date, close from (
+        select date, close, max(date) over () as last,
+               row_number() over (partition by date_trunc('week', date::date) order by date desc) as week_rank
+        from ${priceBars} where ${priceBars.symbol} = ${symbol}
+      ) b
+      where date::date >= last::date - interval '61 months'
+        and (week_rank = 1 or date::date >= last::date - interval '14 months')
+      order by date`),
+    db.execute(sql`select distinct unnest(${priceBars.sources}) as source from ${priceBars} where ${priceBars.symbol} = ${symbol} order by 1`),
     db.select().from(fairValues).where(eq(fairValues.symbol, symbol)),
   ]);
   return {
-    bars: bars.map((b) => ({ date: b.date, close: b.close })),
-    sources: [...new Set(bars.flatMap((b) => b.sources))],
+    bars: (bars as unknown as { date: string; close: number }[]).map((b) => ({ date: b.date, close: b.close })),
+    sources: (sourceRows as unknown as { source: string }[]).map((r) => r.source),
     fair:
       fair && fair.value !== null
         ? {

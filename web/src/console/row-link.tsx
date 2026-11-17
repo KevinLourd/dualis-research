@@ -2,6 +2,7 @@
 
 import { Table } from "@cloudflare/kumo";
 import { useRouter } from "next/navigation";
+import { openPanel } from "./item-nav";
 import { usePrefetchOnIntent } from "./link";
 
 /**
@@ -12,7 +13,7 @@ import { usePrefetchOnIntent } from "./link";
 export function RowLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   const router = useRouter();
   const load = usePrefetchOnIntent(href);
-  const open = () => router.push(href, { scroll: false });
+  const open = () => openPanel(href) || router.push(href, { scroll: false });
   return (
     <Table.Row
       tabIndex={0}

@@ -1,4 +1,5 @@
 "use client";
+import { numberFormat } from "./format";
 
 import { Chart } from "@cloudflare/kumo";
 import { BarChart, ScatterChart } from "echarts/charts";
@@ -17,7 +18,7 @@ echarts.use([BarChart, ScatterChart, GridComponent, TooltipComponent, MarkLineCo
  */
 export type FieldRow = { label: string; low: number; base: number; high: number; weight: number | null; total?: boolean };
 
-const fmt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 });
+const fmt = (v: number) => numberFormat({ maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }).format(v);
 
 export function FootballField({ rows, fairValue, currency }: { rows: FieldRow[]; fairValue: number | null; currency: string | null }) {
   const dark = usePageDark();

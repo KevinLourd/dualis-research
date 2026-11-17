@@ -11,6 +11,7 @@ import {
   LinkSimpleIcon,
 } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
+import { dateFormat, numberFormat } from "@/console/format";
 import { LogoDownload } from "@/console/logo-download";
 import { hasLogo, logoSvg } from "@/console/sandbox-logos";
 import type { GoldSandboxAccount, GoldSandboxPost, SandboxFormat } from "@/db/schema/sandbox";
@@ -137,16 +138,16 @@ function Markdown({ text, h2 }: { text: string; h2: string }) {
   );
 }
 
-const fmt = (n: number) => new Intl.NumberFormat("en-US").format(n);
-const compact = (n: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
-const longDate = (at: Date) => at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Almaty" });
+const fmt = (n: number) => numberFormat().format(n);
+const compact = (n: number) => numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(n);
+const longDate = (at: Date) => dateFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Almaty" }).format(at);
 
 /** X's own time stamp: « 3h » under a day, else « Nov 11 ». */
 function xTime(at: Date, now: Date) {
   const mins = Math.round((now.getTime() - at.getTime()) / 60_000);
   if (mins >= 0 && mins < 60) return `${Math.max(1, mins)}m`;
   if (mins >= 60 && mins < 24 * 60) return `${Math.floor(mins / 60)}h`;
-  return at.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Almaty" });
+  return dateFormat("en-US", { month: "short", day: "numeric", timeZone: "Asia/Almaty" }).format(at);
 }
 
 /** $CASHTAGS and bare domains in X blue, the rest as written. */
@@ -350,7 +351,7 @@ export function XProfile({ account, posts, total, pairedHref, base, view, liveUr
 
 const S = { ink: "#363737", muted: "#777", rule: "#e6e6e6", accent: "#FF6719", font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', serif: 'Spectral, Georgia, "Times New Roman", serif' } as const;
 
-const noteTime = (at: Date) => at.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "Asia/Almaty" });
+const noteTime = (at: Date) => dateFormat("en-US", { month: "short", day: "numeric", timeZone: "Asia/Almaty" }).format(at);
 
 /** An open Substack post: the publication's post page (title, subtitle, byline, cover, body). */
 function SubstackArticle({ account, post, back }: { account: GoldSandboxAccount; post: GoldSandboxPost; back: string }) {

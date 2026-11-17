@@ -5,7 +5,7 @@ import { requestDraftAction } from "@/content/actions";
 import { canDispatch } from "@/content/dispatch";
 import { lastContentRun, listIdeas } from "@/console/content-queries";
 import { PendingButton } from "@/console/content-ui";
-import { relativeTime } from "@/console/format";
+import { dateFormat, relativeTime } from "@/console/format";
 import { itemHref } from "@/console/analysis";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import Link from "@/console/link";
@@ -39,7 +39,7 @@ function dayLabel(day: string): string {
   const today = new Date().toISOString().slice(0, 10);
   if (day === today) return "Today";
   if (day === new Date(Date.now() - 86400_000).toISOString().slice(0, 10)) return "Yesterday";
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return dateFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`));
 }
 
 /** Score as a number with a colour: 70+ worth posting, 40-69 maybe, below quiet. */

@@ -3,7 +3,7 @@ import { UsersThreeIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import { isoDate } from "@/collectors/markets";
 import { CopyButton } from "@/console/content-ui";
-import { relativeTime } from "@/console/format";
+import { dateFormat, numberFormat, relativeTime } from "@/console/format";
 import { GoalChart } from "@/console/goal-chart";
 import { getGrowthRow, type GrowthRow, lastNetworkRun, listAudience, listGrowthTargets } from "@/console/growth-queries";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
@@ -16,9 +16,9 @@ import { TableSearch } from "@/console/table-search";
 
 export const metadata = { title: "Growth" };
 
-const fmt = (n: number) => new Intl.NumberFormat("en-US").format(n);
-const compact = (n: number | null) => (n === null ? null : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n));
-const dayLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const fmt = (n: number) => numberFormat().format(n);
+const compact = (n: number | null) => (n === null ? null : numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(n));
+const dayLabel = (iso: string) => dateFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
 const STATUS: Record<string, { text: string; variant: "neutral" | "primary" | "warning" | "success" | "outline" }> = {
   draft: { text: "To send", variant: "neutral" },

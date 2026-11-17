@@ -1,11 +1,11 @@
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import type { GoldConsensus, GoldConsensusCoverage } from "@/db/schema/consensus";
-import { compactMoney } from "./format";
+import { compactMoney, dateFormat } from "./format";
 import { Card, SourceTags, TickerLink } from "./ui";
 
 const METRIC: Record<string, string> = { revenue: "Revenue", ebitda: "EBITDA", "operating-income": "Operating income", "net-income": "Net income", eps: "EPS" };
 const period = (type: string, end: string) => {
-  const label = new Date(`${end}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+  const label = dateFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${end}-01T00:00:00Z`));
   return type === "year" ? `FY ending ${label}` : `Quarter ending ${label}`;
 };
 const fmt = (metric: string, v: number | null) => (v === null ? "–" : metric === "eps" ? v.toFixed(2) : (compactMoney(v, null) ?? "–"));
