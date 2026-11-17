@@ -41,8 +41,13 @@ export const NARRATIVE_STATE_DIMENSION = "narrative-state";
  * v7 (PR-E, prod 2026-11-17: Kyungbang's holder, profit and consensus drivers all read the company's debt paydown): the
  * judge reads the driver's OWN figures first (its exhibits' series), the company's other figures as context only, and
  * judges this reason alone; magnitude names its series, kept only when it is one of the driver's (`scopeMagnitude`).
+ * v8 (Kevin 2026-11-18: « résumée très clairement et le plus concisément possible en haut »; the judge wrote ~30 words
+ * against a 20-word instruction): the judge no longer writes the reason; a second call on its finished judgment does
+ * (`writeReason`, at most 15 words), never a validator or a retry.
  */
-export const DRIVER_STATE_QUESTION = "driver-state@v7";
+export const DRIVER_STATE_QUESTION = "driver-state@v8";
+/** The reason at the top of the driver panel: at most this many words (stated in `writeReason`'s prompt). */
+export const REASON_WORDS = 15;
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. v3: reads each driver's durability and magnitude. */
 export const THESIS_STATE_QUESTION = "thesis-state@v3";
 
@@ -250,14 +255,43 @@ export const memoryStore = (): JudgmentStore => {
   };
 };
 
+const REASON_SYSTEM = "You write the one line at the top of an equity research panel. Answer with JSON only, no prose, no code fence. Plain English, no em dash.";
+/** The prompt of the reason writer: the finished judgment of one driver in, its top line out. */
+export function reasonPrompt(a: Pick<Answer, "tag" | "durability" | "magnitude" | "headline" | "explanation" | "why">): string {
+  const m = a.magnitude;
+  return [
+    "A judge has finished reading where one reason the market holds about a company stands now. Its judgment:",
+    `State: ${a.tag}${a.durability && a.durability !== "n-a" ? `, ${a.durability}` : ""}.`,
+    m ? `Size: ${m.figure}${m.from && m.to ? ` ${m.from} to ${m.to}` : ""}${m.change ? ` (${m.change})` : ""}, ${m.size}.` : "Size: no figure.",
+    a.headline ? `Headline: ${a.headline}` : null,
+    `Explanation: ${a.explanation ?? a.why ?? ""}`,
+    "",
+    `Write the reason a reader sees first, summarised as clearly and as briefly as possible: ONE sentence of at most ${REASON_WORDS} words, subject verb complement.`,
+    "It says the business cause (why it moved, never only that it moved), then whether it lasts (structural or temporary) and how big, when the judgment gives them; when nothing turned, it says so about this subject.",
+    'Example: "Backlog doubled on two multi-year contracts: structural, material."',
+    'JSON: {"reason": "<the sentence>"}',
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+/** The second call on a finished driver judgment: its top-line reason. Its answer is taken as written (dashes stripped). */
+export async function writeReason(complete: Complete, a: Pick<Answer, "tag" | "durability" | "magnitude" | "headline" | "explanation" | "why">): Promise<string | null> {
+  const r = await complete({ system: REASON_SYSTEM, prompt: reasonPrompt(a) });
+  const o = JSON.parse(firstJsonObject(r.text)) as { reason?: unknown };
+  return typeof o.reason === "string" && o.reason.trim() ? stripDashes(o.reason.trim()) : null;
+}
+
 /** One stored judgment per (subject, question key): same input, never asked twice. `pages` = the documents the judge read (its citations are checked against them before storing). */
-async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: { subjectKind: string; subjectId: string; questionKey: string; question: string; prompt: string; withSignal: boolean; pages?: ReadPages; magnitudeKeys?: Set<string> }) {
+async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: { subjectKind: string; subjectId: string; questionKey: string; question: string; prompt: string; withSignal: boolean; pages?: ReadPages; magnitudeKeys?: Set<string>; writeReason?: boolean }) {
   const stored = await store.get(req.subjectKind, req.subjectId, req.questionKey);
   if (stored) return stored;
   const r = await complete({ system: SYSTEM, prompt: req.prompt });
   const a = parseAnswer(r.text, req.withSignal);
   const citations = req.pages ? await keepPrintedCitations(db, a.citations, req.pages) : [];
   const magnitude = req.magnitudeKeys ? scopeMagnitude(a.magnitude, req.magnitudeKeys) : a.magnitude;
+  // A driver's reason is written by a second call on the finished judgment (a meta-task on the text), never by the judge.
+  const reason = req.writeReason ? await writeReason(complete, { ...a, magnitude }) : a.reason;
   return store.put({
     subjectKind: req.subjectKind,
     subjectId: req.subjectId,
@@ -268,7 +302,7 @@ async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: 
     citedSentence: null,
     reason: a.why,
     model: r.model,
-    raw: { headline: a.headline, since: a.since, pricedIn: a.pricedIn, signal: a.signal, durability: a.durability, magnitude, ...(a.magnitude && !magnitude ? { magnitudeDropped: a.magnitude } : {}), reason: a.reason, explanation: a.explanation, citations, citationsDropped: a.citations.length - citations.length },
+    raw: { headline: a.headline, since: a.since, pricedIn: a.pricedIn, signal: a.signal, durability: a.durability, magnitude, ...(a.magnitude && !magnitude ? { magnitudeDropped: a.magnitude } : {}), reason, explanation: a.explanation, citations, citationsDropped: a.citations.length - citations.length },
   });
 }
 type Raw = { headline?: string | null; since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null; durability?: Durability | null; magnitude?: Magnitude | null; reason?: string | null; explanation?: string | null; citations?: DocCitation[] };
@@ -349,7 +383,7 @@ const DRIVER_GAME = [
 const DRIVER_SCOPE = [
   "You judge THIS reason only. The market holds the story for several reasons and each one has its own judge: has what the market believes on THIS point turned?",
   "A change in another part of the business (debt paid down under a reason about profits, store sales under a reason about analyst coverage) is judged on the reason about it, never here.",
-  "When this reason's own subject did not move, it reads continuation or noise, and the reason says so about this subject, whatever else improved or worsened.",
+  "When this reason's own subject did not move, it reads continuation or noise, and the explanation says so about this subject, whatever else improved or worsened.",
 ].join(" ");
 
 /**
@@ -396,8 +430,7 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
       own
         ? "magnitude = the change in ONE of this reason's own figures above: series = its key in brackets, from and to with their periods, the change, and size: material or small. null when none of them moved or for noise; never a figure from the company's other figures."
         : "magnitude = null: this reason has no figure of its own.",
-      "reason = ONE short sentence of at most 20 words, subject verb complement, about THIS reason's subject, for the top of the page (the detail goes in explanation): the business cause of its state, whether it lasts, how big (e.g. \"Backlog doubled to 2.1x revenue on two multi-year contracts: structural.\"). Never only \"profit rose\": say WHY it rose.",
-      "explanation = 3 to 6 sentences on this reason: what changed in the business and why, in management's words where the documents give them (quoted), and why it lasts or not.",
+      "explanation = 3 to 6 sentences on this reason: what changed in the business and WHY (never only \"profit rose\": the cause behind it), in management's words where the documents give them (quoted), and why it lasts or not.",
       "citations = every sentence you quote, copied EXACTLY as printed in the documents below, with the label and page it sits on ([] when no document says it).",
       ...(last ? ["", last] : []),
     ].join("\n");
@@ -406,10 +439,11 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
       subjectId: driver.id,
       questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${base}|${driver.category}|${driver.title}|${driver.text}|${driver.moveIds.join(",")}|${key}|${own ?? ""}`)}`,
       question: `${DRIVER_STATE_QUESTION}: ${driver.title}`,
-      prompt: `${question}\n\nNews:\n${input}\n\nThe company's other reported figures (context only: a change there belongs to the reason about it):\n${figures}\n\nCompany documents:\n${documents}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "durability": <structural | temporary | n-a>, "magnitude": {"figure": "<e.g. Backlog>", "series": "<its key, e.g. qline:backlog>", "from": "<e.g. 1.0x revenue, FY2024>", "to": "<e.g. 2.1x revenue, FY2025>", "change": "<e.g. +110%>", "size": <material | small>} or null, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "reason": "<one short sentence>", "explanation": "<3 to 6 sentences>", "citations": [{"doc": "<D1>", "page": <page number>, "quote": "<exact words>"}], "why": "<one short sentence for a reader who has not seen the news>"}`,
+      prompt: `${question}\n\nNews:\n${input}\n\nThe company's other reported figures (context only: a change there belongs to the reason about it):\n${figures}\n\nCompany documents:\n${documents}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "durability": <structural | temporary | n-a>, "magnitude": {"figure": "<e.g. Backlog>", "series": "<its key, e.g. qline:backlog>", "from": "<e.g. 1.0x revenue, FY2024>", "to": "<e.g. 2.1x revenue, FY2025>", "change": "<e.g. +110%>", "size": <material | small>} or null, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "explanation": "<3 to 6 sentences>", "citations": [{"doc": "<D1>", "page": <page number>, "quote": "<exact words>"}], "why": "<one short sentence for a reader who has not seen the news>"}`,
       withSignal: false,
       pages,
       magnitudeKeys: new Set(ownKeys),
+      writeReason: true,
     });
     const raw = rawOf(j);
     drivers.push({
