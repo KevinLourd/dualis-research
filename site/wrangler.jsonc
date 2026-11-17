@@ -8,6 +8,8 @@
   "workers_dev": true,
   // dualisresearch.com + www reach this Worker through the dualis-relay Worker on Thierry's Cloudflare account (CLAUDE.md).
   // No "routes" key: the deploy token cannot see that zone (code 10082, 2026-11-09).
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Next to the database (Hetzner Nuremberg, CLAUDE.md "Database"): every page reads gold tables.
+  "placement": { "region": "aws:eu-central-1" }
   // Runtime secrets (set by .github/workflows/deploy-site.yml): DATABASE_URL (read-only use: gold tables), SITE_PASSWORD (preview gate).
 }

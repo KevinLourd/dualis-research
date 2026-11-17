@@ -9,8 +9,10 @@ import type { Db } from "./types";
  */
 export function connectNode(): { db: Db; close: () => Promise<void> } {
   const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL_UNPOOLED / DATABASE_URL is not set (Neon connection strings; see web/README.md)");
-  // Neon: 4 connections, a collect stage runs its dimensions at once (registry STAGES). Locally one: what a PGlite dev server accepts.
-  const client = postgres(url, { max: url.includes("neon.tech") ? 4 : 1, onnotice: () => {} });
+  if (!url) throw new Error("DATABASE_URL_UNPOOLED / DATABASE_URL is not set (the hosted database; see web/README.md)");
+  // Hosted database: 4 connections, a collect stage runs its dimensions at once (registry STAGES). Locally one: what a
+  // PGlite dev server accepts.
+  const local = ["localhost", "127.0.0.1", "::1"].includes(new URL(url).hostname);
+  const client = postgres(url, { max: local ? 1 : 4, onnotice: () => {} });
   return { db: drizzle(client), close: () => client.end() };
 }
