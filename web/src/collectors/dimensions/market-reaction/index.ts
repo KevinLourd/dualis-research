@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { fairValueHistory, fairValues, marketReactions, type FxConversion, type GoldFairValueHistory, type GoldMarketReaction } from "@/db/schema/analysis";
+import { fairValueHistory, fairValues, marketReactions, priceMoves, type FxConversion, type GoldFairValueHistory, type GoldMarketReaction, type GoldPriceMove } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import { valuationSyntheses } from "@/db/schema/valuation";
 import type { Db } from "@/db/types";
@@ -11,10 +11,12 @@ import { majorUnit } from "../financials/derive";
 import { fxReader } from "../fx";
 import { analysedSymbols } from "../watchlist";
 import { reactionOf, type Bar, type FvPoint, type Minute } from "./compute";
+import { findMoves } from "./moves";
 import { latestPrice, priceKnownAt } from "@/console/live-test";
 import { latestTicks, mergeTicks, ticksKnownAt } from "../intraday-price/read";
 
 export * from "./compute";
+export * from "./moves";
 
 /**
  * Market Reaction + Fair Value History (Kevin 2026-11-09: the judges must see the fair value, its range and the price
@@ -25,15 +27,17 @@ export * from "./compute";
 
 export const MARKET_REACTION_DIMENSION = "market-reaction";
 
-type Payload = { history: Omit<GoldFairValueHistory, "rebuiltAt">[]; reactions: Omit<GoldMarketReaction, "rebuiltAt">[] };
+type Payload = { history: Omit<GoldFairValueHistory, "rebuiltAt">[]; reactions: Omit<GoldMarketReaction, "rebuiltAt">[]; moves?: Omit<GoldPriceMove, "rebuiltAt">[] };
 
-/** Closes of the evidence window plus a margin, oldest first, in major units. */
-async function closes(db: Db, symbol: string, currency: string | null): Promise<Bar[]> {
-  const from = new Date(Date.now() - (EVIDENCE_WINDOW_DAYS + 20) * 86_400_000).toISOString().slice(0, 10);
+/** Closes from `days` ago (default: the evidence window plus a margin), oldest first, in major units. */
+async function closes(db: Db, symbol: string, currency: string | null, days = EVIDENCE_WINDOW_DAYS + 20): Promise<Bar[]> {
+  const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   const bars = await db.select({ date: gold.priceBars.date, close: gold.priceBars.close }).from(gold.priceBars).where(and(eq(gold.priceBars.symbol, symbol), gte(gold.priceBars.date, from))).orderBy(asc(gold.priceBars.date));
   return bars.map((b) => ({ date: b.date, close: majorUnit(b.close, currency).price }));
 }
 
+/** The moves read every stored close (5 years) plus the year their first z-score needs. */
+const MOVE_HISTORY_DAYS = 6 * 366;
 /** One read of the benchmark per run (keyed on the run's fetch function), not one per ticker. */
 const runBench = new WeakMap<typeof fetch, Promise<Bar[]>>();
 
@@ -83,9 +87,13 @@ export const marketReactionSource: Source = {
     const db = ctx.db;
     const [[q], [fv]] = await Promise.all([db.select().from(gold.quotes).where(eq(gold.quotes.symbol, symbol)), db.select().from(fairValues).where(eq(fairValues.symbol, symbol))]);
     const currency = q?.currency ?? null;
-    let bench = runBench.get(ctx.fetch);
-    if (!bench) runBench.set(ctx.fetch, (bench = closes(db, BENCHMARK, null)));
-    const [bars, benchBars, rawPoints, items] = await Promise.all([closes(db, symbol, currency), bench, fairValuePoints(db, symbol), itemsOf(db, symbol)]);
+    let benchLong = runBench.get(ctx.fetch);
+    if (!benchLong) runBench.set(ctx.fetch, (benchLong = closes(db, BENCHMARK, null, MOVE_HISTORY_DAYS)));
+    const [longBars, benchLongBars, rawPoints, items] = await Promise.all([closes(db, symbol, currency, MOVE_HISTORY_DAYS), benchLong, fairValuePoints(db, symbol), itemsOf(db, symbol)]);
+    // The reactions read the evidence window only; the moves every stored close.
+    const from = new Date(Date.now() - (EVIDENCE_WINDOW_DAYS + 20) * 86_400_000).toISOString().slice(0, 10);
+    const bars = longBars.filter((b) => b.date >= from);
+    const benchBars = benchLongBars.filter((b) => b.date >= from);
     const points = await inQuoteCurrency(db, rawPoints, currency ? majorUnit(1, currency).currency : null);
     const now: FvPoint | null = fv ? { day: (fv.asOf ?? new Date()).toISOString().slice(0, 10), value: fv.value, low: fv.low, high: fv.high } : null;
     const major = currency ? majorUnit(1, currency).currency : null;
@@ -105,14 +113,15 @@ export const marketReactionSource: Source = {
         : null;
     const reactions = items.map((it) => reactionOf({ id: `${symbol}|${it.kind}:${it.id}`, symbol, day: it.at.toISOString().slice(0, 10) }, bars, benchBars, points, now, fv?.currency ?? major, minuteOf(it.at)));
     const history = points.map((p) => ({ id: `${symbol}|${p.day}`, symbol, day: p.day, value: p.value, low: p.low, high: p.high, currency: p.currency, conversion: p.conversion }));
-    const payload: Payload = { history, reactions };
-    return { request: { symbol, items: items.length, bars: bars.length }, httpStatus: null, payload };
+    const moves = findMoves(symbol, longBars, benchLongBars).map((m) => ({ ...m, currency: major }));
+    const payload: Payload = { history, reactions, moves };
+    return { request: { symbol, items: items.length, bars: longBars.length, moves: moves.length }, httpStatus: null, payload };
   },
 };
 
 export const marketReactionDim: Dimension = {
   name: MARKET_REACTION_DIMENSION,
-  description: "Per analysed ticker: the fair value as it stood each day (base, low, high), and for every news item and filing of the year what the price did around it (close before, next close, five closes later, today) vs the S&P 500, with the fair value then and now. Code only, from stored data.",
+  description: "Per analysed ticker: the fair value as it stood each day (base, low, high), for every news item and filing of the year what the price did around it (close before, next close, five closes later, today) vs the S&P 500, with the fair value then and now, and every significant price move of the stored closes (beyond 2 standard deviations of its abnormal returns vs the S&P 500). Code only, from stored data.",
   sources: [marketReactionSource],
   subjects: analysedSymbols,
   promote: async (db, fetches): Promise<PromoteResult> => ({ silverRowsBySource: { rules: await promoteMarketReactions(db, fetches) } }),
@@ -127,14 +136,17 @@ export async function promoteMarketReactions(db: Db, fetches: BronzeFetch[]): Pr
   const history = [...latest.values()].flatMap((p) => p.history);
   // Bronze holds JSON: the minute view's times come back as strings.
   const when = (v: Date | string | null) => (v === null ? null : new Date(v));
+  const moves = [...latest.values()].flatMap((p) => p.moves ?? []);
   const reactions = [...latest.values()].flatMap((p) => p.reactions).map((r) => ({ ...r, eventAt: when(r.eventAt), priceAtEventAt: when(r.priceAtEventAt), priceNowAt: when(r.priceNowAt) }));
   await db.transaction(async (tx) => {
     await tx.delete(fairValueHistory).where(inArray(fairValueHistory.symbol, symbols));
     await tx.delete(marketReactions).where(inArray(marketReactions.symbol, symbols));
     if (history.length) await tx.insert(fairValueHistory).values(history);
     for (let i = 0; i < reactions.length; i += 500) await tx.insert(marketReactions).values(reactions.slice(i, i + 500));
+    await tx.delete(priceMoves).where(inArray(priceMoves.symbol, symbols));
+    for (let i = 0; i < moves.length; i += 500) await tx.insert(priceMoves).values(moves.slice(i, i + 500));
   });
-  return history.length + reactions.length;
+  return history.length + reactions.length + moves.length;
 }
 
 /** The stored reactions of a ticker by Evidence id (what the judges read). */
