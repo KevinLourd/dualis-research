@@ -35,14 +35,8 @@ jobs:
         run: pnpm lint
       - name: Tests (in-process Postgres, no Docker)
         run: pnpm test
-      - name: Build (Next + OpenNext Worker bundle)
-        run: pnpm cf:build
-      - name: Worker size under the free 3 MiB limit
-        run: |
-          npx wrangler deploy --dry-run --outdir .wrangler-dry | tee dry.log
-          gz=$(grep -o 'gzip: [0-9.]* KiB' dry.log | grep -o '[0-9.]*')
-          echo "Worker gzip size: ${gz} KiB"
-          awk -v s="$gz" 'BEGIN { exit (s > 3072) }' || { echo "::error::Worker is ${gz} KiB gzipped, over the 3 MiB free plan limit"; exit 1; }
+      - name: Build (standalone Node server, web/deploy/README.md)
+        run: pnpm build && test -f .next/standalone/server.js
 
   site:
     runs-on: ubuntu-latest
