@@ -95,7 +95,7 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
       n++;
       if (prompt.includes('"reason": "<the sentence>"')) {
         prompts.reason = prompt;
-        return { text: JSON.stringify({ reason: "Orders doubled on a one-off restocking: temporary." }), model: "fake" };
+        return { text: JSON.stringify({ reason: "Customer restocking doubled orders to JPY 8.3B." }), model: "fake" };
       }
       if (prompt.includes("Where does this reason stand NOW")) {
         prompts.driver = prompt;
@@ -113,15 +113,19 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
     expect(prompts.driver).toContain("[D1 page 2] Summary of results, first half FY2026");
     expect(prompts.driver).toContain("strong needs a structural change AND a material one");
     expect(prompts.thesis).toContain("reversal:weak, temporary, Orders JPY 4.1B to JPY 8.3B (+102%), material");
-    expect(prompts.thesis).toContain("Orders doubled on a one-off restocking: temporary.");
+    expect(prompts.thesis).toContain("Customer restocking doubled orders to JPY 8.3B.");
     // The invented quote is dropped, never retried.
     expect(payload.drivers[0].citations).toEqual([expect.objectContaining({ documentId: DOC, page: 2, quote: "Orders for 300mm wafer shippers doubled" })]);
     // The reason is not the judge's job: a second call writes it from the finished judgment, at most 15 words.
     expect(prompts.driver).not.toContain('"reason"');
     expect(prompts.reason).toContain("Explanation: Management: Orders for 300mm wafer shippers doubled");
     expect(prompts.reason).toContain("at most 15 words");
-    expect(prompts.reason).toContain("Size: Orders JPY 4.1B to JPY 8.3B (+102%), material.");
-    expect(payload.drivers[0].conclusion).toBe("Orders doubled on a one-off restocking: temporary.");
+    expect(prompts.reason).toContain("Figure: Orders JPY 4.1B to JPY 8.3B (+102%).");
+    // One source per fact: durability and size are the judge's badges, never fed to the reason writer nor asked of it.
+    expect(prompts.reason).toContain("State: reversal:weak.");
+    expect(prompts.reason).not.toContain("(+102%), material");
+    expect(prompts.reason).toContain("never write them");
+    expect(payload.drivers[0].conclusion).toBe("Customer restocking doubled orders to JPY 8.3B.");
     expect(n).toBe(3);
     // Same input: never asked again.
     await judgeThesis(db, fake, dbStore(db), SYMBOL, d);
@@ -132,7 +136,7 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
 
     await promoteNarrativeStates(db, [{ subject: `${SYMBOL}:short`, payload, error: null, fetchedAt: new Date() } as unknown as BronzeFetch]);
     const states = await db.select().from(narrativeStates);
-    expect(states.find((s) => s.level === "driver")).toMatchObject({ durability: "temporary", reason: "Orders doubled on a one-off restocking: temporary.", magnitude: { figure: "Orders", size: "material" }, citations: [expect.objectContaining({ page: 2 })] });
+    expect(states.find((s) => s.level === "driver")).toMatchObject({ durability: "temporary", reason: "Customer restocking doubled orders to JPY 8.3B.", magnitude: { figure: "Orders", size: "material" }, citations: [expect.objectContaining({ page: 2 })] });
   });
 });
 
@@ -191,13 +195,13 @@ describe("a driver's state reads only what that driver is about (PR-E, Kyungbang
 describe("the driver panel: the reason first, then what changed with its quotes, then the moves", () => {
   it("renders in that order, each quote a chip opening its page, each move opening its panel", async () => {
     const { DriverReason } = await import("@/console/driver-reason");
-    const state = { effect: "reversal", strength: "weak", why: "A restocking.", reason: "Orders doubled on a one-off restocking: temporary.", durability: "temporary", magnitude: { figure: "Orders", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. It ends next year.", citations: [{ documentId: DOC, page: 2, quote: "Orders for 300mm wafer shippers doubled", title: "Summary of results" }] } as unknown as GoldNarrativeState;
+    const state = { effect: "reversal", strength: "weak", why: "A restocking.", reason: "Customer restocking doubled orders to JPY 8.3B.", durability: "temporary", magnitude: { figure: "Orders", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. It ends next year.", citations: [{ documentId: DOC, page: 2, quote: "Orders for 300mm wafer shippers doubled", title: "Summary of results" }] } as unknown as GoldNarrativeState;
     const moves = [{ id: `${SYMBOL}:2026-06-01`, startDay: "2026-06-01", direction: "up", returnPct: 0.2, cause: { fact: "First-half orders doubled." } }] as never;
     const html = renderToStaticMarkup(createElement(DriverReason, { state, side: "short", moves, hrefFor: (item: string) => `/x?item=${encodeURIComponent(item)}` }));
     expect(html).toContain("Weak crack · Temporary");
     const at = (s: string) => html.indexOf(s);
-    expect(at("Orders doubled on a one-off restocking")).toBeGreaterThan(-1);
-    expect(at("Orders doubled on a one-off restocking")).toBeLessThan(at("What changed"));
+    expect(at("Customer restocking doubled orders")).toBeGreaterThan(-1);
+    expect(at("Customer restocking doubled orders")).toBeLessThan(at("What changed"));
     expect(at("What changed")).toBeLessThan(at("What moved the stock"));
     // The chip sits right after the words it quotes and opens the page with the quote highlighted.
     expect(html).toContain(`href="/x?item=${encodeURIComponent(`doc:${DOC}:2:Orders for 300mm wafer shippers doubled`)}"`);
