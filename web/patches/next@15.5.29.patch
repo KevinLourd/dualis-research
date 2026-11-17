@@ -1,0 +1,84 @@
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.development.js b/dist/compiled/react-dom/cjs/react-dom-client.development.js
+index 4376913076151ad78dcc4059ad4152fad25478da..9befe93a658ed85da6adbef05b1669edeebc9e62 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-client.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.development.js	
+@@ -15776,6 +15776,16 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++      // Backport of React 19.3 popHydrationStateOnInterruptedWork: a host element that suspended while reconciling its
++      // children (a client component chunk not loaded yet) is replayed; rewind the hydration cursor to the element it
++      // already claimed, else the replay claims its first child and React logs #418 (Dualis console, 2026-11-17).
++      unitOfWork === hydrationParentFiber &&
++        (isHydrating
++          ? (popToNextHostParent(unitOfWork),
++            5 === unitOfWork.tag &&
++              null != unitOfWork.stateNode &&
++              (nextHydratableInstance = unitOfWork.stateNode))
++          : (popToNextHostParent(unitOfWork), (isHydrating = !0)));
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-client.production.js b/dist/compiled/react-dom/cjs/react-dom-client.production.js
+index 755076a5cf15273f024c18fdc6a8805f1e36860b..587c3c17088ef880ad53304d49bee54392c9cc36 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-client.production.js
++++ b/dist/compiled/react-dom/cjs/react-dom-client.production.js	
+@@ -11210,6 +11210,16 @@ function replaySuspendedUnitOfWork(unitOfWork) {
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      // Backport of React 19.3 popHydrationStateOnInterruptedWork: a host element that suspended while reconciling its
++      // children (a client component chunk not loaded yet) is replayed; rewind the hydration cursor to the element it
++      // already claimed, else the replay claims its first child and React logs #418 (Dualis console, 2026-11-17).
++      next === hydrationParentFiber &&
++        (isHydrating
++          ? (popToNextHostParent(next),
++            5 === next.tag &&
++              null != next.stateNode &&
++              (nextHydratableInstance = next.stateNode))
++          : (popToNextHostParent(next), (isHydrating = !0)));
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
+index 43d0363849598f796873fffaf33117d54b76de19..9c12c6a1a0379c4898d78687611f925fb656cc8f 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.development.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.development.js	
+@@ -15784,6 +15784,16 @@
+           break;
+         case 5:
+           resetHooksOnUnwind(unitOfWork);
++      // Backport of React 19.3 popHydrationStateOnInterruptedWork: a host element that suspended while reconciling its
++      // children (a client component chunk not loaded yet) is replayed; rewind the hydration cursor to the element it
++      // already claimed, else the replay claims its first child and React logs #418 (Dualis console, 2026-11-17).
++      unitOfWork === hydrationParentFiber &&
++        (isHydrating
++          ? (popToNextHostParent(unitOfWork),
++            5 === unitOfWork.tag &&
++              null != unitOfWork.stateNode &&
++              (nextHydratableInstance = unitOfWork.stateNode))
++          : (popToNextHostParent(unitOfWork), (isHydrating = !0)));
+         default:
+           unwindInterruptedWork(current, unitOfWork),
+             (unitOfWork = workInProgress =
+diff --git a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
+index 85185b07d38d122ada8ed308523b181da102ccad..d5bbcda1de4f06c4790d5f30755ef9b8bd4878fa 100644
+--- a/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js
++++ b/dist/compiled/react-dom/cjs/react-dom-profiling.profiling.js	
+@@ -11814,6 +11814,16 @@ function replaySuspendedUnitOfWork(unitOfWork) {
+       break;
+     case 5:
+       resetHooksOnUnwind(next);
++      // Backport of React 19.3 popHydrationStateOnInterruptedWork: a host element that suspended while reconciling its
++      // children (a client component chunk not loaded yet) is replayed; rewind the hydration cursor to the element it
++      // already claimed, else the replay claims its first child and React logs #418 (Dualis console, 2026-11-17).
++      next === hydrationParentFiber &&
++        (isHydrating
++          ? (popToNextHostParent(next),
++            5 === next.tag &&
++              null != next.stateNode &&
++              (nextHydratableInstance = next.stateNode))
++          : (popToNextHostParent(next), (isHydrating = !0)));
+     default:
+       unwindInterruptedWork(current, next),
+         (next = workInProgress =
