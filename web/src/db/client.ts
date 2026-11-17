@@ -1,8 +1,15 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { cache } from "react";
 import type { Db } from "./types";
-import { requestDatabaseUrl } from "./url";
+import { databaseUrl } from "./url";
 
-/** Database for the web app, one per request (Workers forbid sharing a socket across requests). */
-export const getDb = cache((): Db => drizzle(postgres(requestDatabaseUrl(), { max: 1, fetch_types: false })));
+let pool: Db | undefined;
+
+/**
+ * The console's database: ONE pool for the Node server process (web/deploy/README.md), shared by every request.
+ * Up to 10 connections, closed after a minute idle.
+ */
+export function getDb(): Db {
+  pool ??= drizzle(postgres(databaseUrl(), { max: 10, idle_timeout: 60, fetch_types: false }));
+  return pool;
+}

@@ -40,10 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# cloudflare / opennext
-/.open-next/
-/.wrangler/
-.dev.vars*
 
 # local throwaway db, clerk keyless dev keys
 /.clerk/
@@ -51,4 +47,3 @@ next-env.d.ts
 
 # neon cli local link
 .neon
-/.wrangler-dry/

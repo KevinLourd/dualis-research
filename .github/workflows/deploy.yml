@@ -21,13 +21,16 @@ jobs:
         working-directory: web
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # The OpenNext build/deploy runs wrangler locally, which wants a local stand-in for the Hyperdrive binding.
-      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # The console runs as a Node server on the Dualis server (web/deploy/README.md): a deploy-only SSH key whose
+      # only command is /srv/console/deploy-hook.sh.
+      CONSOLE_DEPLOY_KEY: ${{ secrets.CONSOLE_DEPLOY_KEY }}
+      CONSOLE_DEPLOY_HOST: ${{ secrets.CONSOLE_DEPLOY_HOST }}
+      CONSOLE_DEPLOY_KNOWN_HOSTS: ${{ secrets.CONSOLE_DEPLOY_KNOWN_HOSTS }}
+      # The doorbell of the WhatsApp service: a message the console queues leaves at once.
+      BELL_TOKEN: ${{ secrets.BELL_TOKEN }}
       # Thierry's OneDrive sign-in (Settings > OneDrive): the Azure app of his Duality tenant + the key sealing his token.
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -39,7 +42,7 @@ jobs:
         working-directory: .
         run: |
           missing=""
-          for name in DATABASE_URL DATABASE_URL_UNPOOLED CLERK_SECRET_KEY NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID AZURE_CLIENT_ID AZURE_TENANT_ID ONEDRIVE_TOKEN_KEY; do
+          for name in DATABASE_URL DATABASE_URL_UNPOOLED CLERK_SECRET_KEY NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CONSOLE_DEPLOY_KEY CONSOLE_DEPLOY_HOST CONSOLE_DEPLOY_KNOWN_HOSTS AZURE_CLIENT_ID AZURE_TENANT_ID ONEDRIVE_TOKEN_KEY; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -59,21 +62,42 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Migrate Neon (direct connection)
+      - name: Migrate the database
         run: pnpm db:migrate
-      - name: Build Worker
-        run: pnpm cf:build
-      - name: Deploy to Cloudflare Workers (runtime secrets uploaded with the version)
+      - name: Build the console (Next.js standalone Node server)
+        run: pnpm build
+      - name: Deploy to the Dualis server
         run: |
-          node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY, AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID, AZURE_TENANT_ID: process.env.AZURE_TENANT_ID, ONEDRIVE_TOKEN_KEY: process.env.ONEDRIVE_TOKEN_KEY, DRAFT_DISPATCH_TOKEN: process.env.DRAFT_DISPATCH_TOKEN || undefined }))'
           set -o pipefail  # a failed deploy must fail the step, not hide behind tee (2026-11-06: site deploy 503 read green)
-          pnpm cf:deploy -- --secrets-file "$RUNNER_TEMP/worker-secrets.json" | tee deploy.log
-          rm -f "$RUNNER_TEMP/worker-secrets.json"
-          url=$(grep -o 'https://[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)
-          echo "### Console live at $url" >> "$GITHUB_STEP_SUMMARY"
+          umask 077
+          out="$RUNNER_TEMP/console"
+          mkdir -p "$out"
+          cp -R .next/standalone/. "$out/"
+          mkdir -p "$out/.next" && cp -R .next/static "$out/.next/static"
+          if [ -d public ]; then cp -R public "$out/public"; fi
+          # The server reads the database locally: same user and password, host 127.0.0.1, no TLS hop.
+          local_db=$(python3 -c 'import os, urllib.parse as u; p = u.urlsplit(os.environ["DATABASE_URL"]); print(u.urlunsplit((p.scheme, f"{p.username}:{p.password}@127.0.0.1:5432", p.path, "sslmode=disable", "")))')
+          {
+            printf 'DATABASE_URL=%s\n' "$local_db"
+            printf 'CLERK_SECRET_KEY=%s\n' "$CLERK_SECRET_KEY"
+            printf 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=%s\n' "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+            printf 'AZURE_CLIENT_ID=%s\nAZURE_TENANT_ID=%s\nONEDRIVE_TOKEN_KEY=%s\n' "$AZURE_CLIENT_ID" "$AZURE_TENANT_ID" "$ONEDRIVE_TOKEN_KEY"
+            if [ -n "$DRAFT_DISPATCH_TOKEN" ]; then printf 'DRAFT_DISPATCH_TOKEN=%s\n' "$DRAFT_DISPATCH_TOKEN"; fi
+            if [ -n "$BELL_TOKEN" ]; then printf 'BELL_TOKEN=%s\n' "$BELL_TOKEN"; fi
+          } > "$out/console.env"
+          printf '%s\n' "$CONSOLE_DEPLOY_KEY" > "$RUNNER_TEMP/console_key"
+          printf '%s\n' "$CONSOLE_DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/console_known_hosts"
+          tar czf "$RUNNER_TEMP/console.tgz" -C "$out" .
+          rm -rf "$out"
+          du -h "$RUNNER_TEMP/console.tgz"
+          ssh -i "$RUNNER_TEMP/console_key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$RUNNER_TEMP/console_known_hosts" "$CONSOLE_DEPLOY_HOST" < "$RUNNER_TEMP/console.tgz" | tee console-deploy.log
+          rm -f "$RUNNER_TEMP/console_key" "$RUNNER_TEMP/console.tgz"
+          echo "### Console" >> "$GITHUB_STEP_SUMMARY"
+          tail -2 console-deploy.log >> "$GITHUB_STEP_SUMMARY"
       # Only what this merge can move (Kevin 2026-11-06 « speeder x10 »): a dimension's folder -> it and every later
       # one; shared collector / schema / LLM code -> core; console, site, docs -> nothing (registry.ts collectPlan).
       - name: Refresh data now
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
@@ -88,6 +112,7 @@ jobs:
   # URL and Claude token over SSH; the box key can only run wa/box/deploy-hook.sh, which rebuilds only when something changed.
   whatsapp:
     needs: deploy
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       WA_DEPLOY_KEY: ${{ secrets.WA_DEPLOY_KEY }}

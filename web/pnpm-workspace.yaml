@@ -1,7 +1,6 @@
 allowBuilds:
   esbuild: true
   sharp: true
-  workerd: true
 minimumReleaseAgeExclude:
   - '@clerk/backend@3.26.6'
   - '@clerk/nextjs@7.9.24'
@@ -37,11 +36,7 @@ minimumReleaseAgeExclude:
   - '@electric-sql/pglite-socket@0.2.18'
   - '@electric-sql/pglite@0.5.15'
   - '@next/eslint-plugin-next@15.5.29'
-  - '@opennextjs/aws@4.1.15'
-  - '@opennextjs/cloudflare@1.20.16'
   - eslint-config-next@15.5.29
-  - miniflare@5.20261103.0-beta
-  - wrangler@4.157.0
   - '@neon/config@1.10.1'
   - '@neon/env@1.6.9'
   - '@neon/sdk@7.8.0'
