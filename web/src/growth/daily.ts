@@ -1,4 +1,5 @@
 import { isoDate } from "@/collectors/markets";
+import { CONSOLE_URL } from "@/console-url";
 import { GOAL, planned, progress } from "./goal";
 
 /** Pure growth figures, shared by the Growth page and the morning WhatsApp brief: one computation, two surfaces. */
@@ -66,7 +67,7 @@ export function growthBrief(audience: { date: string; subscribers: number }[], l
   };
 }
 
-export const GROWTH_PAGE_URL = "https://dualis-console.dualis-research.workers.dev/growth";
+export const GROWTH_PAGE_URL = `${CONSOLE_URL}/growth`;
 
 /** The WhatsApp caption under the chart. Short lines, figures first. */
 export function briefText(b: GrowthBrief): string {

@@ -56,7 +56,7 @@ describe("growth brief figures", () => {
         "",
         "➡️ x11 speed needed",
         "",
-        "Details: https://dualis-console.dualis-research.workers.dev/growth",
+        "Details: https://console.dualisresearch.com/growth",
       ].join("\n"),
     );
   });
