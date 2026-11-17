@@ -5,6 +5,10 @@ import type { NextConfig } from "next";
 const stubAuth = process.env.SCREENSHOT_AUTH_STUB === "1" && process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
+  // A self-contained Node server (.next/standalone/server.js), run in a container on the Dualis server (web/deploy/README.md).
+  output: "standalone",
+  // The trace root is web/ itself: a lockfile further up the disk otherwise nests the server under that path.
+  outputFileTracingRoot: path.resolve("."),
   images: { unoptimized: true },
   // A page loaded ahead (console links prefetch in full) or already visited stays in the browser 5 minutes: a click
   // renders at once. Server actions (Thierry's edits) still refresh it right away.

@@ -12,9 +12,6 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "collect": "tsx src/collectors/cli.ts",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:deploy": "opennextjs-cloudflare deploy",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "wa:test": "tsx scripts/whatsapp-test.ts",
     "wa:signal-test": "tsx scripts/signal-alert-test.ts",
     "private:push": "tsx scripts/private-push.ts"
@@ -38,7 +35,6 @@
     "@eslint/eslintrc": "^3",
     "@neon/config": "1.10.1",
     "@neon/env": "1.6.9",
-    "@opennextjs/cloudflare": "1.20.16",
     "@tailwindcss/postcss": "^4.3.4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -52,7 +48,6 @@
     "typescript": "^5",
     "unpdf": "^2.1.0",
     "vitest": "3.2.4",
-    "wrangler": "4.157.0",
     "zod": "^4.6.7"
   }
 }

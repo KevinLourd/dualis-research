@@ -140,6 +140,33 @@ export function deriveMetrics(symbol: string, lines: Line[]): Metric[] {
     if (ebitda !== undefined && rev && rev.value > 0) base("ebitda-margin", ebitda / rev.value, "ratio", "EBITDA / revenue", [...ebitdaInputs, rev]);
     if (fcf !== undefined && rev && rev.value > 0) base("fcf-margin", fcf / rev.value, "ratio", "free cash flow / revenue", [get(pt, pe, "cfo")!, get(pt, pe, "capex")!, rev]);
 
+    // Leverage read against earnings, the way a credit analyst reads it (Thierry 2026-11-17: debt / EBITDA, never debt
+    // next to market cap): the debt at the period end over the EBITDA of the 12 months to it (the fiscal year, or the
+    // last 4 reported quarters); interest cover = operating income / interest expense over the same 12 months.
+    // No ratio when EBITDA (or operating income) is zero or negative: the multiple means nothing there.
+    const ltmQuarters = pt === "year" ? [pe] : [0, 3, 6, 9].map((n) => minusMonths(pe, n));
+    const ltmWords = pt === "year" ? "fiscal year" : "last 4 reported quarters";
+    const ltmLines = (line: string) => ltmQuarters.map((p) => get(pt, p, line));
+    const ltmEbitda = ltmQuarters.map((p) => metrics.get(`${pt}|${p}|ebitda`));
+    if (ltmEbitda.every((v) => v !== undefined)) {
+      const e = (ltmEbitda as number[]).reduce((a, b) => a + b, 0);
+      const eInputs = [...ltmLines("operating-income"), ...ltmLines("depreciation-amortization")] as Line[];
+      const debt = get(pt, pe, "total-debt");
+      const cash = get(pt, pe, "cash");
+      if (e > 0 && debt) {
+        base("total-debt-to-ebitda", debt.value / e, "multiple", `total debt / EBITDA of the ${ltmWords} (EBITDA = operating income + depreciation and amortization)`, [debt, ...eInputs]);
+        if (cash) base("net-debt-to-ebitda", (debt.value - cash.value) / e, "multiple", `(total debt - cash and equivalents) / EBITDA of the ${ltmWords}; below zero = more cash than debt`, [debt, cash, ...eInputs]);
+      }
+    }
+    const oi = ltmLines("operating-income");
+    const interest = ltmLines("interest-expense");
+    if (oi.every(Boolean) && interest.every(Boolean)) {
+      const o = (oi as Line[]).reduce((a, l) => a + l.value, 0);
+      // Outflows are stored positive; a source that signs interest negative is read the same.
+      const i = (interest as Line[]).reduce((a, l) => a + Math.abs(l.value), 0);
+      if (o > 0 && i > 0) base("interest-cover", o / i, "multiple", `operating income / interest expense, ${ltmWords}`, [...(oi as Line[]), ...(interest as Line[])]);
+    }
+
     const priceLine = get("month", pe, "share-price");
     const shares = get(pt, pe, "shares-outstanding") ?? get(pt, pe, "shares-diluted-avg");
     if (!priceLine || !shares) continue;
