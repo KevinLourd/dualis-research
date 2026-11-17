@@ -7,7 +7,7 @@ import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } fr
 import { analysedSymbols } from "../watchlist";
 import { stripDashes } from "../thesis/structure";
 import { fnv, gatherFacts } from "./facts";
-import { ANALYSIS_SYSTEM, ANALYSIS_VERSION, RATIONALE_SYSTEM, REPORT_SYSTEM, analysisPrompt, parseAnalysis, parseRationale, rationalePrompt, reportPrompt } from "./prompt";
+import { ANALYSIS_SYSTEM, ANALYSIS_VERSION, RATIONALE_SYSTEM, REPORT_SYSTEM, analysisPrompt, bindMoves, parseAnalysis, parseRationale, rationalePrompt, reportPrompt } from "./prompt";
 import { exhibitData, seriesCatalog, type StoredSeries } from "./series";
 import { currentSides, driverIdOf, parseThesisId, sidesOrReason, thesisId } from "./sides";
 
@@ -74,6 +74,7 @@ export const analysisSource: Source = {
       ({ answer, unbound } = bindExhibits(parseAnalysis(again.text), facts.catalog));
       if (unbound.length) return { request: { inputHash }, httpStatus: null, payload: { answer: again.text }, error: `drivers ${unbound.join(", ")} have no exhibit drawn from stored series` };
     }
+    answer = bindMoves(answer, symbol, facts.moveIds);
     const numbered = numberedExhibits(answer);
     // Narrative Rationale: why the market holds the story, every claim citing its sources; its charts bound like the drivers'.
     const r = await ctx.complete({ system: RATIONALE_SYSTEM, prompt: rationalePrompt(facts.text, answer, numbered) });
@@ -149,7 +150,7 @@ export async function rebuildAnalysisGold(db: Db): Promise<void> {
       const version = thesisVersion(a.analysis);
       nar.push({ id, symbol, side, text: a.analysis.narrative, detail: a.analysis.narrativeDetail ?? null, version, asOf: a.createdAt });
       const exhibitIds: string[] = [];
-      a.analysis.drivers.forEach((d, i) => drv.push({ id: driverIdOf(symbol, side, i + 1), symbol, side, rank: i + 1, category: d.category, title: d.title, summary: d.summary ?? null, text: d.text, version }));
+      a.analysis.drivers.forEach((d, i) => drv.push({ id: driverIdOf(symbol, side, i + 1), symbol, side, rank: i + 1, category: d.category, title: d.title, summary: d.summary ?? null, text: d.text, moveIds: d.moveIds ?? [], version }));
       for (const e of numberedExhibits(a.analysis)) {
         const data = exhibitData(catalog, e.series);
         if (!data) continue;

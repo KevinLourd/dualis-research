@@ -2,7 +2,7 @@ import { cache } from "react";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { SignalCall, SignalStrength } from "@/content/signal-words";
 import { getDb } from "@/db/client";
-import { evidence as goldEvidence, exhibits, fairValues, marketReactions, narrativeDrivers, narrativeStates, signals, type ThesisSide } from "@/db/schema/analysis";
+import { evidence as goldEvidence, exhibits, fairValues, marketReactions, narrativeDrivers, narrativeStates, priceMoveCauses, priceMoves, signals, type ThesisSide } from "@/db/schema/analysis";
 import { consensus } from "@/db/schema/consensus";
 import { companyProfiles, filings, priceBars, quotes, tickers } from "@/db/schema/gold";
 import { goldNewsItems } from "@/db/schema/news";
@@ -179,7 +179,12 @@ export async function driverDetail(symbol: string, id: string) {
     db.select().from(narrativeStates).where(eq(narrativeStates.id, id)),
     db.select().from(marketReactions).where(eq(marketReactions.symbol, symbol)),
   ]);
-  return driver ? { driver, exhibits: xs, evidence: ev.filter((e) => e.verdicts.some((v) => v.driverId === id && v.effect !== "noise")), state: state ?? null, side: driver.side, reactions: new Map(reactions.map((r) => [r.id, r])) } : null;
+  if (!driver) return null;
+  // The significant moves the market made on this reason (what made it a driver), newest first.
+  const moves = driver.moveIds.length
+    ? (await db.select().from(priceMoves).leftJoin(priceMoveCauses, eq(priceMoveCauses.id, priceMoves.id)).where(inArray(priceMoves.id, driver.moveIds)).orderBy(desc(priceMoves.startDay))).map((r) => ({ ...r.price_moves, cause: r.price_move_causes }))
+    : [];
+  return { driver, exhibits: xs, evidence: ev.filter((e) => e.verdicts.some((v) => v.driverId === id && v.effect !== "noise")), state: state ?? null, side: driver.side, moves, reactions: new Map(reactions.map((r) => [r.id, r])) };
 }
 
 /** Level C: one Exhibit and the driver it supports. */

@@ -8,6 +8,7 @@ import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
 import { driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
 import { StrengthBadge } from "./board";
 import { TagBadge } from "./tag-badge";
+import { DriverReason } from "./driver-reason";
 import { EvidenceRows, Exhibit, itemHref, metricLabel, PRICED_WORD } from "./analysis";
 import { reactionLine } from "@/collectors/dimensions/market-reaction/compute";
 import { DriverExhibit, ExhibitChart } from "./driver-chart";
@@ -273,13 +274,11 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
     subtitle: `${d.driver.category}, a reason the market holds the narrative`,
     body: (
       <>
-        {d.state && (
-          <div className="flex flex-col gap-2">
-            <TagBadge effect={d.state.effect} strength={d.state.strength} side={d.side} />
-            {d.state.why && <p className="text-base leading-relaxed text-kumo-default">{d.state.why}</p>}
-          </div>
-        )}
-        <p className="text-lg leading-relaxed text-kumo-strong">{d.driver.text}</p>
+        {/* The reason first, in one sentence (Kevin 2026-11-17), then what changed with its quotes, then the moves. */}
+        <DriverReason state={d.state} side={d.side} moves={d.moves} hrefFor={(item) => itemHref(symbol, item)} />
+        <Section title="Why the market holds it">
+          <p className="text-base leading-relaxed text-kumo-default">{d.driver.text}</p>
+        </Section>
         {d.exhibits.map((x) => (
           <Exhibit key={x.id} symbol={symbol} exhibit={x} />
         ))}
