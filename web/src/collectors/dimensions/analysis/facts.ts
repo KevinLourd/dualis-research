@@ -50,6 +50,12 @@ const QUARTER_LINES = ["qline:revenue", "qline:operating-income", "qline:net-inc
  */
 const OPERATING_KEYS = ["line:backlog", "metric:backlog-growth", "metric:backlog-to-revenue", "line:remaining-performance-obligations", "metric:remaining-performance-obligations-growth", "metric:remaining-performance-obligations-to-revenue", "line:order-intake", "metric:book-to-bill"];
 const OPERATING_QUARTER_KEYS = OPERATING_KEYS.map((k) => `q${k}`);
+/**
+ * Leverage the way an investor reads it: debt against the earnings that service it (net debt and total debt over the
+ * EBITDA of the 12 months to that date, interest cover), beside the debt and cash they come from. Absent rows drop.
+ */
+const BALANCE_KEYS = ["line:total-debt", "line:cash", "metric:net-debt", "metric:ebitda", "metric:net-debt-to-ebitda", "metric:total-debt-to-ebitda", "line:interest-expense", "metric:interest-cover"];
+const BALANCE_QUARTER_KEYS = BALANCE_KEYS.filter((k) => k !== "metric:ebitda").map((k) => `q${k}`);
 const HALF_LINES = ["hline:revenue", "hline:gross-profit", "hline:operating-income", "hline:net-income"];
 
 const pct = (v: number | null) => (v === null ? null : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
@@ -101,6 +107,7 @@ export async function figuresText(db: Db, symbol: string): Promise<string> {
     keys("qline").length ? `Last quarters:\n${table(catalog, keys("qline"), 4)}` : null,
     keys("hline").length ? `Last half years:\n${table(catalog, keys("hline"), 4)}` : null,
     operatingText(catalog),
+    balanceText(catalog),
     streamsText(streams),
   ]
     .filter((x) => x !== null)
@@ -114,6 +121,20 @@ function operatingText(catalog: Map<string, StoredSeries>): string | null {
   if (years.length + quarters.length === 0) return null;
   return [
     "Operating figures the company reports (backlog = at the period end; x = times the revenue of the 12 months to that date):",
+    years.length ? table(catalog, years, 4) : null,
+    quarters.length ? `Quarters:\n${table(catalog, quarters, 4)}` : null,
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
+}
+
+/** Debt, cash and leverage against earnings, fiscal years then quarters; null when nothing is reported. */
+export function balanceText(catalog: Map<string, StoredSeries>): string | null {
+  const years = BALANCE_KEYS.filter((k) => catalog.has(k));
+  const quarters = BALANCE_QUARTER_KEYS.filter((k) => catalog.has(k));
+  if (years.length + quarters.length === 0) return null;
+  return [
+    "Balance sheet and leverage (debt and cash at the period end; Net debt / EBITDA and Total debt / EBITDA = times the EBITDA of the 12 months to that date, a negative net debt = more cash than debt; interest cover = operating income / interest expense over the same 12 months):",
     years.length ? table(catalog, years, 4) : null,
     quarters.length ? `Quarters:\n${table(catalog, quarters, 4)}` : null,
   ]
@@ -179,6 +200,10 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   // per news): they stay out of the hash; each one is judged against the narrative by `evidence` instead.
   const news = ["News and filings of the last 12 months (newest first):", items.length ? items.map((i) => `- ${i.at.toISOString().slice(0, 10)} ${i.kind}${i.publisher ? ` (${i.publisher})` : ""}: ${i.title}`).join("\n") : "none"].join("\n");
 
+  // Leverage against earnings reaches the model now, outside the hash: the analysis rewrite that reads it is one
+  // ANALYSIS_VERSION bump (INFLECTION-1117 PR-D), never a second wave of rewrites from this block alone.
+  const leverage = balanceText(catalog);
+
   const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency, stamp: quoteStamp(quote) } : null;
   const fvLine = fairValue
     ? `Fair value (${fairValue.author === "thierry" ? "the analyst's own number" : "weighted from several valuation methods"}): ${fmt(fairValue.value, "per-share")} ${fairValue.currency ?? ""}${fairValue.low !== null && fairValue.high !== null ? `, range ${fmt(fairValue.low, "per-share")} to ${fmt(fairValue.high, "per-share")}` : ""}; ${fairValue.method ?? ""}.${vreport ? ` ${vreport.summary}` : ""}`
@@ -188,7 +213,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
   const bucket = q && q.close > 0 ? Math.round(Math.log(q.close) / Math.log(1.15)) : "none";
   return {
     symbol,
-    text: `${priceLine}\n${fvLine}\n${stable}\n\n${news}`,
+    text: `${priceLine}\n${fvLine}\n${stable}${leverage ? `\n\n${leverage}` : ""}\n\n${news}`,
     hash: fnv(`${stable}\nprice-bucket:${bucket}\nfair-value-bucket:${fvBucket}`),
     catalog,
     quote: q,
