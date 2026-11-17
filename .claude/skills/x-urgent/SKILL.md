@@ -9,7 +9,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 
 ## X post
 - **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead (belief, real figure with both values, why), at most 250 characters, ending « Source: Dualis Research »; never the one-line 🚨 form.
-- **Length**: at most 200 characters.
+- **Length**: at most 200 characters. The shock number compares two consecutive periods (quarter with quarter, year with year), names both values and the period, and says in a few words why it matters.
 - **Hook**: opens `🚨 BREAKING: <short name>` then ONE shock number in the first 60 characters.
 - **Structure**: the shock number, then one line of urgency (« Nobody is pricing this. », « The market has not caught up. »), never a fair value or gap. `$TICKER` once. ONE measure only, the one the picture shows, copied digit for digit from its note; no claim without its number. A macro post names the exposure with its own figure and unit (« borrowings minus cash $38.2M »).
 - **Allowed**: one word in CAPS, one exclamation mark, « just », « wake up », « nobody is talking about this ».
@@ -23,12 +23,12 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 
 ## X Article
 - **Length**: 400 to 700 words, short punchy paragraphs (1-2 sentences).
-- **Title**: `BREAKING:` + the shock number, at most 90 characters, a number the cover charts (« BREAKING: CareCloud Quadrupled Shareholder Profit and Wall Street Missed It »).
+- **Title**: `BREAKING:` + the shock number, at most 90 characters, ONE measure with ONE period, the one the cover charts (« BREAKING: CareCloud Quadrupled Shareholder Profit and Wall Street Missed It »).
 - **Subtitle**: one line of urgency on the title's measure.
 - **Structure** (`##` headings): `## The number`, `## Why nobody saw it`, `## What happens next`, `## The risk`.
 - **Visual**: see Image below.
 - Do: one bold line per section with its figure.
-- Don't: drop the risk section; fake scarcity (« last chance »); jargon (« dilute », « 200-day average »: say more shares sold, average price of the last 200 days); a line on the signal's own strength (« Our signal is weak »).
+- Don't: drop the risk section; fake scarcity (« last chance »); any word from the plain-words list of content-matrix, e.g. free cash flow, net debt, dilute (say cash left after investments, borrowings minus cash, more shares sold); any word on the signal's strength or our reading (« Our reading is a weak one »).
 
 ## Image
 - **style**: `breaking` (news card when a news item is listed, else the big title).

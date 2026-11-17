@@ -8,7 +8,7 @@ description: Substack in the BALANCED tone (today's Dualis house style) - Note a
 The house style (skills `daily-content`, `breaking-chart`, `research-note`, `content-drafts/format.ts`). The analyst with conviction: urgent, direct, certain, sober words.
 
 ## Note
-- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead, at most 400 characters, line 1 opening « 📈 <Company> $TICKER: » (📉 for a SELL), never 🚨.
+- **Signal post (BUY or SELL)**: the 3 spaced lines of skill `angle-signal` instead, at most 400 characters, line 1 ALWAYS opening « 📈 <Company> $TICKER: » (📈 for a BUY or an inflection, 📉 for a SELL or a crack; never no emoji), never 🚨.
 - **Length**: one paragraph of 2 or 3 short sentences, 150 to 300 characters, no line breaks. Short Notes break out most often; 600-1,199 characters is a dead zone (Eden, 473k Notes: https://eden.so/blog/how-to-grow-on-substack-notes/).
 - **Hook** (a post with no BUY or SELL): `🚨 <short name>: ` then the alarm with its number and period (« Q3 profit $4.7M »). Never a label or question (« Trade alert », « Here Is What Happened Next »); every claim carries a number.
 - **Structure**: 1 the alarm + number, 2 why the market has it wrong, 3 (optional) what to watch.
@@ -23,7 +23,7 @@ The house style (skills `daily-content`, `breaking-chart`, `research-note`, `con
 ## Article
 Anatomy of skill `research-note`; title formula of Multibagger Ideas (the claim with its figures).
 - **Length**: 900 to 1400 words.
-- **Title**: a claim with its figures (« 4x Profit for Shareholders, a Price Still Pricing the Preferred »). Subtitle: one line; it becomes the SEO description (https://on.substack.com/p/substack-seo-guide).
+- **Title**: a claim with the figures of the ONE measure of the cover chart, never a second measure such as the share price (« 4x Profit for Shareholders, a Price Still Pricing the Preferred »). Subtitle: one line; it becomes the SEO description (https://on.substack.com/p/substack-seo-guide).
 - **Structure** (`##` headings): `## Key takeaways` (3 bullets), `## What the market believes`, `## What changed`, `## Bull vs bear`, `## What would prove us wrong`.
 - **Visual**: see Image below.
 - Do: numbers with date and source; the paywall would sit before « Bull vs bear » (Substack's examples put it before the payoff: https://on.substack.com/p/free-vs-paid).

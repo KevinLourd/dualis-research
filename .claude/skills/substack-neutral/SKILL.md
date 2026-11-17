@@ -24,7 +24,7 @@ CareCloud reported Q3 profit attributable to common shareholders of $4.7M, four 
 - **Title**: descriptive, ONE measure only, plain words (« CareCloud: Q3 Profit for Shareholders Rose Fourfold »); never a price gap plus a one-day fall in one title. Subtitle: the view in one line.
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence` (reported figures, each with both values), `## Risks`; no valuation section, never a fair value or price target. The 3 signal lines are told as flowing sentences inside these sections, never pasted as a block of lines and never above the Summary.
 - **Visual**: see Image below. The cover's note prints the title's number.
-- Do: every figure with its period and source, in plain words (operating profit, « a year earlier »), never EBITDA, enterprise value, discounted cash flow, micro-cap or « year over year »; count beliefs once (never « four beliefs » then « two of the four »).
+- Do: every figure with its period and source, in plain words (operating profit, « a year earlier »), every change (a %, « a third », « doubled ») with both values (« $7.5M, up 21% from $6.2M »), never EBITDA, enterprise value, discounted cash flow, micro-cap or « year over year »; count beliefs once (never « four beliefs » then « two of the four »).
 - Don't: emoji, hype, an unsourced figure, a sentence about our own method (« we rate », « the three lines of the signal », « our analysis marks »).
 
 ## Image

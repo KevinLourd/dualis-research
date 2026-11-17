@@ -24,7 +24,7 @@ The house style of our X drafts (skill `x-post`, `content-drafts/format.ts`). Th
 ## X Article (long-form, Premium)
 X Articles carry a title, a cover image, headers, images and embedded posts (https://ppc.land/x-opens-articles-to-all-premium-users-ending-exclusive-pricing-tier/). The timeline shows only the title and cover, so the title is the hook (https://opentweet.io/how-to/write-an-x-article).
 - **Length**: 500 to 900 words, counted before sending: each section gets 2-4 short paragraphs with a dated figure per paragraph.
-- **Title**: the claim with its figures, at most 90 characters (« CareCloud Earns 4x More for Shareholders. The Price Has Not Noticed »).
+- **Title**: the line-2 figure of the 3 lines with its period, at most 90 characters (« CareCloud Margin Hit 19.6% in Q3, Up From 5.8% »); never the share price.
 - **Subtitle**: one line, what the reader learns.
 - **Structure** (markdown `##` headings, each section does one job):
   1. `## What happened`: the fact, dated, with its source.

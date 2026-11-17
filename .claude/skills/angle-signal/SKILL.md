@@ -16,8 +16,8 @@ Our own edge: a narrative cracking or inflecting, read by our analysis. It is th
 ## How to write it: 3 lines
 **Every signal post, X and Substack, every tone, is these 3 lines in order, a blank line between them:**
 1. **What the market believes**: the story the price tells, in a few plain words, with the company and `$TICKER` (« SuperCom $SPCB: the market still prices a shrinking business. »).
-2. **The real figure that contradicts it**: ONE reported figure with its period and its comparison, both values (« Q3 revenue $7.5M, up 21% from $6.2M a year earlier. »). Copied from Reported figures, Evidence or a driver's `Now:` line; the % comes from those two values.
-3. **Why it breaks the story, in ONE sentence** (« A shrinking business does not grow sales 21%. »).
+2. **The real figure that contradicts it**: ONE reported figure with its period and both values, a « record » included (the earlier value it beats) (« Q3 revenue $7.5M, up 21% from $6.2M a year earlier. »). Copied digit for digit from one reversing driver's `Now:` line: its measure, both values, its rounding, the word naming what the second value is (expected, a year earlier; « record » alone fails), and the side of the picture (crack = SELL, inflection = BUY). With a frame drawn, line 2 is the headline figure of one frame block, its digits copied exactly (a cash level, share count or margin the frame does not headline is never line 2), and line 1, line 3 and the emoji follow that block's side (inflection 📈, crack 📉). With no driver, from Reported figures or Evidence; the % comes from those two values.
+3. **Why it breaks the story: one sentence, one cause (never two joined by « and »), no number, no claim such as « record » that lacks a figure** (« A shrinking business does not grow sales 21%. »).
 - Then « Source: Dualis Research » on its own line.
 - **Layout**: urgent and balanced may open line 1 with 📈 (a story turning up, BUY side) or 📉 (a loved story cracking, SELL side); neutral uses spacing only. The tone changes the words, never the 3 lines.
 - **Length**: X post at most 250 characters (the disclaimer follows, X stops at 280); Note at most 400 characters; an Article opens with the 3 lines as its first section, then gives the evidence.
@@ -25,8 +25,8 @@ Our own edge: a narrative cracking or inflecting, read by our analysis. It is th
 - The picture: skill `content-matrix`, « The picture » (the chart of the line-2 figure, both periods boxed).
 - Say « profit for shareholders », never « net income ». One measure across the 3 lines.
 
-## A post with no BUY or SELL (a plain company update)
-ONE claim with its reported figure, period and comparison, what is new and why a holder cares today, at most 3 figures, its own chart. Never a result that improved beside another that worsened.
+## A post with no BUY or SELL (a weak signal)
+Still the 3 lines above and the Source line, on ONE measure: the line-2 figure with its period and both values, the same measure in every line, no second result, its own chart. The last line is « Source: Dualis Research ».
 
 ## Never
 - A fair value, a gap to it (« 24% under fair value »), a range, an upside or downside %, a price target, a horizon or the word « opportunity ».

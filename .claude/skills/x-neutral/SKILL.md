@@ -27,7 +27,7 @@ CareCloud ($CCLD) reported Q3 profit attributable to common shareholders of $4.7
 - **Structure** (`##` headings): `## Summary` (3 bullets: view, catalyst, risk), `## Background`, `## The evidence` (the reported figures, each with both values), `## Risks`. No valuation section: never a fair value or price target.
 - **Visual**: see Image below.
 - Do: one figure per sentence with its period.
-- Don't: emoji, hype, an unsourced figure, or jargon in the body: say « new shares sold » (never dilution), « the profit multiple » (never price to earnings or enterprise value to operating profit), « operating profit » (never operating profit before depreciation), « average price of the last 200 days ».
+- Don't: emoji, hype, an unsourced figure, or jargon in the body: say « new shares sold » (never dilution), « cash left after investments » (never free cash flow), « the profit multiple » (never price to earnings or enterprise value to operating profit), « operating profit » (never operating profit before depreciation), « average price of the last 200 days ».
 
 ## Image
 - **style**: `breaking`, ONE chart; a BUY or SELL post follows content-matrix « The picture » (the chart of the line-2 figure, `from` = the compared period).
