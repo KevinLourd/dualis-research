@@ -185,7 +185,7 @@ export function balanceText(catalog: Map<string, StoredSeries>): string | null {
 
 const minusYear = (ym: string) => (ym ? `${Number(ym.slice(0, 4)) - 1}${ym.slice(4)}` : "");
 
-function table(catalog: Map<string, StoredSeries>, keys: string[], last: number): string {
+export function table(catalog: Map<string, StoredSeries>, keys: string[], last: number): string {
   const rows = keys.map((k) => catalog.get(k)).filter((s): s is StoredSeries => !!s);
   if (rows.length === 0) return "none";
   const periods = [...new Set(rows.flatMap((s) => [...s.points.keys()]))].sort().slice(-last);

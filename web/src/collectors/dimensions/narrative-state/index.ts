@@ -1,8 +1,9 @@
 import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
-import { figuresText } from "../analysis/facts";
+import { figuresText, table } from "../analysis/facts";
+import { seriesCatalog, type StoredSeries } from "../analysis/series";
 import { quoteStamp } from "../intraday-price";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { DURABILITIES, evidence, fairValueHistory, NARRATIVE_TAGS, narratives, narrativeStates, parseTag, priceMoveCauses, priceMoves, PRICED_IN, type DocCitation, type Durability, type GoldEvidence, type Magnitude, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
+import { DURABILITIES, evidence, exhibits, fairValueHistory, NARRATIVE_TAGS, narratives, narrativeStates, parseTag, priceMoveCauses, priceMoves, PRICED_IN, type DocCitation, type Durability, type GoldEvidence, type Magnitude, type PricedIn, type Strength, type ThesisSide } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import { judgments } from "@/db/schema/silver";
 import type { Db } from "@/db/types";
@@ -37,8 +38,11 @@ export const NARRATIVE_STATE_DIMENSION = "narrative-state";
  * last reading, key on facts + 5% buckets. v5 (INFLECTION-1117, Thierry): + durability (structural / temporary), magnitude,
  * the one-sentence reason, the full explanation quoting management from the company's documents, the moves behind it.
  * v6 (eval 2026-11-17: reasons ran to 40 words, a consensus driver sized on net debt): reason at most 20 words, magnitude = this reason's figure.
+ * v7 (PR-E, prod 2026-11-17: Kyungbang's holder, profit and consensus drivers all read the company's debt paydown): the
+ * judge reads the driver's OWN figures first (its exhibits' series), the company's other figures as context only, and
+ * judges this reason alone; magnitude names its series, kept only when it is one of the driver's (`scopeMagnitude`).
  */
-export const DRIVER_STATE_QUESTION = "driver-state@v6";
+export const DRIVER_STATE_QUESTION = "driver-state@v7";
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. v3: reads each driver's durability and magnitude. */
 export const THESIS_STATE_QUESTION = "thesis-state@v3";
 
@@ -121,7 +125,7 @@ export function parseAnswer(text: string, withSignal: boolean): Answer {
     why: str(o.why),
     // Durability only says something about a turn: nothing turns = n-a, whatever the answer wrote.
     durability: o.durability === undefined ? null : reversal && DURABILITIES.includes(o.durability as Durability) ? (o.durability as Durability) : "n-a",
-    magnitude: m && str(m.figure) ? { figure: str(m.figure)!, from: str(m.from), to: str(m.to), change: str(m.change), size: m.size === "material" ? "material" : "small" } : null,
+    magnitude: m && str(m.figure) ? { figure: str(m.figure)!, series: str(m.series), from: str(m.from), to: str(m.to), change: str(m.change), size: m.size === "material" ? "material" : "small" } : null,
     reason: str(o.reason),
     explanation: str(o.explanation),
     citations: (Array.isArray(o.citations) ? (o.citations as Record<string, unknown>[]) : [])
@@ -172,6 +176,53 @@ export async function driverMoveLines(db: Db, moveIds: string[]): Promise<string
   return rows.map(({ price_moves: m, price_move_causes: c }) => `${m.startDay}: stock ${pct(m.returnPct)}, S&P 500 ${pct(m.benchReturn)}. ${c?.fact ?? "cause not judged"}`);
 }
 
+/** A driver's chart as its judge sees it: the title and the stored series keys it draws (gold.exhibits, or an analysis answer in a replay). */
+export type DriverExhibit = { title: string; series: string[] };
+
+/** Series families whose keys name the same figure at another period length (`line:revenue`, `qline:revenue`...). */
+const FAMILIES = [["line", "hline", "qline", "metric", "qmetric"], ["consensus", "qconsensus", "actual", "qactual"]];
+/**
+ * The stored series that belong to a driver: its exhibits' keys, the same figure at the other period lengths, and the
+ * figure's derived ratios (`revenue` -> `revenue-growth`, `net-debt` -> `net-debt-to-ebitda`). The share price is the
+ * market's reaction, never the business figure a reason is measured on: left out.
+ */
+export function driverSeriesKeys(catalog: Map<string, StoredSeries>, exhibitsOf: DriverExhibit[]): string[] {
+  const out = new Set<string>();
+  for (const key of exhibitsOf.flatMap((e) => e.series)) {
+    const i = key.indexOf(":");
+    if (i < 0) continue;
+    const [prefix, name] = [key.slice(0, i), key.slice(i + 1)];
+    const family = FAMILIES.find((f) => f.includes(prefix));
+    if (!family) continue;
+    for (const k of catalog.keys()) {
+      const j = k.indexOf(":");
+      const [p, n] = [k.slice(0, j), k.slice(j + 1)];
+      if (family.includes(p) && (n === name || n.startsWith(`${name}-`))) out.add(k);
+    }
+  }
+  return [...out].sort();
+}
+
+/** A driver's own figures for its judge: one table per period length, the latest 6 periods, each row with its key. */
+export function driverFiguresText(catalog: Map<string, StoredSeries>, keys: string[], exhibitsOf: DriverExhibit[]): string | null {
+  if (keys.length === 0) return null;
+  const byType = new Map<string, string[]>();
+  for (const k of keys) {
+    const t = catalog.get(k)!.periodType;
+    byType.set(t, [...(byType.get(t) ?? []), k]);
+  }
+  const charts = exhibitsOf.map((e) => e.title).join("; ");
+  return [`Its charts: ${charts}.`, ...[...byType].map(([t, ks]) => `${{ year: "Fiscal years", half: "Half years", quarter: "Quarters", month: "Months" }[t as StoredSeries["periodType"]]}:\n${table(catalog, ks, 6)}`)].join("\n");
+}
+
+/**
+ * Deterministic cleanup after the judge (never a retry): a magnitude stays only when it is read on one of the driver's
+ * own series. A driver with none gets no magnitude; a figure from another part of the business belongs to its own driver.
+ */
+export function scopeMagnitude(m: Magnitude | null, keys: Set<string>): Magnitude | null {
+  return m && m.series && keys.has(m.series) ? m : null;
+}
+
 /** Where a stored judgment lives: the database in a run, a map in a dry replay (the eval reads prod, never writes). */
 export type JudgmentStore = {
   get(subjectKind: string, subjectId: string, questionKey: string): Promise<typeof judgments.$inferSelect | undefined>;
@@ -200,12 +251,13 @@ export const memoryStore = (): JudgmentStore => {
 };
 
 /** One stored judgment per (subject, question key): same input, never asked twice. `pages` = the documents the judge read (its citations are checked against them before storing). */
-async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: { subjectKind: string; subjectId: string; questionKey: string; question: string; prompt: string; withSignal: boolean; pages?: ReadPages }) {
+async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: { subjectKind: string; subjectId: string; questionKey: string; question: string; prompt: string; withSignal: boolean; pages?: ReadPages; magnitudeKeys?: Set<string> }) {
   const stored = await store.get(req.subjectKind, req.subjectId, req.questionKey);
   if (stored) return stored;
   const r = await complete({ system: SYSTEM, prompt: req.prompt });
   const a = parseAnswer(r.text, req.withSignal);
   const citations = req.pages ? await keepPrintedCitations(db, a.citations, req.pages) : [];
+  const magnitude = req.magnitudeKeys ? scopeMagnitude(a.magnitude, req.magnitudeKeys) : a.magnitude;
   return store.put({
     subjectKind: req.subjectKind,
     subjectId: req.subjectId,
@@ -216,7 +268,7 @@ async function judgeOnce(store: JudgmentStore, db: Db, complete: Complete, req: 
     citedSentence: null,
     reason: a.why,
     model: r.model,
-    raw: { headline: a.headline, since: a.since, pricedIn: a.pricedIn, signal: a.signal, durability: a.durability, magnitude: a.magnitude, reason: a.reason, explanation: a.explanation, citations, citationsDropped: a.citations.length - citations.length },
+    raw: { headline: a.headline, since: a.since, pricedIn: a.pricedIn, signal: a.signal, durability: a.durability, magnitude, ...(a.magnitude && !magnitude ? { magnitudeDropped: a.magnitude } : {}), reason: a.reason, explanation: a.explanation, citations, citationsDropped: a.citations.length - citations.length },
   });
 }
 type Raw = { headline?: string | null; since?: string | null; pricedIn?: PricedIn | null; signal?: Strength | null; durability?: Durability | null; magnitude?: Magnitude | null; reason?: string | null; explanation?: string | null; citations?: DocCitation[] };
@@ -276,7 +328,7 @@ export async function pathLines(db: Db, symbol: string, now = new Date()): Promi
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** What a driver of this thesis looks like to the judges (gold.narrative_drivers, or an analysis answer in a replay). */
-export type JudgedDriver = { id: string; rank: number; category: string; title: string; text: string; moveIds: string[] };
+export type JudgedDriver = { id: string; rank: number; category: string; title: string; text: string; moveIds: string[]; exhibits?: DriverExhibit[] };
 export type ThesisInput = { side: ThesisSide; version: string; narrative: string; market: Parameters<typeof marketLine>[0]; drivers: JudgedDriver[] };
 
 /**
@@ -291,16 +343,28 @@ const DRIVER_GAME = [
 ].join(" ");
 
 /**
+ * The scope of one driver judge (PR-E, Kyungbang 2026-11-17: the holder, profit and consensus drivers all read the debt
+ * paydown): the market holds several reasons, each has its own judge, so this one judges its own subject only.
+ */
+const DRIVER_SCOPE = [
+  "You judge THIS reason only. The market holds the story for several reasons and each one has its own judge: has what the market believes on THIS point turned?",
+  "A change in another part of the business (debt paid down under a reason about profits, store sales under a reason about analyst coverage) is judged on the reason about it, never here.",
+  "When this reason's own subject did not move, it reads continuation or noise, and the reason says so about this subject, whatever else improved or worsened.",
+].join(" ");
+
+/**
  * Judges one thesis: each driver (its news, the moves it rests on, the company's own documents), then the thesis.
  * `store` keeps the judgments (the database in a run, memory in a dry replay).
  */
 export async function judgeThesis(db: Db, complete: Complete, store: JudgmentStore, symbol: string, d: ThesisInput): Promise<NarrativeStatePayload> {
   const side = d.side;
-  const [rows, reactions, pages] = await Promise.all([db.select().from(evidence).where(eq(evidence.symbol, symbol)), reactionsOf(db, symbol), pagesToRead(db, symbol)]);
+  const [rows, reactions, pages, catalog] = await Promise.all([db.select().from(evidence).where(eq(evidence.symbol, symbol)), reactionsOf(db, symbol), pagesToRead(db, symbol), seriesCatalog(db, symbol)]);
   const w = SIDE[side];
-  // The reported figures: a reason about the numbers is judged on the numbers too, never on headlines alone.
+  // The reported figures: a reason about the numbers is judged on the numbers too, never on headlines alone. A driver
+  // judge reads its own figures first and these as context; the thesis judge reads them whole.
   const figures = await figuresText(db, symbol);
-  const head = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`, "", figures];
+  const story = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`];
+  const head = [...story, "", figures];
   // What the key holds: the thesis, the figures, the documents read, the price and fair value in 5% buckets.
   const docsKey = pages.map((p) => `${p.page.document.id}:${p.page.page}`).join(",");
   const base = `${d.version}|${fnv(figures)}|${marketKey(d.market)}|${fnv(docsKey)}`;
@@ -312,31 +376,40 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
     const input = lines.length ? lines.join("\n") : "No news or filing of the last 12 months bears on this reason.";
     const moves = await driverMoveLines(db, driver.moveIds);
     const last = await lastReading(db, "driver-state", driver.id, DRIVER_STATE_QUESTION);
+    const exhibitsOf = driver.exhibits ?? [];
+    const ownKeys = driverSeriesKeys(catalog, exhibitsOf);
+    const own = driverFiguresText(catalog, ownKeys, exhibitsOf);
     const question = [
-      ...head,
+      ...story,
+      "",
       `ONE of the reasons the market holds it (${driver.category}): ${driver.title}. ${driver.text}`,
+      own ? `This reason's own figures (what its state is measured on, each row with its key in brackets):\n${own}` : "This reason has no reported figure of its own: judge it on its news, its moves and the documents, and give no magnitude.",
       moves.length ? `The significant price moves the market made on this reason (what made it a driver):\n${moves.join("\n")}` : "No significant price move is tied to this reason.",
       "",
-      "Below, every news item and filing that bears on this reason, newest first, each already tagged against it, with what the price did since and where it stood vs the fair value then and now; then the pages of the company's own documents where management explains the period.",
+      "Below, every news item and filing that bears on this reason, newest first, each already tagged against it, with what the price did since and where it stood vs the fair value then and now; then the company's other reported figures, for context only; then the pages of the company's own documents where management explains the period (read them for what they say about this reason).",
       `Where does this reason stand NOW? reversal = it is turning against the story (${w.reversal}); continuation = it holds and gets stronger; noise = nothing moves it.`,
+      DRIVER_SCOPE,
       DRIVER_GAME,
       "Weigh the news with their dates: recent beats old, several weak reversals in a row can make a strong one, one strong continuation after a reversal can cancel it.",
       "since = the day of the first news of the CURRENT state (null for noise). pricedIn = how much of that state the price has already moved (none, partly, fully), read from the price lines.",
-      "headline = the current state in 4 to 5 words with its key number, like a chart label (e.g. \"YTD margin 30% vs 2023\", \"Sales growth slows to 4%\"); null for noise.",
-      "magnitude = the figure of THIS reason that changed (reported, with its periods), from and to, the change, and size: material or small. null for noise.",
-      "reason = ONE short sentence of at most 20 words, subject verb complement, for the top of the page (the detail goes in explanation): the business cause of the state, whether it lasts, how big (e.g. \"Backlog doubled to 2.1x revenue on two multi-year contracts: structural.\"). Never only \"profit rose\": say WHY it rose.",
-      "explanation = 3 to 6 sentences: what changed in the business and why, in management's words where the documents give them (quoted), and why it lasts or not.",
+      "headline = the current state of this reason in 4 to 5 words with its key number, like a chart label (e.g. \"YTD margin 30% vs 2023\", \"Sales growth slows to 4%\"); null for noise.",
+      own
+        ? "magnitude = the change in ONE of this reason's own figures above: series = its key in brackets, from and to with their periods, the change, and size: material or small. null when none of them moved or for noise; never a figure from the company's other figures."
+        : "magnitude = null: this reason has no figure of its own.",
+      "reason = ONE short sentence of at most 20 words, subject verb complement, about THIS reason's subject, for the top of the page (the detail goes in explanation): the business cause of its state, whether it lasts, how big (e.g. \"Backlog doubled to 2.1x revenue on two multi-year contracts: structural.\"). Never only \"profit rose\": say WHY it rose.",
+      "explanation = 3 to 6 sentences on this reason: what changed in the business and why, in management's words where the documents give them (quoted), and why it lasts or not.",
       "citations = every sentence you quote, copied EXACTLY as printed in the documents below, with the label and page it sits on ([] when no document says it).",
       ...(last ? ["", last] : []),
     ].join("\n");
     const j = await judgeOnce(store, db, complete, {
       subjectKind: "driver-state",
       subjectId: driver.id,
-      questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${base}|${driver.category}|${driver.title}|${driver.text}|${driver.moveIds.join(",")}|${key}`)}`,
+      questionKey: `${DRIVER_STATE_QUESTION}:${d.version}:${fnv(`${base}|${driver.category}|${driver.title}|${driver.text}|${driver.moveIds.join(",")}|${key}|${own ?? ""}`)}`,
       question: `${DRIVER_STATE_QUESTION}: ${driver.title}`,
-      prompt: `${question}\n\nNews:\n${input}\n\nCompany documents:\n${documents}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "durability": <structural | temporary | n-a>, "magnitude": {"figure": "<e.g. Backlog>", "from": "<e.g. 1.0x revenue, FY2024>", "to": "<e.g. 2.1x revenue, FY2025>", "change": "<e.g. +110%>", "size": <material | small>} or null, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "reason": "<one short sentence>", "explanation": "<3 to 6 sentences>", "citations": [{"doc": "<D1>", "page": <page number>, "quote": "<exact words>"}], "why": "<one short sentence for a reader who has not seen the news>"}`,
+      prompt: `${question}\n\nNews:\n${input}\n\nThe company's other reported figures (context only: a change there belongs to the reason about it):\n${figures}\n\nCompany documents:\n${documents}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "durability": <structural | temporary | n-a>, "magnitude": {"figure": "<e.g. Backlog>", "series": "<its key, e.g. qline:backlog>", "from": "<e.g. 1.0x revenue, FY2024>", "to": "<e.g. 2.1x revenue, FY2025>", "change": "<e.g. +110%>", "size": <material | small>} or null, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "headline": "<4-5 words with the number, or null>", "reason": "<one short sentence>", "explanation": "<3 to 6 sentences>", "citations": [{"doc": "<D1>", "page": <page number>, "quote": "<exact words>"}], "why": "<one short sentence for a reader who has not seen the news>"}`,
       withSignal: false,
       pages,
+      magnitudeKeys: new Set(ownKeys),
     });
     const raw = rawOf(j);
     drivers.push({
@@ -410,10 +483,20 @@ export const narrativeStateSource: Source = {
     const { symbol, side } = parseThesisId(subject);
     const d = await driversOf(ctx.db, symbol, side);
     if (!d) return { request: { symbol, side }, httpStatus: null, error: "no narrative or no driver for this thesis yet" };
-    const payload = await judgeThesis(ctx.db, ctx.complete, dbStore(ctx.db), symbol, { side, version: d.version, narrative: d.narrative, market: d.market, drivers: d.drivers.map((x) => ({ ...x, moveIds: x.moveIds ?? [] })) });
+    const charts = await driverExhibits(ctx.db, d.drivers.map((x) => x.id));
+    const payload = await judgeThesis(ctx.db, ctx.complete, dbStore(ctx.db), symbol, { side, version: d.version, narrative: d.narrative, market: d.market, drivers: d.drivers.map((x) => ({ ...x, moveIds: x.moveIds ?? [], exhibits: charts.get(x.id) ?? [] })) });
     return { request: { symbol, side, version: d.version }, httpStatus: null, payload };
   },
 };
+
+/** Each driver's charts (gold.exhibits), in rank order: what its own figures are. */
+export async function driverExhibits(db: Db, driverIds: string[]): Promise<Map<string, DriverExhibit[]>> {
+  const out = new Map<string, DriverExhibit[]>();
+  if (driverIds.length === 0) return out;
+  const rows = await db.select({ driverId: exhibits.driverId, title: exhibits.title, series: exhibits.series }).from(exhibits).where(inArray(exhibits.driverId, driverIds)).orderBy(asc(exhibits.rank));
+  for (const r of rows) out.set(r.driverId, [...(out.get(r.driverId) ?? []), { title: r.title, series: r.series.map((s) => s.key) }]);
+  return out;
+}
 
 /** Every current thesis (`<symbol>:<side>`) of the analysed tickers. */
 async function subjects(db: Db): Promise<string[]> {
