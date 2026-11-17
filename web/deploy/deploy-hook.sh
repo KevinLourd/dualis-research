@@ -1,4 +1,6 @@
 #!/bin/bash
+# HOSTNAME=:: : Next.js calls itself on localhost (::1 here), so it must listen on IPv6 too; ufw keeps port 3000 closed
+# to the internet, Caddy is the way in.
 # The console's deploy, on the Dualis server (/srv/console/deploy-hook.sh, run by the `deploy` user's forced SSH
 # command, see web/deploy/README.md). stdin = a .tgz of the Next.js standalone build + console.env. Unpacks it as a new
 # release, restarts the container on it, checks it answers, else puts the previous release back. Keeps 3 releases.
@@ -13,12 +15,12 @@ chmod 600 "$release/console.env"
 start() {
   docker rm -f dualis-console >/dev/null 2>&1 || true
   docker run -d --name dualis-console --network host --restart unless-stopped --memory 1g \
-    -e NODE_ENV=production -e PORT=3000 -e HOSTNAME=127.0.0.1 -e NODE_OPTIONS=--max-old-space-size=640 \
+    -e NODE_ENV=production -e PORT=3000 -e HOSTNAME=:: -e NODE_OPTIONS=--max-old-space-size=640 \
     --env-file "$1/console.env" -v "$1:/app:ro" -w /app node:24-slim node server.js >/dev/null
 }
 healthy() {
   for _ in $(seq 1 40); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/sign-in || true)
+    code=$(curl -s -m 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/sign-in || true)
     [ "$code" = 200 ] && return 0
     sleep 1
   done
