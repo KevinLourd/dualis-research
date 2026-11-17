@@ -14,9 +14,6 @@ importers:
       '@cloudflare/kumo':
         specifier: 2.17.0
         version: 2.17.0(@date-fns/tz@1.5.0)(@phosphor-icons/react@2.1.10(react-dom@19.1.10(react@19.1.10))(react@19.1.10))(@types/react@19.3.0)(date-fns@4.4.0)(echarts@6.1.0)(react-dom@19.1.10(react@19.1.10))(react@19.1.10)(zod@4.6.7)
-      '@neondatabase/serverless':
-        specifier: 1.2.0
-        version: 1.2.0
       '@phosphor-icons/react':
         specifier: 2.1.10
         version: 2.1.10(react-dom@19.1.10(react@19.1.10))(react@19.1.10)
@@ -6180,7 +6177,8 @@ snapshots:
 
   '@neon/sdk@7.8.0': {}
 
-  '@neondatabase/serverless@1.2.0': {}
+  '@neondatabase/serverless@1.2.0':
+    optional: true
 
   '@next/env@15.5.29': {}
 
