@@ -16,13 +16,16 @@ import { day, numberFormat, price, utc } from "./format";
 import { Section } from "./signal";
 import { Fact, FactList, SourceTags } from "./ui";
 import { sourceNote } from "./source-labels";
+import { documentPageDetail } from "./document-queries";
+import { DocumentPageText, docItemId, openAt, parseDocItem } from "./document-page";
 import type { PeerRow } from "@/db/schema/valuation";
 import type { ThesisSide } from "@/db/schema/analysis";
 
 /**
  * Level C: the detail of one item of the analysis (`?item=` on the Analysis page): what it says, its chart, and where
  * it comes from (a research-note "Source:" line naming the providers, the original document).
- * Items: `fair-value`, `narrative` (its detail + Rationale), `news:<catalyst id>` (= its Evidence id), `driver:<id>`, `exhibit:<id>`, `kpi:<metric>`, `price`, `move:<move id>` (a significant price move and its cause).
+ * Items: `fair-value`, `narrative` (its detail + Rationale), `news:<catalyst id>` (= its Evidence id), `driver:<id>`, `exhibit:<id>`, `kpi:<metric>`, `price`, `move:<move id>` (a significant price move and its cause),
+ * `doc:<document id>:<page>[:<quote>]` (one page of a company document, the quote highlighted).
  */
 
 export type ItemView = { title: string; subtitle?: string; body: React.ReactNode };
@@ -602,6 +605,41 @@ async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise
   };
 }
 
+/** One page of a company document as printed: the quoted passage highlighted, the pages around it, and the document itself. */
+async function docItem(symbol: string, key: string): Promise<ItemView | null> {
+  const ref = parseDocItem(key);
+  if (!ref) return null;
+  const d = await documentPageDetail(symbol, ref.documentId, ref.page);
+  if (!d) return null;
+  const { document: doc } = d;
+  const pageLink = (page: number, label: string) => (
+    <Link href={itemHref(symbol, docItemId(doc.id, page))} scroll={false} className="text-kumo-link hover:underline">
+      {label}
+    </Link>
+  );
+  return {
+    title: doc.title,
+    subtitle: `${d.company} · ${day(doc.filedAt)} · Page ${d.page} of ${doc.pageCount}`,
+    body: (
+      <>
+        <DocumentPageText text={d.text} quote={ref.quote} />
+        <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
+          <span className="flex items-center gap-4">
+            {d.page > 1 && pageLink(d.page - 1, `‹ Page ${d.page - 1}`)}
+            {d.page < doc.pageCount && pageLink(d.page + 1, `Page ${d.page + 1} ›`)}
+          </span>
+          {doc.viewUrl && (
+            <a href={openAt(doc.viewUrl, doc.format, d.page)} target="_blank" rel="noreferrer" className={external}>
+              Open document <ArrowSquareOutIcon size={14} className="mt-1 shrink-0" aria-label="opens the document" />
+            </a>
+          )}
+        </div>
+        <SourceNote sources={doc.sources} />
+      </>
+    ),
+  };
+}
+
 export async function itemView(symbol: string, item: string, thesis: ThesisSide | null = null): Promise<ItemView | null> {
   if (item === "price") return priceItem(symbol);
   if (item === "fair-value") return fairValueItem(symbol);
@@ -614,5 +652,6 @@ export async function itemView(symbol: string, item: string, thesis: ThesisSide 
   if (kind === "exhibit") return exhibitItem(symbol, key);
   if (kind === "valuation") return methodItem(symbol, key);
   if (kind === "move") return moveItem(symbol, key);
+  if (kind === "doc") return docItem(symbol, key);
   return null;
 }

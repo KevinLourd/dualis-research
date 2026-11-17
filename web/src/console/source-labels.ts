@@ -12,6 +12,10 @@ const FILINGS: Record<string, string> = {
   tdnet: "TDnet",
   "companies-house": "Companies House",
   hkexnews: "HKEXnews",
+  hkex: "HKEXnews",
+  "sec-document": "SEC EDGAR",
+  "edinet-document": "EDINET",
+  "dart-document": "DART",
   asx: "ASX",
 };
 const PROVIDERS: Record<string, string> = {

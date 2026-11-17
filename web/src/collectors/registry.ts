@@ -35,6 +35,7 @@ import { sandboxReview } from "./dimensions/sandbox-review";
 import { sandboxVisuals } from "./dimensions/sandbox-visuals";
 import { substackNetwork } from "./dimensions/substack-network";
 import { filingsDimension } from "./dimensions/filings";
+import { filingDocumentsDim } from "./dimensions/filing-documents";
 import { portfolio } from "./dimensions/portfolio";
 import { price } from "./dimensions/price";
 import { intradayPrice } from "./dimensions/intraday-price";
@@ -48,6 +49,7 @@ import type { Dimension } from "./types";
  * A new dimension = a folder under dimensions/ + one line here. Watchlist first: it defines the subjects. News after company-profile: it queries the resolved names.
  * Outreach before substack-network: the drafted authors join the crawl's candidates.
  * OneDrive (Thierry's research folder) before thesis: the research reads it. Its write-back right after filings.
+ * Filing documents (the text of the core reports, results releases and presentations, page by page) right after filings: every claim cites its page.
  * Consensus after earnings: analyst expectations vs actuals, read by the signal that says "above / below what the market expects".
  * Financials after price and filings: EV reads the quote, EDINET the fiscal year end, the PDF extraction the annual report link.
  * Portfolio right after watchlist: Thierry's positions (his posts + console edits); price also fetches the S&P 500 (`^GSPC`) the Portfolio page compares against.
@@ -64,7 +66,7 @@ import type { Dimension } from "./types";
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, moveCausesDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, filingDocumentsDim, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, analysis, marketReactionDim, moveCausesDim, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -85,7 +87,7 @@ export const STAGES: readonly (readonly string[])[] = [
   ["portfolio", "company-profile"],
   ["news", "onedrive", "price", "filings", "earnings"],
   ["intraday-price"],
-  ["thesis", "onedrive-filings", "consensus"],
+  ["thesis", "onedrive-filings", "filing-documents", "consensus"],
   ["financials"],
   ["peers"],
   ["fx"],
