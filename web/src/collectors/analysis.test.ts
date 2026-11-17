@@ -67,6 +67,7 @@ const fake: Complete = async ({ prompt, system }) => {
     const n = (prompt.match(/^\[\d+\]/gm) ?? []).length;
     return { text: JSON.stringify({ items: Array.from({ length: n }, (_, i) => ({ n: i + 1, pricedIn: "none", drivers: { "1": { tag: "noise", p: 0.8, why: "Nothing on the cycle.", cited: null }, "2": { tag: "reversal:strong", p: 0.8, why: "A buyback trust returns cash.", cited: "buyback" } } })) }), model: "fake" };
   }
+  if (prompt.includes('"reason": "<the sentence>"')) return { text: JSON.stringify({ reason: "A buyback returns cash: structural." }), model: "fake" };
   if (prompt.includes("Where does this reason stand NOW")) {
     calls.push("driver-state");
     const turned = prompt.includes("[reversal:strong");

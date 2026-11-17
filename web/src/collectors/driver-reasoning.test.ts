@@ -89,13 +89,17 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
     await db.insert(fairValues).values({ symbol: SYMBOL, value: 2000, currency: "JPY", low: 1800, high: 2200, method: "x", label: "x", author: "claude", claudeValue: 2000, inputs: [] });
     await db.insert(narratives).values({ id: `${SYMBOL}:short`, symbol: SYMBOL, side: "short", text: "The market sees Miraial as a recovering wafer-carrier maker.", detail: null, version: "v1", asOf: new Date() });
     await db.insert(narrativeDrivers).values({ id: `${SYMBOL}:short:1`, symbol: SYMBOL, side: "short", rank: 1, category: "Business economics", title: "Orders doubled on multi-year contracts", summary: null, text: "Orders doubled.", moveIds: [`${SYMBOL}:2026-06-01`], version: "v1" });
-    const prompts: { driver?: string; thesis?: string } = {};
+    const prompts: { driver?: string; thesis?: string; reason?: string } = {};
     let n = 0;
     const fake: Complete = async ({ prompt }) => {
       n++;
+      if (prompt.includes('"reason": "<the sentence>"')) {
+        prompts.reason = prompt;
+        return { text: JSON.stringify({ reason: "Orders doubled on a one-off restocking: temporary." }), model: "fake" };
+      }
       if (prompt.includes("Where does this reason stand NOW")) {
         prompts.driver = prompt;
-        return { text: JSON.stringify({ tag: "reversal:weak", p: 0.7, durability: "temporary", magnitude: { figure: "Orders", series: "hline:order-intake", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, since: "2026-11-10", pricedIn: "none", headline: "Orders double, one-off", reason: "Orders doubled on a one-off restocking: temporary.", explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. The restocking ends next year.", citations: [{ doc: "D1", page: 2, quote: "Orders for 300mm wafer shippers doubled" }, { doc: "D1", page: 2, quote: "Invented sentence nobody printed" }], why: "A restocking." }), model: "fake" };
+        return { text: JSON.stringify({ tag: "reversal:weak", p: 0.7, durability: "temporary", magnitude: { figure: "Orders", series: "hline:order-intake", from: "JPY 4.1B", to: "JPY 8.3B", change: "+102%", size: "material" }, since: "2026-11-10", pricedIn: "none", headline: "Orders double, one-off", explanation: "Management: Orders for 300mm wafer shippers doubled as two customers signed. The restocking ends next year.", citations: [{ doc: "D1", page: 2, quote: "Orders for 300mm wafer shippers doubled" }, { doc: "D1", page: 2, quote: "Invented sentence nobody printed" }], why: "A restocking." }), model: "fake" };
       }
       prompts.thesis = prompt;
       return { text: JSON.stringify({ tag: "reversal:weak", p: 0.6, signal: "weak", since: "2026-11-10", pricedIn: "none", why: "A temporary turn." }), model: "fake" };
@@ -112,13 +116,19 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
     expect(prompts.thesis).toContain("Orders doubled on a one-off restocking: temporary.");
     // The invented quote is dropped, never retried.
     expect(payload.drivers[0].citations).toEqual([expect.objectContaining({ documentId: DOC, page: 2, quote: "Orders for 300mm wafer shippers doubled" })]);
-    expect(n).toBe(2);
+    // The reason is not the judge's job: a second call writes it from the finished judgment, at most 15 words.
+    expect(prompts.driver).not.toContain('"reason"');
+    expect(prompts.reason).toContain("Explanation: Management: Orders for 300mm wafer shippers doubled");
+    expect(prompts.reason).toContain("at most 15 words");
+    expect(prompts.reason).toContain("Size: Orders JPY 4.1B to JPY 8.3B (+102%), material.");
+    expect(payload.drivers[0].conclusion).toBe("Orders doubled on a one-off restocking: temporary.");
+    expect(n).toBe(3);
     // Same input: never asked again.
     await judgeThesis(db, fake, dbStore(db), SYMBOL, d);
-    expect(n).toBe(2);
+    expect(n).toBe(3);
     // A dry replay never writes: a memory store asks again.
     await judgeThesis(db, fake, memoryStore(), SYMBOL, d);
-    expect(n).toBe(4);
+    expect(n).toBe(6);
 
     await promoteNarrativeStates(db, [{ subject: `${SYMBOL}:short`, payload, error: null, fetchedAt: new Date() } as unknown as BronzeFetch]);
     const states = await db.select().from(narrativeStates);

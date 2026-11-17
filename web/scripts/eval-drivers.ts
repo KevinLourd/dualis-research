@@ -49,8 +49,9 @@ async function stored(db: Db, subject: string) {
     const b = before.get(d.id);
     const v = r.drivers[i];
     console.log(`- ${d.id} « ${d.title} » [${d.category}] charts: ${(d.exhibits ?? []).map((e) => e.series.join(",")).join(" | ") || "none"}`);
-    console.log(`  BEFORE ${b ? `${b.effect}:${b.strength ?? ""} ${b.durability ?? ""} | ${mag(b.magnitude)} | ${b.reason ?? b.why ?? ""}` : "none"}`);
-    console.log(`  AFTER  ${v.verdict} ${v.durability ?? ""} | ${mag(v.magnitude)} | ${v.conclusion ?? v.reason ?? ""}`);
+    const words = (s: string | null | undefined) => (s ? `(${s.split(/\s+/).filter(Boolean).length} words) ${s}` : "");
+    console.log(`  BEFORE ${b ? `${b.effect}:${b.strength ?? ""} ${b.durability ?? ""} | ${mag(b.magnitude)} | ${words(b.reason ?? b.why)}` : "none"}`);
+    console.log(`  AFTER  ${v.verdict} ${v.durability ?? ""} | ${mag(v.magnitude)} | ${words(v.conclusion ?? v.reason)}`);
   });
   console.log(`Thesis: ${r.thesis.verdict} signal=${r.thesis.signal}. ${r.thesis.reason}`);
 }
