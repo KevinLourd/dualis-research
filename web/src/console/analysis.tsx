@@ -249,7 +249,7 @@ function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: D
               <span className="flex w-44 flex-col items-end gap-1.5">
                 {d.state ? (
                   <>
-                    <TagBadge effect={d.state.effect} strength={d.state.strength} side={side} />
+                    <TagBadge effect={d.state.effect} strength={d.state.strength} side={side} durability={d.state.durability} />
                     <StateTiming state={d.state} />
                   </>
                 ) : (

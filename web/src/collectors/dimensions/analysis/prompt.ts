@@ -2,8 +2,12 @@ import { DRIVER_CATEGORIES, type AnalysisAnswer, type ThesisSide, type ExhibitSp
 import { firstJsonObject } from "@/llm/judge";
 import { stripDashes } from "../thesis/structure";
 
-/** Bump when a prompt changes meaning: every ticker is analysed again. v7 (Kevin 2026-11-09): one analysis per thesis side. */
-export const ANALYSIS_VERSION = "analysis@v7";
+/**
+ * Bump when a prompt changes meaning: every ticker is analysed again. v7 (Kevin 2026-11-09): one analysis per thesis
+ * side. v8 (INFLECTION-1117): drivers found from the moves the market made on the business, each citing them; leverage
+ * read against earnings.
+ */
+export const ANALYSIS_VERSION = "analysis@v8";
 
 const METHOD = [
   "The analyst's method: he does not believe in one true value. The price reflects the market's NARRATIVE; the FAIR VALUE is what the business is worth if its plan works.",
@@ -23,7 +27,7 @@ const SIDE_WORDS: Record<ThesisSide, { thesis: string; story: string; tone: stri
   long: {
     thesis: "the LONG thesis",
     story: "the PESSIMISTIC story the market tells about the company, the reason the price sits at or below the fair value",
-    tone: "a reason for pessimism (debt, a missed guide, a shrinking market, a dilution...)",
+    tone: "a reason for pessimism (a missed guide, a shrinking market, margins under pressure, a dilution, debt heavy against earnings...)",
     against: "A fact that goes AGAINST this story (a record quarter under a gloomy story) is never a driver: it is the news that may turn one.",
     consensus: "analysts expect a decline or keep cutting estimates; a company no analyst follows (no consensus in the facts) is also a reason for the discount",
   },
@@ -49,7 +53,7 @@ export function analysisPrompt(factsText: string, side: ThesisSide, previous: Pr
       ? [
           `Your previous version of ${w.thesis}:`,
           JSON.stringify(previous, null, 1),
-          "Keep it WORD FOR WORD (same narrative, same drivers in the same order, same words) unless the facts above changed what the market believes. A new news item is not a reason to rewrite the story: news are judged against it separately. Rewrite only what the facts made wrong.",
+          "Keep it WORD FOR WORD (same narrative, same drivers in the same order, same words) unless the facts above changed what the market believes, or a driver breaks the method below. A new news item is not a reason to rewrite the story: news are judged against it separately. Rewrite only what the facts or the method made wrong.",
           "",
         ]
       : []),
@@ -59,12 +63,15 @@ export function analysisPrompt(factsText: string, side: ThesisSide, previous: Pr
     '  "narrativeDetail": "<3 to 5 sentences: why the market holds this story and where the price sits versus the fair value and its range, with the figures>",',
     '  "drivers": [ 1 to 5, the REASONS the market holds that story, most important first:',
     `    {"category": <one of: ${DRIVER_CATEGORIES.map((c) => JSON.stringify(c)).join(", ")}>, "title": "<5 to 9 words, the reason itself>", "summary": "<ONE short plain sentence, subject verb complement, no figure>", "text": "<2 to 3 sentences with the reported figures>",`,
+    '     "moves": [<the date of each [move YYYY-MM-DD] listed in the facts that this reason caused, e.g. "2025-08-14"; [] when none did>],',
     '     "exhibits": [1 or 2 charts that show it: {"title": "<chart title>", "chart": "bar" | "line", "series": [<1 to 3 keys from the stored chart series list, same period type>], "takeaway": "<one line: what the chart shows>"}]}',
     "  ]",
     "}",
     `Every driver SUPPORTS the narrative: it is a reason the market believes the story, ${w.tone}. ${w.against}`,
     "Drivers are every reason the market really holds, and only those: 1 to 5, as many as there are. Never invent a reason to fill the list, and never leave one out: a reason left out is a reason whose reversal no news can show.",
     `"Consensus expectations" is a driver when the analyst consensus agrees with the narrative, even when it only follows another reason: ${w.consensus}. When the consensus goes against this story, it is not one of its drivers.`,
+    "How to find the drivers: a driver is what the market reacted to on the BUSINESS. The significant price moves listed with their business cause show what the market cared about on this company: each driver should rest on the moves it caused (\"moves\"). A move caused by the market at large (rates, a war, a commodity, a sector selloff) or by trading is never a driver. A reason with no move is allowed when the market priced it without a single event (no analyst coverage, a consensus, a slow story), and its text says so.",
+    "Debt is a reason only when it is heavy against the earnings that service it (net debt / EBITDA, interest cover in the facts), never because it is large against the market cap: a small company with debt of 2x EBITDA carries normal debt.",
     "Each driver needs at least one exhibit whose series keys appear EXACTLY in the stored chart series list.",
     "The operating figures the company reports (backlog, remaining performance obligations, order intake) are facts like the statements: they often show a business changing before its revenue does. Weigh them like any figure: a driver can rest on one (its series can be charted), and one that goes against the story is said in the report.",
   ].join("\n");
@@ -120,9 +127,17 @@ export function parseAnalysis(text: string): AnalysisAnswer {
         exhibits: (Array.isArray(d.exhibits) ? (d.exhibits as Record<string, unknown>[]) : []).map(
           (e): ExhibitSpec => ({ title: stripDashes(String(e.title ?? "")), chart: e.chart === "line" ? "line" : "bar", series: Array.isArray(e.series) ? e.series.map(String) : [], takeaway: stripDashes(String(e.takeaway ?? "")) }),
         ),
+        // The move dates as written; `bindMoves` turns them into stored move ids and drops the unknown ones.
+        moveIds: (Array.isArray(d.moves) ? d.moves : []).map((m) => String(m).trim()),
       };
     }),
   };
+}
+
+/** Keeps only the moves the facts listed: a date becomes `<symbol>:<date>`; an unknown one is dropped (like an Exhibit key). */
+export function bindMoves(a: AnalysisAnswer, symbol: string, known: Set<string>): AnalysisAnswer {
+  const idOf = (m: string) => (m.startsWith(`${symbol}:`) ? m : `${symbol}:${m.replace(/^\[?move\s*/i, "").replace(/\]$/, "")}`);
+  return { ...a, drivers: a.drivers.map((d) => ({ ...d, moveIds: [...new Set((d.moveIds ?? []).map(idOf))].filter((id) => known.has(id)) })) };
 }
 
 export const RATIONALE_SYSTEM = [

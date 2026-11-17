@@ -96,7 +96,7 @@ export type AnalysisAnswer = {
   narrative: string;
   narrativeDetail?: string | null;
   /** Every driver SUPPORTS the narrative: a reason the market holds it (never one that weakens it, Kevin 2026-11-06). */
-  drivers: { category: DriverCategory; title: string; summary?: string | null; text: string; exhibits: ExhibitSpec[] }[];
+  drivers: { category: DriverCategory; title: string; summary?: string | null; text: string; exhibits: ExhibitSpec[]; moveIds?: string[] }[];
 };
 
 const rebuiltAt = timestamp("rebuilt_at", { withTimezone: true }).notNull().defaultNow();
@@ -189,6 +189,8 @@ export const narrativeDrivers = gold.table(
     /** ONE plain sentence shown under the title; `text` = the full description (item panel). */
     summary: text("summary"),
     text: text("text").notNull(),
+    /** The significant price moves (`gold.price_moves` ids) the market made on this reason: what made it a driver (INFLECTION-1117). */
+    moveIds: text("move_ids").array().notNull().default([]),
     version: text("version").notNull(),
     rebuiltAt,
   },
@@ -282,6 +284,16 @@ export const narrativeStates = gold.table(
     pricedIn: text("priced_in").$type<PricedIn>(),
     /** Thesis level only: the signal this thesis gives NOW (strong / weak) or none, decided by the judge. */
     signal: text("signal").$type<Strength>(),
+    /** Driver level (driver-state@v5): does the change last (Structural) or not (Temporary); n-a when nothing turns. */
+    durability: text("durability").$type<Durability>(),
+    /** Driver level: the figure that changed, from -> to, and the judge's word on its size. */
+    magnitude: jsonb("magnitude").$type<Magnitude>(),
+    /** Driver level: ONE short sentence for the top of the driver panel: the business cause, whether it lasts, how big. */
+    reason: text("reason"),
+    /** Driver level: the full why, management's words quoted; each quote in `citations`. */
+    explanation: text("explanation"),
+    /** Driver level: the document pages the explanation quotes, each quote checked as printed on its page. */
+    citations: jsonb("citations").$type<DocCitation[]>().notNull().default([]),
     judgmentId: uuid("judgment_id").notNull(),
     /** When the judge made this verdict (never the time of the run that re-read it). */
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
@@ -290,6 +302,17 @@ export const narrativeStates = gold.table(
   (t) => [index("gold_narrative_states_symbol").on(t.symbol)],
 );
 export type GoldNarrativeState = typeof narrativeStates.$inferSelect;
+
+/**
+ * Thierry 2026-11-17: an inflection is a change in the business that LASTS as the market projects it (Structural); a
+ * one-off contract, a commodity input, demand pulled forward or over-earning is Temporary (weak at most).
+ */
+export const DURABILITIES = ["structural", "temporary", "n-a"] as const;
+export type Durability = (typeof DURABILITIES)[number];
+/** How big the change is: the figure, from -> to, the change, and whether it is big enough to move the stock. */
+export type Magnitude = { figure: string; from: string | null; to: string | null; change: string | null; size: "material" | "small" };
+/** A sentence quoted from a stored company document page (`gold.documents`, `gold.document_pages`). */
+export type DocCitation = { documentId: string; page: number; quote: string; title?: string | null; filedAt?: string | null };
 
 /** One thesis' reading, kept on the ticker's signal so the board shows both when they compete. */
 export type ThesisReading = { side: ThesisSide; signal: Strength; effect: EvidenceEffect; strength: Strength; why: string | null; since: string | null };
