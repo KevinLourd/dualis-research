@@ -5,7 +5,8 @@ import { signalWords } from "./signal-words";
 
 /** Pure WhatsApp texts the content dimensions send Thierry (the service adds the "Dualis Research" line on top). */
 
-export const CONSOLE_URL = process.env.CONSOLE_URL ?? "https://dualis-console.dualis-research.workers.dev";
+export { CONSOLE_URL } from "@/console-url";
+import { CONSOLE_URL } from "@/console-url";
 
 /** The client on the allowlist: drafts and alerts go to him, tests go to the test contact. */
 export function clientPhone(): string {
