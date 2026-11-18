@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
       { source: "/portfolio", destination: "/research#performance", permanent: false },
       // Thierry 2026-11-12: About is now Team.
       { source: "/about", destination: "/team", permanent: true },
+      // Kevin 2026-11-18: Company is now Investment Process.
+      { source: "/company", destination: "/investment-process", permanent: true },
     ];
   },
 };

@@ -5,10 +5,10 @@ import type { Card } from "@/components/cards";
 import { AsymmetryFigure, DispersionFigure } from "@/components/edge-figures";
 import { MARKETS } from "@/lib/model";
 
-export const metadata: Metadata = { title: "Company" };
+export const metadata: Metadata = { title: "Investment Process" };
 
 /**
- * Company (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
+ * Investment Process (« Company » until Kevin 2026-11-18, `/company` redirects) (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
  * Altas's photo hero and statement with three columns; what we look for as a card carousel, two setups and two figures (Thierry 2026-11-17); the « play winnable games » line.
  * Thierry 2026-11-06: no price vs value figure. Thierry 2026-11-09: no track record and no list of calls here (two
  * calls « makes it look like I've only got two things », the research portal holds them), and the line is unsigned
@@ -22,7 +22,8 @@ const PILLARS = [
 
 /**
  * What we look for, in Thierry's words (file of 2026-11-17): four cards flipped through as a carousel, then two setups
- * side by side, then dispersion and asymmetry with a plain figure each. The site never names where he lives.
+ * side by side under « Primary Setups », then dispersion and asymmetry, each beside a figure with no words
+ * (Kevin 2026-11-18). The site never names where he lives.
  */
 const LOOK_FOR: readonly Card[] = [
   {
@@ -62,7 +63,7 @@ const SETUPS = [
   },
 ] as const;
 
-export default function Company() {
+export default function InvestmentProcess() {
   return (
     <>
       <section className="photo-hero">
@@ -70,7 +71,7 @@ export default function Company() {
         <img src="/img/company-hero.jpg" alt="" aria-hidden="true" />
         <div className="photo-hero-veil" />
         <div className="wrap photo-hero-inner">
-          <p className="band-label">Company</p>
+          <p className="band-label">Investment Process</p>
           <h1>Independent equity research</h1>
           <p>Constantly on the lookout for asymmetric opportunities where we feel we have the most edge.</p>
         </div>
@@ -107,6 +108,7 @@ export default function Company() {
 
       <section className="section">
         <div className="wrap">
+          <h2 className="h-bold">Primary Setups</h2>
           <div className="setups">
             {SETUPS.map((s) => (
               <article key={s.title}>
@@ -126,7 +128,7 @@ export default function Company() {
 
       <section className="section">
         <figure className="wrap founder-quote">
-          <blockquote>Play winnable games. The best odds sit where fewer eyes look.</blockquote>
+          <blockquote>We seek to play winnable games. The best odds sit where fewer eyes look.</blockquote>
         </figure>
       </section>
 

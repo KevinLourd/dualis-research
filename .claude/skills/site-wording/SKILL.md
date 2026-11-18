@@ -11,7 +11,7 @@ Thierry owns the site's wording since 2026-11-09. You change TEXT only: the word
 | Page | File | What |
 |---|---|---|
 | Home | `app/page.tsx` | title, line under it, link |
-| Company | `app/company/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 carousel cards), `SETUPS` (2 panels), the two lines beside the figures, the quote, closing band |
+| Investment Process (was Company) | `app/investment-process/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 carousel cards), `SETUPS` (2 panels), the two lines beside the figures, the quote, closing band |
 | Research | `app/research/page.tsx` | page line, section titles, closing band |
 | Research, four kinds of research | `lib/model.ts` `CATEGORIES` | title and text of Deep Dives, Primers, Updates, Other (also the portal's tabs) |
 | Research, FAQ | `components/blocks.tsx` `FAQ` | questions and answers |

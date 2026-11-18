@@ -193,7 +193,7 @@ export function Proof() {
           </a>
         </div>
         <div>
-          <YtdChart source={`Return since January 1, 2026: the main account (about +55%) vs the S&P 500, from the post of ${formatDate(TRACK_RECORD.asOf)}.`} />
+          <YtdChart source={`Return since January 1, 2026: the main account vs the S&P 500, from the post of ${formatDate(TRACK_RECORD.asOf)}.`} />
           <p className="footnote">*{TRACK_RECORD.note}</p>
         </div>
       </div>

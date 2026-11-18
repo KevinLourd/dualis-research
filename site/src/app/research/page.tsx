@@ -47,7 +47,7 @@ export default async function Research() {
 
       <section className="section">
         <div className="wrap">
-          <h2 className="h-light">Four kinds of research</h2>
+          <h2 className="h-light">The research we publish</h2>
           <Formats />
         </div>
       </section>

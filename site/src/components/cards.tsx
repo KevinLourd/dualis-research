@@ -60,13 +60,15 @@ function Icon({ name }: { name: CardIcon }) {
 
 /** One card: its suit in two corners, an icon, the title and its text. */
 export function PlayingCard({ card }: { card: Card }) {
+  // Hearts and diamonds are red, as on a real deck (Kevin 2026-11-18).
+  const red = card.suit === "heart" || card.suit === "diamond";
   return (
     <div className="pcard">
       <div className="pc-frame">
-        <span className="pc-idx tl">
+        <span className={`pc-idx tl${red ? " red" : ""}`}>
           <SuitGlyph suit={card.suit} />
         </span>
-        <span className="pc-idx br">
+        <span className={`pc-idx br${red ? " red" : ""}`}>
           <SuitGlyph suit={card.suit} />
         </span>
         <div className="pc-face">
