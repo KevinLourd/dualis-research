@@ -51,7 +51,7 @@ export const DRIVER_STATE_QUESTION = "driver-state@v9";
 /** The reason at the top of the driver panel: at most this many words (stated in `writeReason`'s prompt). */
 export const REASON_WORDS = 15;
 /** v1 (2026-11-09): the thesis tag AND its signal, decided by the judge. v2 (2026-11-12): + its last reading, key on facts + 5% buckets. v3: reads each driver's durability and magnitude. */
-export const THESIS_STATE_QUESTION = "thesis-state@v3";
+export const THESIS_STATE_QUESTION = "thesis-state@v4";
 
 /** The company documents a driver judge reads: filed in the last 12 months, the newest few, their best results pages. */
 export const DOC_MONTHS = 12;
@@ -316,11 +316,12 @@ type Raw = { headline?: string | null; since?: string | null; pricedIn?: PricedI
 const rawOf = (j: typeof judgments.$inferSelect) => (j.raw ?? {}) as Raw;
 
 /** The judge's own last reading of this subject (any version of the question), as one line for its prompt, or null. */
-export async function lastReading(db: Db, subjectKind: string, subjectId: string, question: string): Promise<string | null> {
+/** `sameVersion`: only a reading made under this version of the question (a version that changes what the judge reads must not be anchored on the old one). */
+export async function lastReading(db: Db, subjectKind: string, subjectId: string, question: string, sameVersion = false): Promise<string | null> {
   const [j] = await db
     .select({ verdict: judgments.verdict, reason: judgments.reason, raw: judgments.raw, createdAt: judgments.createdAt })
     .from(judgments)
-    .where(and(eq(judgments.subjectKind, subjectKind), eq(judgments.subjectId, subjectId), like(judgments.questionKey, `${question.split("@")[0]}@%`)))
+    .where(and(eq(judgments.subjectKind, subjectKind), eq(judgments.subjectId, subjectId), like(judgments.questionKey, sameVersion ? `${question}:%` : `${question.split("@")[0]}@%`)))
     .orderBy(desc(judgments.createdAt))
     .limit(1);
   if (!j) return null;
@@ -402,10 +403,11 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
   const [rows, reactions, pages, catalog] = await Promise.all([db.select().from(evidence).where(eq(evidence.symbol, symbol)), reactionsOf(db, symbol), pagesToRead(db, symbol), seriesCatalog(db, symbol)]);
   const w = SIDE[side];
   // The reported figures: a reason about the numbers is judged on the numbers too, never on headlines alone. A driver
-  // judge reads its own figures first and these as context; the thesis judge reads them whole.
+  // judge reads its own figures first and these as context. The thesis judge never reads them (v4, Kevin 2026-11-18:
+  // Kyungbang read « Weak inflection » on a debt paydown no driver was about, every driver grey under it): the story
+  // stands on its drivers, so its state comes from their states only.
   const figures = await figuresText(db, symbol);
   const story = [`${symbol}, ${w.label.toLowerCase()}: ${w.story}.`, `The narrative: ${d.narrative}`, marketLine(d.market), `Today is ${today()}.`];
-  const head = [...story, "", figures];
   // What the key holds: the thesis, the figures, the documents read, the price and fair value in 5% buckets.
   const docsKey = pages.map((p) => `${p.page.document.id}:${p.page.page}`).join(",");
   const base = `${d.version}|${fnv(figures)}|${marketKey(d.market)}|${fnv(docsKey)}`;
@@ -482,12 +484,14 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
     })
     .join("\n");
   const path = await pathLines(db, symbol);
-  const last = await lastReading(db, "thesis-state", thesisId(symbol, side), THESIS_STATE_QUESTION);
+  const last = await lastReading(db, "thesis-state", thesisId(symbol, side), THESIS_STATE_QUESTION, true);
   const question = [
-    ...head,
+    ...story,
     "",
     "The reasons the market holds this story (Narrative Drivers, most important first) and where each one stands now (its tag, whether the change lasts, how big):",
     input,
+    "",
+    "The story is these reasons and nothing else: it turns only as far as they turn. A change in the business that none of them is about is not part of this story; when no reason is turning, the story is not turning, however good or bad the company's other numbers look.",
     "",
     "The price path and the fair value over time:",
     path,
@@ -503,7 +507,7 @@ export async function judgeThesis(db: Db, complete: Complete, store: JudgmentSto
     subjectId: thesisId(symbol, side),
     questionKey: `${THESIS_STATE_QUESTION}:${d.version}:${fnv(`${base}|${drivers.map((x) => x.judgmentId).join(",")}`)}`,
     question: `${THESIS_STATE_QUESTION}: ${symbol} ${side}`,
-    prompt: `${question}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "signal": <strong | weak | none>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "why": "<one or two short sentences: where the story stands and why it signals or not, with the price vs the fair value>"}`,
+    prompt: `${question}\n\nJSON: {"tag": <one of ${NARRATIVE_TAGS.join(" | ")}>, "p": <0..1 confidence>, "signal": <strong | weak | none>, "since": "<YYYY-MM-DD or null>", "pricedIn": <none | partly | fully>, "why": "<one or two short sentences: which reason(s) turn or hold, and why it signals or not, with the price vs the fair value>"}`,
     withSignal: true,
   });
   const reversals = rows

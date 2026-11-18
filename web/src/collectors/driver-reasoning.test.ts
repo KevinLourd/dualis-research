@@ -114,6 +114,10 @@ describe("Driver State v5: Structural / Temporary, magnitude, the reason, quotes
     expect(prompts.driver).toContain("strong needs a structural change AND a material one");
     expect(prompts.thesis).toContain("reversal:weak, temporary, Orders JPY 4.1B to JPY 8.3B (+102%), material");
     expect(prompts.thesis).toContain("Customer restocking doubled orders to JPY 8.3B.");
+    // The thesis judge decides from its drivers only (v4): the company's figures reach the driver judges, never this one.
+    expect(prompts.driver).toContain("order-intake");
+    expect(prompts.thesis).not.toContain("order-intake");
+    expect(prompts.thesis).toContain("it turns only as far as they turn");
     // The invented quote is dropped, never retried.
     expect(payload.drivers[0].citations).toEqual([expect.objectContaining({ documentId: DOC, page: 2, quote: "Orders for 300mm wafer shippers doubled" })]);
     // The reason is not the judge's job: a second call writes it from the finished judgment, at most 15 words.
