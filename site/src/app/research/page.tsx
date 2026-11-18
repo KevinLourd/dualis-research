@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { CoverStrip, CtaBand, Faq, GAMES, LatestResearch, Proof } from "@/components/blocks";
-import { Hand } from "@/components/cards";
+import { CoverStrip, CtaBand, Faq, Formats, LatestResearch, Proof } from "@/components/blocks";
 import { PageBand } from "@/components/page-band";
 import { Portal } from "@/components/portal";
 import { DISCLAIMER, subscribeHref } from "@/lib/model";
@@ -18,7 +17,7 @@ export default async function Research() {
   const subscribe = subscribeHref(substackUrl);
   return (
     <>
-      <PageBand label="Research" line="Investment research for buy-side investors, with aligned incentives." thread="research" />
+      <PageBand label="Research" line="Investment research for buy-side investors, with aligned incentives." />
 
       {posts.length > 0 && (
         <section className="cover-band">
@@ -48,8 +47,8 @@ export default async function Research() {
 
       <section className="section">
         <div className="wrap">
-          <h2 className="fw-head">The winnable games we look for</h2>
-          <Hand cards={GAMES} caption="Five games, one hand. The narrative turn is the ace we train most." />
+          <h2 className="h-light">Four kinds of research</h2>
+          <Formats />
         </div>
       </section>
 

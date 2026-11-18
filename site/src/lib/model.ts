@@ -59,29 +59,39 @@ export const BEST_CALLS = [
   { name: "Quantum Corp", ticker: "QMCO", side: "Short", result: "40%+", resultNote: "gain on the short", report: "Quantum", line: "A hyped story with a backlog about to run out." },
 ] as const;
 
-/** The research portal's three shelves (Thierry 2026-11-04). Filed by a stored judgment in the console's collector. */
-export type ResearchCategory = "coverage" | "primer" | "memo";
+/**
+ * The research portal's four shelves, titles and lines in Thierry's words (2026-11-17). Filed by a stored judgment in
+ * the console's collector (`research-category@v2`).
+ */
+export type ResearchCategory = "coverage" | "primer" | "update" | "other";
 export const CATEGORIES: { key: ResearchCategory; number: string; title: string; short: string; body: string }[] = [
   {
     key: "coverage",
     number: "01",
-    title: "Company coverage",
-    short: "Coverage",
-    body: "Deep dives on one company, long or short. Names the market has murdered or loved without sense, where the narrative is about to turn.",
+    title: "Deep Dives",
+    short: "Deep Dive",
+    body: "Single-company write-ups, long or short. We zero in on the few drivers that move the business and where we think the market has them wrong. Names we own in the portfolio will be clearly identified, and watchlist names will be tracked for future review.",
   },
   {
     key: "primer",
     number: "02",
-    title: "Industry and thematic primers",
-    short: "Primers",
-    body: "How an industry or a theme really works: the value chain, who wins, and what the market is missing about it.",
+    title: "Industry/Thematic Primers",
+    short: "Primer",
+    body: "We map industries and themes where fundamentals are starting to accelerate, and the market hasn’t caught on yet. That is where we expect mispricings to show up. Each primer explains what is driving the change and which companies are most exposed to it.",
   },
   {
-    key: "memo",
+    key: "update",
     number: "03",
-    title: "Memos",
-    short: "Memos",
-    body: "Portfolio updates, process notes and shorter takes. When a thesis has played out, we say so clearly.",
+    title: "Updates",
+    short: "Update",
+    body: "Follow-ups on ideas we’ve published: earnings, filings, catalysts hit or missed, and any change to our view. When a thesis has played out or broken, we close it and explain why.",
+  },
+  {
+    key: "other",
+    number: "04",
+    title: "Other",
+    short: "Other",
+    body: "Write-ups on our investment process, the current market environment, and anything else we deem relevant to our readers’ attention.",
   },
 ];
 

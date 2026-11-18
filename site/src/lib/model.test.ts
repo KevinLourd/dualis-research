@@ -16,14 +16,14 @@ describe("links and dates", () => {
 describe("research portal shelves", () => {
   const posts = [
     { id: "a", category: "coverage" as const },
-    { id: "b", category: "memo" as const },
+    { id: "b", category: "update" as const },
     { id: "c", category: null },
   ];
   it("files each post on its shelf; one not filed yet shows only under All", () => {
     expect(shelf(posts, "all").map((p) => p.id)).toEqual(["a", "b", "c"]);
     expect(shelf(posts, "coverage").map((p) => p.id)).toEqual(["a"]);
     expect(shelf(posts, "primer")).toEqual([]);
-    expect(categoryLabel("primer")).toBe("Primers");
+    expect(categoryLabel("primer")).toBe("Primer");
     expect(categoryLabel(null)).toBe("Research");
   });
 });
