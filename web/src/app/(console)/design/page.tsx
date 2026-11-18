@@ -46,7 +46,6 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Design system"
-        description="One source for the website, this console and every chart Claude draws. Read live from GitHub, so a change shows here within 5 minutes."
         actions={
           <>
             <Badge variant="outline">Version {tokens.version}</Badge>

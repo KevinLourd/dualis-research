@@ -46,7 +46,7 @@ export default async function DraftsPage({ searchParams }: { searchParams: Promi
       <ComingNext
         icon={<NotePencilIcon size={40} className="text-kumo-inactive" />}
         title="No draft yet"
-        description="Open an idea in Ideas and press Create draft on the channel you want. The draft lands here."
+        description="Open an idea and press Create draft."
       />
     );
   }

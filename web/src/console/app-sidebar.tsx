@@ -2,17 +2,14 @@
 
 import { Sidebar, useSidebar } from "@cloudflare/kumo";
 import {
-  DatabaseIcon,
   FlaskIcon,
   GearSixIcon,
   LightningIcon,
   ListBulletsIcon,
   BriefcaseIcon,
   NotePencilIcon,
-  PaletteIcon,
-  NewspaperIcon,
+  TestTubeIcon,
   TrendUpIcon,
-  XLogoIcon,
 } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -37,18 +34,52 @@ const SANDBOX_TONES = [
   { handle: "ledgerlens", tone: "neutral" },
 ] as const;
 const SANDBOX = [
-  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/x/${handle}`, label: `X ${tone}`, icon: XLogoIcon })),
-  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/substack/${handle}`, label: `Substack ${tone}`, icon: NewspaperIcon })),
+  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/x/${handle}`, label: `X ${tone}` })),
+  ...SANDBOX_TONES.map(({ handle, tone }) => ({ href: `/sandbox/substack/${handle}`, label: `Substack ${tone}` })),
 ];
+
+const OPERATIONS = [
+  { href: "/data", label: "Data" },
+  { href: "/design", label: "Design system" },
+  { href: "/settings", label: "Settings" },
+] as const;
 
 const GROUPS = [
   { label: "Research", items: RESEARCH },
   { label: "Business", items: BUSINESS },
-  { label: "Sandbox", items: SANDBOX },
 ] as const;
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
+ * A folded entry (Kevin 2026-11-18: a shorter sidebar): its pages show on a click, and it opens by itself on one of them.
+ */
+function Folded({ label, icon, items, pathname }: { label: string; icon: typeof GearSixIcon; items: readonly { href: string; label: string }[]; pathname: string }) {
+  return (
+    <Sidebar.MenuItem>
+      <Sidebar.Collapsible defaultOpen={items.some((x) => isActive(pathname, x.href))}>
+        <Sidebar.CollapsibleTrigger
+          render={
+            <Sidebar.MenuButton icon={icon} tooltip={label}>
+              {label}
+              <Sidebar.MenuChevron />
+            </Sidebar.MenuButton>
+          }
+        />
+        <Sidebar.CollapsibleContent>
+          <Sidebar.MenuSub>
+            {items.map((x) => (
+              <Sidebar.MenuSubButton key={x.href} href={x.href} active={isActive(pathname, x.href)}>
+                {x.label}
+              </Sidebar.MenuSubButton>
+            ))}
+          </Sidebar.MenuSub>
+        </Sidebar.CollapsibleContent>
+      </Sidebar.Collapsible>
+    </Sidebar.MenuItem>
+  );
 }
 
 export function AppSidebar() {
@@ -73,21 +104,13 @@ export function AppSidebar() {
                   {label}
                 </Sidebar.MenuButton>
               ))}
+              {group.label === "Business" && <Folded label="Sandbox" icon={TestTubeIcon} items={SANDBOX} pathname={pathname} />}
             </Sidebar.Menu>
           </Sidebar.Group>
         ))}
         <Sidebar.Group>
-          <Sidebar.GroupLabel>Operations</Sidebar.GroupLabel>
           <Sidebar.Menu>
-            <Sidebar.MenuButton href="/data" icon={DatabaseIcon} tooltip="Data" active={isActive(pathname, "/data")}>
-              Data
-            </Sidebar.MenuButton>
-            <Sidebar.MenuButton href="/design" icon={PaletteIcon} tooltip="Design system" active={isActive(pathname, "/design")}>
-              Design system
-            </Sidebar.MenuButton>
-            <Sidebar.MenuButton href="/settings" icon={GearSixIcon} tooltip="Settings" active={isActive(pathname, "/settings")}>
-              Settings
-            </Sidebar.MenuButton>
+            <Folded label="Operations" icon={GearSixIcon} items={OPERATIONS} pathname={pathname} />
           </Sidebar.Menu>
         </Sidebar.Group>
       </Sidebar.Content>

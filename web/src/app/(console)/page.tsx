@@ -27,12 +27,13 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Signals" description="Where the market's story on a stock is cracking or turning, strongest first. Open a row to see why." />
+      <PageHeader title="Signals" />
       {strong.length === 0 ? (
         <ComingNext
           icon={<LightningIcon size={40} className="text-kumo-inactive" />}
+          size="sm"
           title="No strong signal today"
-          description="A strong signal is a narrative the judge sees cracking, with the price on the right side of your fair value. Weaker ones are below."
+          description="Weaker ones are below."
         />
       ) : (
         <SignalTable rows={strong} panelHref={panelHref} />

@@ -93,7 +93,7 @@ export default async function LiveTestPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Live test" description={`What following the Signal would have returned.${start ? ` Live since ${day(start)}.` : ""} No trading costs counted.`} />
+      <PageHeader title="Live test" description={start ? `Since ${day(start)}, no trading costs.` : undefined} />
 
       <Card title="Signal book vs S&P 500">
         <LivePnl
