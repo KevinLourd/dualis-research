@@ -1,4 +1,4 @@
-import { ArrowSquareOutIcon } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOutIcon, ArrowsDownUpIcon, BuildingsIcon, CalculatorIcon, ChartBarIcon, ChartLineIcon, ChatTextIcon, CrosshairIcon, DatabaseIcon, FileTextIcon, FilesIcon, GaugeIcon, LightbulbIcon, MathOperationsIcon, NewspaperIcon, SlidersHorizontalIcon, StackIcon, TableIcon, TextAlignLeftIcon } from "@phosphor-icons/react/ssr";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { Badge } from "@cloudflare/kumo";
 import Link from "@/console/link";
@@ -76,6 +76,7 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
                 <Drawers>
                   {judged.map(({ drv, v }) => (
                     <Drawer
+                      icon={<CrosshairIcon size={16} aria-hidden />}
                       key={drv.id}
                       title={
                         <span className="flex flex-wrap items-center gap-2">
@@ -95,7 +96,7 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
                     </Drawer>
                   ))}
                   {d.reaction && d.reaction.closeBefore !== null && (
-                    <Drawer title="Price reaction">
+                    <Drawer icon={<ChartLineIcon size={16} aria-hidden />} title="Price reaction">
                       <p className="text-base leading-relaxed text-kumo-default">{reactionLine(d.reaction)}</p>
                     </Drawer>
                   )}
@@ -116,11 +117,11 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
         )}
         <Drawers>
         {d.exhibit && (
-          <Drawer title={`Exhibit ${d.exhibit.number}: ${d.exhibit.title}`}>
+          <Drawer icon={<ChartBarIcon size={16} aria-hidden />} title={`Exhibit ${d.exhibit.number}: ${d.exhibit.title}`}>
             <Exhibit symbol={symbol} exhibit={d.exhibit} />
           </Drawer>
         )}
-        <Drawer title={`Original documents · ${d.articles.length + d.filings.length}`}>
+        <Drawer icon={<FileTextIcon size={16} aria-hidden />} title={`Original documents · ${d.articles.length + d.filings.length}`}>
           <ul className="flex flex-col gap-4">
             {d.articles.map((a) => (
               <li key={a.id} className="flex flex-col gap-1">
@@ -184,7 +185,7 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
           />
         )}
         <Drawers>
-        <Drawer title={`Every period · ${rows.length}`}>
+        <Drawer icon={<TableIcon size={16} aria-hidden />} title={`Every period · ${rows.length}`}>
         <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>
             <KTableHeader>
@@ -264,7 +265,7 @@ async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
         </span>
         <p className="text-xl leading-snug font-semibold text-kumo-strong">{conclusion}</p>
         <Drawers>
-        <Drawer title="The move">
+        <Drawer icon={<ArrowsDownUpIcon size={16} aria-hidden />} title="The move">
         <FactList>
           <Fact label="Stock">{signed(m.returnPct)}</Fact>
           <Fact label="S&P 500">{signed(m.benchReturn)}</Fact>
@@ -274,7 +275,7 @@ async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
         <p className="text-sm text-kumo-subtle">Significant = beyond two standard deviations of the stock&apos;s own daily moves, S&amp;P 500 taken out.</p>
         </Drawer>
         {c && c.cites.length > 0 && (
-          <Drawer title={`What it rests on · ${c.cites.length}`}>
+          <Drawer icon={<FilesIcon size={16} aria-hidden />} title={`What it rests on · ${c.cites.length}`}>
             <ul className="flex flex-col gap-4">
               {c.cites.map((x) => (
                 <li key={`${x.kind}:${x.id}`} className="flex flex-col gap-1">
@@ -312,18 +313,18 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
       <>
         {/* The reason first, in one sentence (Kevin 2026-11-17), then what changed with its quotes, then the moves. */}
         <DriverReason state={d.state} side={d.side} moves={d.moves} hrefFor={(item) => itemHref(symbol, item)}>
-          <Drawer title="Why the market holds it">
+          <Drawer icon={<LightbulbIcon size={16} aria-hidden />} title="Why the market holds it">
             <p className="text-base leading-relaxed text-kumo-default">{d.driver.text}</p>
           </Drawer>
           {d.exhibits.length > 0 && (
-            <Drawer title={`Exhibits · ${d.exhibits.length}`}>
+            <Drawer icon={<ChartBarIcon size={16} aria-hidden />} title={`Exhibits · ${d.exhibits.length}`}>
               {d.exhibits.map((x) => (
                 <Exhibit key={x.id} symbol={symbol} exhibit={x} />
               ))}
             </Drawer>
           )}
           {d.evidence.length > 0 && (
-            <Drawer title={`News · ${d.evidence.length}`}>
+            <Drawer icon={<NewspaperIcon size={16} aria-hidden />} title={`News · ${d.evidence.length}`}>
               <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} side={d.side} />
             </Drawer>
           )}
@@ -346,7 +347,7 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
         <ExhibitChart number={x.number} title={x.title} chart={x.chart} series={x.series} points={x.points} sources={x.sources} height={280} />
         <p className="text-lg leading-relaxed text-kumo-strong">{x.takeaway}</p>
         <Drawers>
-        <Drawer title={`Data · ${x.points.length} periods`}>
+        <Drawer icon={<TableIcon size={16} aria-hidden />} title={`Data · ${x.points.length} periods`}>
         <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>
             <KTableHeader>
@@ -374,7 +375,7 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
           </KTable>
         </div>
         </Drawer>
-        <Drawer title={`Series · ${x.series.length}`}>
+        <Drawer icon={<StackIcon size={16} aria-hidden />} title={`Series · ${x.series.length}`}>
           <ul className="flex flex-col gap-2">
             {x.series.map((s) => (
               <li key={s.key} className="flex flex-wrap items-center gap-2 text-base">
@@ -411,18 +412,18 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
         {f.author === "thierry" && <p className="text-base text-kumo-default">Your number wins{f.method ? ` (${f.method})` : ""}. The methods below are Claude&apos;s, for reference.</p>}
         <Drawers>
           {r && (
-            <Drawer title="Why this value">
+            <Drawer icon={<TextAlignLeftIcon size={16} aria-hidden />} title="Why this value">
               <p className="text-base leading-relaxed text-kumo-default">{r.summary}</p>
             </Drawer>
           )}
           {v.methods.length > 0 && (
-            <Drawer title={`Methods · ${v.methods.length}`}>
+            <Drawer icon={<CalculatorIcon size={16} aria-hidden />} title={`Methods · ${v.methods.length}`}>
               <ValuationField v={v} />
               <MethodsTable symbol={symbol} v={v} />
             </Drawer>
           )}
           {r && (
-            <Drawer title="Valuation report">
+            <Drawer icon={<FileTextIcon size={16} aria-hidden />} title="Valuation report">
               <article className="flex max-w-3xl flex-col gap-4">
                 <ArticleBody markdown={r.markdown} />
               </article>
@@ -465,13 +466,13 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
         )}
         <Drawers>
         {(m.summary || m.weight?.why) && (
-          <Drawer title="Summary">
+          <Drawer icon={<TextAlignLeftIcon size={16} aria-hidden />} title="Summary">
             {m.summary && <p className="text-base leading-relaxed text-kumo-default">{m.summary}</p>}
             {m.weight?.why && <p className="text-base text-kumo-default">Weight: {m.weight.why}</p>}
           </Drawer>
         )}
         {m.history && m.history.points.length > 1 && (
-          <Drawer title="History">
+          <Drawer icon={<ChartBarIcon size={16} aria-hidden />} title="History">
           <ExhibitChart
             number={1}
             title={m.history.label}
@@ -483,7 +484,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Drawer>
         )}
         {m.assumptions.length > 0 && (
-          <Drawer title={`Assumptions · ${m.assumptions.length}`}>
+          <Drawer icon={<SlidersHorizontalIcon size={16} aria-hidden />} title={`Assumptions · ${m.assumptions.length}`}>
             <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
@@ -512,7 +513,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Drawer>
         )}
         {m.steps.length > 0 && (
-          <Drawer title="Calculation">
+          <Drawer icon={<MathOperationsIcon size={16} aria-hidden />} title="Calculation">
             <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
@@ -538,7 +539,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Drawer>
         )}
         {m.peers.length > 0 && (
-          <Drawer title={`Listed peers · ${m.peers.length}`}>
+          <Drawer icon={<BuildingsIcon size={16} aria-hidden />} title={`Listed peers · ${m.peers.length}`}>
             {m.peerPricing && (
               <p className="text-base text-kumo-default">
                 Base and high start from the peers&apos; median {m.peerPricing.label} of <span className="font-mono tabular">{m.peerPricing.median.toFixed(1)}x</span> ({m.peerPricing.count} {m.peerPricing.count === 1 ? "company" : "companies"}): base{" "}
@@ -578,7 +579,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Drawer>
         )}
         {m.inputs.length > 0 && (
-          <Drawer title={`Inputs · ${m.inputs.length}`}>
+          <Drawer icon={<DatabaseIcon size={16} aria-hidden />} title={`Inputs · ${m.inputs.length}`}>
             <div className="rounded-lg ring-1 ring-kumo-hairline">
               <FactList>
                 {m.inputs.map((i) => (
@@ -595,7 +596,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
           </Drawer>
         )}
         {m.report && (
-          <Drawer title="Report">
+          <Drawer icon={<FileTextIcon size={16} aria-hidden />} title="Report">
             <article className="flex max-w-3xl flex-col gap-4">
               <ArticleBody markdown={m.report} />
             </article>
@@ -640,6 +641,7 @@ async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise
         <Drawers>
           {st && a.side && (
             <Drawer
+              icon={<GaugeIcon size={16} aria-hidden />}
               title={
                 <span className="flex flex-wrap items-center gap-2">
                   <span>Where it stands</span>
@@ -655,14 +657,14 @@ async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise
             </Drawer>
           )}
           {short && (
-            <Drawer title="In short">
+            <Drawer icon={<TextAlignLeftIcon size={16} aria-hidden />} title="In short">
               <p className="text-base leading-relaxed text-kumo-default">{short}</p>
             </Drawer>
           )}
           {(r?.claims ?? []).map((c, i) => {
             const { lead, rest } = leadSentence(c.text);
             return (
-              <Drawer key={i} title={lead}>
+              <Drawer icon={<ChatTextIcon size={16} aria-hidden />} key={i} title={lead}>
                 {rest && <p className="text-base leading-relaxed text-kumo-default">{rest}</p>}
                 <span className="flex flex-wrap items-center gap-2 text-sm">
                   {c.drivers.map((rank) => {
@@ -690,7 +692,7 @@ async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise
             );
           })}
           {(r?.exhibits ?? []).length > 0 && (
-            <Drawer title={`Exhibits · ${r!.exhibits.length}`}>
+            <Drawer icon={<ChartBarIcon size={16} aria-hidden />} title={`Exhibits · ${r!.exhibits.length}`}>
               {r!.exhibits.map((x) => (
                 <Exhibit key={x.id} symbol={symbol} exhibit={x} />
               ))}
