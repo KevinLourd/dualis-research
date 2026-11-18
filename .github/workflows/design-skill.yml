@@ -2,7 +2,7 @@ name: Design skill
 
 # Packs the Dualis chart skill for Claude Desktop (Thierry): SKILL.md + dualis_charts.py + a copy of
 # design/tokens.json (for sandboxes without internet) + IBM Plex Sans. Published as the release asset
-# https://github.com/KevinLourd/dualis-research/releases/download/design-skill/dualis-charts.zip
+# https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip
 on:
   push:
     branches: [main]
