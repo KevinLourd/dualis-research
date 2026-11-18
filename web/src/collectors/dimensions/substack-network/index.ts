@@ -38,7 +38,7 @@ const UNJUDGED_WEIGHT = 0.5;
 const MAX_JUDGMENTS_PER_RUN = 80;
 const PARALLEL = 3;
 
-const HEADERS = { "User-Agent": "DualisResearch/1.0 (+https://github.com/KevinLourd/dualis-research)" };
+const HEADERS = { "User-Agent": "DualisResearch/1.0 (+https://github.com/dualis-research/dualis-research)" };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Per run (keyed on the run's fetch function): consecutive refusals and the next gateway to use. */
 const runState = new WeakMap<typeof fetch, { inARow: number; next: number }>();

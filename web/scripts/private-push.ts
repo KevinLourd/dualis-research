@@ -5,7 +5,7 @@ import type { Db } from "../src/db/types";
 import { putPrivateFiles } from "../src/private/files";
 
 /**
- * Pushes Thierry's private input files from a checkout of the private repo (KevinLourd/dualis-private) into
+ * Pushes Thierry's private input files from a checkout of the private repo (dualis-research/dualis-private) into
  * app.private_files on DATABASE_URL, keyed on their path from the checkout root: everything under `data/`, plus the
  * targets doc. Usage: `pnpm private:push ../../dualis-private`.
  */

@@ -19,7 +19,7 @@ export const OWN_WORKFLOW: Record<string, string> = {
   "10 3-16 * * *": "x-publish.yml",
 };
 
-export const REPO = "KevinLourd/dualis-research";
+export const REPO = "dualis-research/dualis-research";
 export const WORKFLOW = "collect.yml";
 
 /** The workflow a slot starts and its dispatch body. Throws on a cron this file does not know (wrangler.jsonc drifted). */

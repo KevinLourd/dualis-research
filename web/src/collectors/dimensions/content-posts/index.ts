@@ -26,7 +26,7 @@ export const REFERENCE_PUBLICATIONS = [
   { host: "multibaggerideas.substack.com", name: "Multibagger Ideas", author: "Multibagger Ideas" },
 ] as const;
 
-const HEADERS = { "user-agent": "DualisResearch/1.0 (+https://github.com/KevinLourd/dualis-research)" };
+const HEADERS = { "user-agent": "DualisResearch/1.0 (+https://github.com/dualis-research/dualis-research)" };
 
 /** Substack challenges datacenter IPs (GitHub Actions) on *.substack.com; publications' own domains pass. */
 const isSubdomain = (host: string) => host.endsWith(".substack.com");

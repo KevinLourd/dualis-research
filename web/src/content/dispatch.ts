@@ -4,7 +4,7 @@
  * repo only, Actions: read and write) on the Worker; without it the request waits for the next collect.
  */
 export const DRAFT_WORKFLOW = "draft.yml";
-export const REPO = "KevinLourd/dualis-research";
+export const REPO = "dualis-research/dualis-research";
 
 export function canDispatch(env: Record<string, string | undefined> = process.env): boolean {
   return !!env.DRAFT_DISPATCH_TOKEN;
