@@ -35,7 +35,7 @@ from matplotlib import font_manager  # noqa: E402
 from matplotlib.patches import FancyBboxPatch  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-LIVE_URL = "https://raw.githubusercontent.com/KevinLourd/dualis-research/main/design/tokens.json"
+LIVE_URL = "https://raw.githubusercontent.com/dualis-research/dualis-research/main/design/tokens.json"
 ESTIMATE = re.compile(r"\d[Ee]$")
 
 _tokens: dict | None = None

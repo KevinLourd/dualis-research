@@ -21,7 +21,7 @@ export const OPENVERSE_SOURCE = "openverse";
 export const COVER_PICK_KEY = "cover-photo@v1";
 const SUBJECT_KIND = "content-post";
 const OPENVERSE = "https://api.openverse.org/v1/images/";
-const HEADERS = { "user-agent": "DualisResearch/1.0 (+https://github.com/KevinLourd/dualis-research)" };
+const HEADERS = { "user-agent": "DualisResearch/1.0 (+https://github.com/dualis-research/dualis-research)" };
 /** Width served on the site: sharp on a 2x screen at the biggest cover size, light enough for a list of them. */
 export const DISPLAY_WIDTH = 1280;
 

@@ -5,7 +5,7 @@ description: Draw or redraw any Dualis Research chart (Substack Note, article, r
 
 # Dualis charts
 
-One design system for every Dualis chart: `design/tokens.json` in the public repo KevinLourd/dualis-research. The site,
+One design system for every Dualis chart: `design/tokens.json` in the public repo dualis-research/dualis-research. The site,
 the console and this skill all read it, so a chart drawn here matches the website and every other report.
 
 ## The one rule: rebuild from the data
@@ -48,7 +48,7 @@ A whole report: draw every chart with the same theme, one call per exhibit, numb
 
 ## Install in Claude Desktop (Thierry)
 1. Download `dualis-charts.zip`: console > Design system > Download the chart skill
-   (https://github.com/KevinLourd/dualis-research/releases/download/design-skill/dualis-charts.zip).
+   (https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip).
 2. Claude Desktop > Settings > Capabilities: turn on code execution.
 3. Settings > Capabilities > Skills > Upload skill > pick the zip.
 4. In any chat or stock project: attach the data and ask "Chart this in the Dualis style".

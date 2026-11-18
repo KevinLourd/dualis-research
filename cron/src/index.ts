@@ -1,7 +1,7 @@
 import { dispatchFor, REPO } from "./plan.ts";
 
 interface Env {
-  /** Fine-grained GitHub token, this repo only, Actions read/write (the console's DRAFT_DISPATCH_TOKEN). */
+  /** Fine-grained GitHub token (resource owner: the dualis-research org), Actions read/write (the console's DRAFT_DISPATCH_TOKEN). */
   DISPATCH_TOKEN: string;
 }
 
