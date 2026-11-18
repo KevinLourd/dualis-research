@@ -27,7 +27,7 @@ The « BREAKING » style of the biggest finance accounts: a headline, a cashtag,
 - **Subtitle**: one line of urgency on the title's measure.
 - **Structure** (`##` headings): `## The number`, `## Why nobody saw it`, `## What happens next`, `## The risk`.
 - **Visual**: see Image below.
-- Do: one bold line per section with its figure.
+- Do: one bold line per section with its figure and unit ($, %); only reported figures of the cover's measure, no closing share price, no forecast, no claim about what the market does.
 - Don't: drop the risk section; fake scarcity (« last chance »); any word from the plain-words list of content-matrix, e.g. free cash flow, net debt, dilute (say cash left after investments, borrowings minus cash, more shares sold); any word on the signal's strength or our reading (« Our reading is a weak one »).
 
 ## Image
