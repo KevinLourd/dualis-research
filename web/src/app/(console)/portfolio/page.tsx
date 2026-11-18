@@ -57,7 +57,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader title="Portfolio" description="What you hold, against the S&P 500 since you entered. Add your entry on a row to draw it." />
+      <PageHeader title="Portfolio" />
 
       <Card title={allWeighted ? "Portfolio vs S&P 500, since inception" : "Each position vs S&P 500, since its entry"}>
         <div className="p-5">
@@ -66,7 +66,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
               bare
               icon={<ChartLineUpIcon size={40} className="text-kumo-inactive" />}
               title="No entry yet"
-              description="Add the entry date and price of a position: its return since then shows here against the S&P 500 over the same days."
+              description="Add a position's entry date and price on its row."
             />
           ) : (
             <ReturnChart lines={lines} />

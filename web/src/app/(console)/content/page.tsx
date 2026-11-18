@@ -66,7 +66,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
         description={
           run?.status === "failed"
             ? `The last idea run (${relativeTime(run.startedAt)}) failed. The Data page shows why.`
-            : "Ideas are proposed every morning from the signals, evidence and fair values, and ranked for each channel."
+            : "The next morning run proposes them."
         }
       />
     );
@@ -89,10 +89,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: Promis
             {ideas.map((i) => (
               <RowLink key={i.id} href={`/content?idea=${i.id}`} label={`Open the idea: ${i.title}`}>
                 <KTableCell className="py-4 pl-6">
-                  <span className="flex min-w-0 flex-col gap-1">
-                    <span className="text-base font-medium text-kumo-strong">{i.title}</span>
-                    <span className="line-clamp-2 text-sm text-kumo-subtle">{i.angle}</span>
-                  </span>
+                  <span className="text-base font-medium text-kumo-strong">{i.title}</span>
                 </KTableCell>
                 <KTableCell className="py-4">
                   {i.symbol ? (

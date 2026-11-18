@@ -18,7 +18,7 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader title="Data" description="Collectors run every morning from GitHub Actions. A missed day shows here." />
+      <PageHeader title="Data" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {latest.map(({ dimension, run }) => (
@@ -27,7 +27,6 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
             title={dimension.name}
             action={run ? <RunStatus status={run.status} /> : <span className="text-sm text-kumo-subtle">Never ran</span>}
           >
-            <p className="px-4 pt-3 pb-2 text-sm text-kumo-subtle">{dimension.description}</p>
             <KTable>
               <KTableHeader>
                 <KTableRow>

@@ -7,7 +7,7 @@ export default async function ContentLayout({ children }: { children: React.Reac
   const [ideas, drafts] = await Promise.all([listIdeas(), listDrafts()]);
   return (
     <>
-      <PageHeader title="Content" description="What to publish next, ranked for each channel. Open an idea to draft it." />
+      <PageHeader title="Content" />
       <TableSearch placeholder="Search ideas and drafts" tabs={<ContentTabs ideas={ideas.length} drafts={drafts.length} />}>
         {children}
       </TableSearch>

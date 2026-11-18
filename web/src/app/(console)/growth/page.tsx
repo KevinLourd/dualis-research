@@ -73,10 +73,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader
-        title="Growth"
-        description={`Grow Analysis Paralysis to ${fmt(GOAL.target)} subscribers by November 30. Writers who cite, feature or host you bring their readers.`}
-      />
+      <PageHeader title="Growth" />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {tiles.map((t) => (
@@ -88,7 +85,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
         ))}
       </div>
 
-      <Card title="Subscribers" action={<span className="text-sm text-kumo-subtle">Counted each morning. Your public count can trail your dashboard by a few.</span>}>
+      <Card title="Subscribers">
         <div className="p-4">
           {audience.length === 0 ? (
             <p className="text-base text-kumo-subtle">No count yet. The first one lands with the next morning run.</p>
@@ -105,23 +102,23 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
           description={
             run?.status === "failed"
               ? `The last Substack crawl (${relativeTime(run.startedAt)}) failed. The Data page shows why.`
-              : "The Substack crawl has not run yet. It runs every morning and ranks the writers whose readers match yours."
+              : "The next morning run lists them."
           }
         />
       ) : (
         <TableSearch placeholder="Search a writer or publication">
           <Card
             title="Recommending you"
-            action={<span className="text-sm text-kumo-subtle">{recommending.length} of {sent} contacted. Checked every morning on Substack.</span>}
+            action={<span className="text-sm text-kumo-subtle">{recommending.length} of {sent} contacted</span>}
           >
             {recommending.length === 0 ? (
-              <p className="p-4 text-base text-kumo-subtle">No writer you contacted recommends you yet. The next morning check will show the first ones.</p>
+              <p className="p-4 text-base text-kumo-subtle">None yet.</p>
             ) : (
               <TargetTable rows={recommending} selectedKey={key} withStatus />
             )}
           </Card>
 
-          <Card title="Every day" action={<span className="text-sm text-kumo-subtle">Writers contacted and recommendations won, day by day</span>}>
+          <Card title="Every day">
             <KTable>
               <KTableHeader>
                 <KTableRow>
