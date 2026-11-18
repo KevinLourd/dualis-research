@@ -14,7 +14,7 @@ import { reactionLine } from "@/collectors/dimensions/market-reaction/compute";
 import { DriverExhibit, ExhibitChart } from "./driver-chart";
 import { formatUnit } from "./exhibit-format";
 import { day, numberFormat, price, utc } from "./format";
-import { Section } from "./signal";
+import { Drawer, Drawers } from "./drawer";
 import { Fact, FactList, SourceTags } from "./ui";
 import { sourceNote } from "./source-labels";
 import { documentPageDetail } from "./document-queries";
@@ -37,6 +37,9 @@ function SourceNote({ sources }: { sources: string[] }) {
   return note ? <p className="text-sm text-kumo-subtle">{note}</p> : null;
 }
 
+/** A news verdict's weight: a turn before a continuation before noise, strong before weak. */
+const verdictWeight = (v: { effect: string; strength: string } | undefined) => (!v ? -1 : (v.effect === "reversal" ? 10 : v.effect === "continuation" ? 5 : 0) + (v.strength === "strong" ? 2 : v.strength === "weak" ? 1 : 0));
+
 const external = "inline-flex items-start gap-1.5 text-base font-medium text-kumo-strong hover:text-kumo-link";
 
 async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
@@ -48,7 +51,6 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
     subtitle: `${day(c.eventDay)}${c.publisher ? ` · ${c.publisher}` : ""}`,
     body: (
       <>
-        {d.reaction && d.reaction.closeBefore !== null && <p className="text-base leading-relaxed text-kumo-default">{reactionLine(d.reaction)}</p>}
         {d.evidence?.effect === "too-old" ? (
           // Too old (Kevin 2026-11-06): from before the current story, judged against no driver.
           <div className="flex flex-col gap-2">
@@ -57,27 +59,50 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
           </div>
         ) : d.evidence ? (
           // Judged against EACH driver (Kevin 2026-11-06): one tag per driver, why, and the sentence it rests on.
-          <ul className="flex flex-col divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
-            {d.drivers.map((drv) => {
-              const v = d.evidence!.verdicts.find((x) => x.driverId === drv.id);
-              return (
-                <li key={drv.id} className="flex flex-col gap-2 px-4 py-3.5">
-                  <span className="flex flex-wrap items-center gap-2">
-                    {v ? <TagBadge effect={v.effect} strength={v.strength} side={drv.side} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
-                    <Link href={itemHref(symbol, `driver:${drv.id}`)} scroll={false} className="text-base font-medium text-kumo-link hover:underline">
-                      {drv.title}
-                    </Link>
-                    <span className="text-sm text-kumo-subtle">{drv.side === "long" ? "Long thesis" : "Short thesis"}</span>
-                    {v?.pricedIn && v.effect !== "noise" && <span className="text-sm text-kumo-subtle">{PRICED_WORD[v.pricedIn]}</span>}
-                  </span>
-                  {v?.why && <p className="text-base leading-relaxed text-kumo-strong">{v.why}</p>}
-                  {v?.citedSentence && v.effect !== "noise" && (
-                    <blockquote className="border-l border-kumo-line pl-4 text-sm leading-relaxed text-kumo-default italic">“{v.citedSentence}”</blockquote>
+          // The verdict that counts most on top, in one sentence; every driver's own verdict in its drawer.
+          (() => {
+            const judged = d.drivers
+              .map((drv) => ({ drv, v: d.evidence!.verdicts.find((x) => x.driverId === drv.id) }))
+              .sort((a, b) => verdictWeight(b.v) - verdictWeight(a.v));
+            const top = judged[0];
+            return (
+              <>
+                {top?.v && (
+                  <div className="flex flex-col gap-3">
+                    <span><TagBadge effect={top.v.effect} strength={top.v.strength} side={top.drv.side} /></span>
+                    {top.v.why && <p className="text-xl leading-snug font-semibold text-kumo-strong">{top.v.why}</p>}
+                  </div>
+                )}
+                <Drawers>
+                  {judged.map(({ drv, v }) => (
+                    <Drawer
+                      key={drv.id}
+                      title={
+                        <span className="flex flex-wrap items-center gap-2">
+                          {v ? <TagBadge effect={v.effect} strength={v.strength} side={drv.side} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
+                          <span>{drv.title}</span>
+                        </span>
+                      }
+                    >
+                      {v?.why && <p className="text-base leading-relaxed text-kumo-default">{v.why}</p>}
+                      {v?.citedSentence && v.effect !== "noise" && <blockquote className="rounded-lg bg-kumo-tint px-4 py-3 text-sm leading-relaxed text-kumo-default italic">“{v.citedSentence}”</blockquote>}
+                      <span className="flex flex-wrap items-center gap-3 text-sm text-kumo-subtle">
+                        {v?.pricedIn && v.effect !== "noise" && <span>{PRICED_WORD[v.pricedIn]}</span>}
+                        <Link href={itemHref(symbol, `driver:${drv.id}`)} scroll={false} className="font-medium text-kumo-link hover:underline">
+                          Open the driver ›
+                        </Link>
+                      </span>
+                    </Drawer>
+                  ))}
+                  {d.reaction && d.reaction.closeBefore !== null && (
+                    <Drawer title="Price reaction">
+                      <p className="text-base leading-relaxed text-kumo-default">{reactionLine(d.reaction)}</p>
+                    </Drawer>
                   )}
-                </li>
-              );
-            })}
-          </ul>
+                </Drawers>
+              </>
+            );
+          })()
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-3">
@@ -89,8 +114,13 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
             {c.evidence && <blockquote className="border-l border-kumo-line pl-4 text-base leading-relaxed text-kumo-default italic">“{c.evidence}”</blockquote>}
           </>
         )}
-        {d.exhibit && <Exhibit symbol={symbol} exhibit={d.exhibit} />}
-        <Section title="Original documents">
+        <Drawers>
+        {d.exhibit && (
+          <Drawer title={`Exhibit ${d.exhibit.number}: ${d.exhibit.title}`}>
+            <Exhibit symbol={symbol} exhibit={d.exhibit} />
+          </Drawer>
+        )}
+        <Drawer title={`Original documents · ${d.articles.length + d.filings.length}`}>
           <ul className="flex flex-col gap-4">
             {d.articles.map((a) => (
               <li key={a.id} className="flex flex-col gap-1">
@@ -120,9 +150,9 @@ async function newsItem(symbol: string, id: string): Promise<ItemView | null> {
                 </span>
               </li>
             ))}
-            {d.articles.length + d.filings.length === 0 && <li className="text-base text-kumo-subtle">No document is linked to this item any more.</li>}
           </ul>
-        </Section>
+        </Drawer>
+        </Drawers>
         <SourceNote sources={c.sources} />
       </>
     ),
@@ -153,6 +183,8 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
             sources={sources}
           />
         )}
+        <Drawers>
+        <Drawer title={`Every period · ${rows.length}`}>
         <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>
             <KTableHeader>
@@ -177,6 +209,8 @@ async function kpiItem(symbol: string, metric: string): Promise<ItemView | null>
             </KTableBody>
           </KTable>
         </div>
+        </Drawer>
+        </Drawers>
         <SourceNote sources={sources} />
       </>
     ),
@@ -195,9 +229,7 @@ async function priceItem(symbol: string): Promise<ItemView | null> {
     body: (
       <>
         <DriverExhibit number={1} title={`${symbol} daily close`} unit={null} period="market" points={bars.map((b) => ({ date: b.date, value: b.close }))} sources={sources} />
-        <p className="text-base text-kumo-subtle">
-          {bars.length} trading days. {disagreements === 0 ? "Every source agrees on every close." : `${disagreements} day${disagreements === 1 ? "" : "s"} where a source's close differs by more than 0.5%.`}
-        </p>
+        {disagreements > 0 && <p className="text-base text-kumo-subtle">{`${disagreements} day${disagreements === 1 ? "" : "s"} where a source's close differs by more than 0.5%.`}</p>}
         <SourceNote sources={sources} />
       </>
     ),
@@ -226,19 +258,23 @@ async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
     subtitle: span,
     body: (
       <>
-        <p className="text-lg leading-relaxed text-kumo-strong">{conclusion}</p>
         <span className="flex flex-wrap items-center gap-2">
           <Badge variant={c?.kind === "fundamental" ? "primary" : "outline"}>{MOVE_KIND[c?.kind ?? "unknown"]}</Badge>
           {c?.category && <Badge variant="outline">{c.category}</Badge>}
         </span>
+        <p className="text-xl leading-snug font-semibold text-kumo-strong">{conclusion}</p>
+        <Drawers>
+        <Drawer title="The move">
         <FactList>
           <Fact label="Stock">{signed(m.returnPct)}</Fact>
           <Fact label="S&P 500">{signed(m.benchReturn)}</Fact>
           <Fact label="Excess move">{`${signed(m.abnormal)}, ${Math.abs(m.z).toFixed(1)} standard deviations`}</Fact>
           <Fact label="Closes">{`${price(m.closeBefore)} to ${price(m.closeEnd)}${m.currency ? ` ${m.currency}` : ""}`}</Fact>
         </FactList>
+        <p className="text-sm text-kumo-subtle">Significant = beyond two standard deviations of the stock&apos;s own daily moves, S&amp;P 500 taken out.</p>
+        </Drawer>
         {c && c.cites.length > 0 && (
-          <Section title="What it rests on">
+          <Drawer title={`What it rests on · ${c.cites.length}`}>
             <ul className="flex flex-col gap-4">
               {c.cites.map((x) => (
                 <li key={`${x.kind}:${x.id}`} className="flex flex-col gap-1">
@@ -256,9 +292,9 @@ async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
                 </li>
               ))}
             </ul>
-          </Section>
+          </Drawer>
         )}
-        <p className="text-sm text-kumo-subtle">A significant move: beyond two standard deviations of the stock&apos;s own daily moves once the S&amp;P 500 is taken out. News and filings read: 3 days before to 1 day after it.</p>
+        </Drawers>
         <SourceNote sources={sources} />
       </>
     ),
@@ -271,20 +307,27 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
   const sources = [...new Set(d.exhibits.flatMap((x) => x.sources))];
   return {
     title: d.driver.title,
-    subtitle: `${d.driver.category}, a reason the market holds the narrative`,
+    subtitle: d.driver.category,
     body: (
       <>
         {/* The reason first, in one sentence (Kevin 2026-11-17), then what changed with its quotes, then the moves. */}
-        <DriverReason state={d.state} side={d.side} moves={d.moves} hrefFor={(item) => itemHref(symbol, item)} />
-        <Section title="Why the market holds it">
-          <p className="text-base leading-relaxed text-kumo-default">{d.driver.text}</p>
-        </Section>
-        {d.exhibits.map((x) => (
-          <Exhibit key={x.id} symbol={symbol} exhibit={x} />
-        ))}
-        <Section title={`News that bear on it · ${d.evidence.length}`}>
-          {d.evidence.length ? <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} side={d.side} /> : <p className="text-base text-kumo-subtle">No news has touched this driver yet.</p>}
-        </Section>
+        <DriverReason state={d.state} side={d.side} moves={d.moves} hrefFor={(item) => itemHref(symbol, item)}>
+          <Drawer title="Why the market holds it">
+            <p className="text-base leading-relaxed text-kumo-default">{d.driver.text}</p>
+          </Drawer>
+          {d.exhibits.length > 0 && (
+            <Drawer title={`Exhibits · ${d.exhibits.length}`}>
+              {d.exhibits.map((x) => (
+                <Exhibit key={x.id} symbol={symbol} exhibit={x} />
+              ))}
+            </Drawer>
+          )}
+          {d.evidence.length > 0 && (
+            <Drawer title={`News · ${d.evidence.length}`}>
+              <EvidenceRows symbol={symbol} rows={d.evidence} driverId={d.driver.id} side={d.side} />
+            </Drawer>
+          )}
+        </DriverReason>
         <SourceNote sources={sources} />
       </>
     ),
@@ -302,6 +345,8 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
       <>
         <ExhibitChart number={x.number} title={x.title} chart={x.chart} series={x.series} points={x.points} sources={x.sources} height={280} />
         <p className="text-lg leading-relaxed text-kumo-strong">{x.takeaway}</p>
+        <Drawers>
+        <Drawer title={`Data · ${x.points.length} periods`}>
         <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
           <KTable>
             <KTableHeader>
@@ -328,7 +373,8 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
             </KTableBody>
           </KTable>
         </div>
-        <Section title="Series">
+        </Drawer>
+        <Drawer title={`Series · ${x.series.length}`}>
           <ul className="flex flex-col gap-2">
             {x.series.map((s) => (
               <li key={s.key} className="flex flex-wrap items-center gap-2 text-base">
@@ -338,7 +384,8 @@ async function exhibitItem(symbol: string, id: string): Promise<ItemView | null>
               </li>
             ))}
           </ul>
-        </Section>
+        </Drawer>
+        </Drawers>
         <SourceNote sources={x.sources} />
       </>
     ),
@@ -362,20 +409,26 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
           </p>
         )}
         {f.author === "thierry" && <p className="text-base text-kumo-default">Your number wins{f.method ? ` (${f.method})` : ""}. The methods below are Claude&apos;s, for reference.</p>}
-        {r && <p className="text-lg leading-relaxed text-kumo-strong">{r.summary}</p>}
-        <ValuationField v={v} />
-        {v.methods.length > 0 && (
-          <Section title="Methods">
-            <MethodsTable symbol={symbol} v={v} />
-          </Section>
-        )}
-        {r && (
-          <Section title="Valuation report">
-            <article className="flex max-w-3xl flex-col gap-4">
-              <ArticleBody markdown={r.markdown} />
-            </article>
-          </Section>
-        )}
+        <Drawers>
+          {r && (
+            <Drawer title="Why this value">
+              <p className="text-base leading-relaxed text-kumo-default">{r.summary}</p>
+            </Drawer>
+          )}
+          {v.methods.length > 0 && (
+            <Drawer title={`Methods · ${v.methods.length}`}>
+              <ValuationField v={v} />
+              <MethodsTable symbol={symbol} v={v} />
+            </Drawer>
+          )}
+          {r && (
+            <Drawer title="Valuation report">
+              <article className="flex max-w-3xl flex-col gap-4">
+                <ArticleBody markdown={r.markdown} />
+              </article>
+            </Drawer>
+          )}
+        </Drawers>
         <SourceNote sources={[...(f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]), ...(f.conversion ? f.conversion.source.split(", ") : [])]} />
       </>
     ),
@@ -402,7 +455,7 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
   const unit = (u: string, x: number) => formatUnit(x, u as "currency", u === "per-share" || u === "currency" ? m.currency : null);
   return {
     title: m.name,
-    subtitle: `${m.family}: ${m.description}`,
+    subtitle: m.family,
     body: (
       <>
         {m.applicable && m.base !== null ? (
@@ -410,9 +463,15 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
         ) : (
           <p className="text-lg text-kumo-subtle">Not used for this company: {m.reason}</p>
         )}
-        {m.summary && <p className="text-lg leading-relaxed text-kumo-strong">{m.summary}</p>}
-        {m.weight?.why && <p className="text-base text-kumo-default">Weight: {m.weight.why}</p>}
+        <Drawers>
+        {(m.summary || m.weight?.why) && (
+          <Drawer title="Summary">
+            {m.summary && <p className="text-base leading-relaxed text-kumo-default">{m.summary}</p>}
+            {m.weight?.why && <p className="text-base text-kumo-default">Weight: {m.weight.why}</p>}
+          </Drawer>
+        )}
         {m.history && m.history.points.length > 1 && (
+          <Drawer title="History">
           <ExhibitChart
             number={1}
             title={m.history.label}
@@ -421,9 +480,10 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
             points={m.history.points.map((p) => ({ period: p.period, values: { h: p.value } }))}
             sources={[...new Set(m.inputs.flatMap((i) => i.sources))]}
           />
+          </Drawer>
         )}
         {m.assumptions.length > 0 && (
-          <Section title="Assumptions">
+          <Drawer title={`Assumptions · ${m.assumptions.length}`}>
             <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
@@ -449,10 +509,10 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
               </KTable>
             </div>
             {m.basis && <p className="text-sm text-kumo-subtle">Run on: {m.basis}</p>}
-          </Section>
+          </Drawer>
         )}
         {m.steps.length > 0 && (
-          <Section title="Calculation">
+          <Drawer title="Calculation">
             <div className="overflow-x-auto rounded-lg ring-1 ring-kumo-hairline">
               <KTable>
                 <KTableHeader>
@@ -475,10 +535,10 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
                 </KTableBody>
               </KTable>
             </div>
-          </Section>
+          </Drawer>
         )}
         {m.peers.length > 0 && (
-          <Section title="Listed peers">
+          <Drawer title={`Listed peers · ${m.peers.length}`}>
             {m.peerPricing && (
               <p className="text-base text-kumo-default">
                 Base and high start from the peers&apos; median {m.peerPricing.label} of <span className="font-mono tabular">{m.peerPricing.median.toFixed(1)}x</span> ({m.peerPricing.count} {m.peerPricing.count === 1 ? "company" : "companies"}): base{" "}
@@ -515,10 +575,10 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
                 </KTableBody>
               </KTable>
             </div>
-          </Section>
+          </Drawer>
         )}
         {m.inputs.length > 0 && (
-          <Section title="Inputs">
+          <Drawer title={`Inputs · ${m.inputs.length}`}>
             <div className="rounded-lg ring-1 ring-kumo-hairline">
               <FactList>
                 {m.inputs.map((i) => (
@@ -532,72 +592,111 @@ async function methodItem(symbol: string, method: string): Promise<ItemView | nu
                 ))}
               </FactList>
             </div>
-          </Section>
+          </Drawer>
         )}
         {m.report && (
-          <Section title="Report">
+          <Drawer title="Report">
             <article className="flex max-w-3xl flex-col gap-4">
               <ArticleBody markdown={m.report} />
             </article>
-          </Section>
+          </Drawer>
         )}
+        </Drawers>
         <SourceNote sources={["claude", ...new Set(m.inputs.flatMap((i) => i.sources))]} />
       </>
     ),
   };
 }
 
-/** Why the market tells this story: the narrative's detail, then each claim of its Rationale with the drivers and sources it rests on. */
+/**
+ * A claim's first sentence, whole, as its drawer title; the rest of the claim opens under it. No split when the text
+ * is one sentence, or when the first stop is an abbreviation (« U.S. »).
+ */
+export function leadSentence(text: string): { lead: string; rest: string } {
+  const m = /^(.{25,}?[.!?])\s+(?=[A-Z0-9])/.exec(text);
+  if (!m || /\b[A-Z]\.$/.test(m[1])) return { lead: text, rest: "" };
+  return { lead: m[1], rest: text.slice(m[0].length) };
+}
+
+/**
+ * Why the market tells this story (Kevin 2026-11-18: the intro and the Rationale told the same thing twice, everything
+ * was open at once): the narrative is the panel's subtitle; under it only drawers: where the story stands now, the
+ * rationale in short, then one drawer per claim (its first sentence as the title, its drivers and sources inside).
+ */
 async function narrativeItem(symbol: string, thesis: ThesisSide | null): Promise<ItemView | null> {
   const a = await getTickerAnalysis(symbol, thesis);
   if (!a.narrative) return null;
   const r = a.rationale;
+  const st = a.narrativeState;
   const driverByRank = new Map(a.drivers.map((d) => [d.rank, d]));
   const exhibitByNumber = new Map([...a.drivers.flatMap((d) => d.exhibits), ...(r?.exhibits ?? [])].map((x) => [String(x.number), x]));
   const sources = [...new Set((r?.exhibits ?? []).flatMap((x) => x.sources))];
+  const short = r?.summary ?? a.narrative.detail;
   return {
     title: "Why the market tells this story",
     subtitle: a.narrative.text,
     body: (
       <>
-        {a.narrative.detail && <p className="text-lg leading-relaxed text-kumo-strong">{a.narrative.detail}</p>}
-        {r && (
-          <Section title="Rationale">
-            <p className="text-base leading-relaxed text-kumo-default">{r.summary}</p>
-            <ol className="flex flex-col gap-5">
-              {r.claims.map((c, i) => (
-                <li key={i} className="flex flex-col gap-2">
-                  <p className="text-base leading-relaxed text-kumo-strong">{c.text}</p>
-                  <span className="flex flex-wrap items-center gap-2 text-sm">
-                    {c.drivers.map((rank) => {
-                      const d = driverByRank.get(rank);
-                      return d ? (
-                        <Link key={rank} href={itemHref(symbol, `driver:${d.id}`)} scroll={false} className="text-kumo-link hover:underline">
-                          <Badge variant="outline">{d.category}</Badge> {d.title}
-                        </Link>
-                      ) : null;
-                    })}
-                    {c.sources.map((src, j) => {
-                      const x = src.type === "exhibit" ? exhibitByNumber.get(src.ref) : undefined;
-                      return x ? (
-                        <Link key={j} href={itemHref(symbol, `exhibit:${x.id}`)} scroll={false} className="text-kumo-link hover:underline">
-                          Exhibit {x.number}
-                        </Link>
-                      ) : (
-                        <span key={j} className="text-kumo-subtle">
-                          {src.label}
-                        </span>
-                      );
-                    })}
-                  </span>
-                </li>
+        <Drawers>
+          {st && a.side && (
+            <Drawer
+              title={
+                <span className="flex flex-wrap items-center gap-2">
+                  <span>Where it stands</span>
+                  <TagBadge effect={st.effect} strength={st.strength} side={a.side} />
+                </span>
+              }
+            >
+              {st.why && <p className="text-base leading-relaxed text-kumo-default">{st.why}</p>}
+              <span className="flex flex-wrap items-center gap-3 text-sm text-kumo-subtle">
+                {st.since && st.effect !== "noise" && <span className="tabular">Since {day(st.since)}</span>}
+                {st.pricedIn && st.effect !== "noise" && <span>{PRICED_WORD[st.pricedIn]}</span>}
+              </span>
+            </Drawer>
+          )}
+          {short && (
+            <Drawer title="In short">
+              <p className="text-base leading-relaxed text-kumo-default">{short}</p>
+            </Drawer>
+          )}
+          {(r?.claims ?? []).map((c, i) => {
+            const { lead, rest } = leadSentence(c.text);
+            return (
+              <Drawer key={i} title={lead}>
+                {rest && <p className="text-base leading-relaxed text-kumo-default">{rest}</p>}
+                <span className="flex flex-wrap items-center gap-2 text-sm">
+                  {c.drivers.map((rank) => {
+                    const d = driverByRank.get(rank);
+                    return d ? (
+                      <Link key={rank} href={itemHref(symbol, `driver:${d.id}`)} scroll={false} className="text-kumo-link hover:underline">
+                        {d.title} ›
+                      </Link>
+                    ) : null;
+                  })}
+                  {c.sources.map((src, j) => {
+                    const x = src.type === "exhibit" ? exhibitByNumber.get(src.ref) : undefined;
+                    return x ? (
+                      <Link key={j} href={itemHref(symbol, `exhibit:${x.id}`)} scroll={false} className="text-kumo-link hover:underline">
+                        Exhibit {x.number}
+                      </Link>
+                    ) : (
+                      <span key={j} className="text-kumo-subtle">
+                        {src.label}
+                      </span>
+                    );
+                  })}
+                </span>
+              </Drawer>
+            );
+          })}
+          {(r?.exhibits ?? []).length > 0 && (
+            <Drawer title={`Exhibits · ${r!.exhibits.length}`}>
+              {r!.exhibits.map((x) => (
+                <Exhibit key={x.id} symbol={symbol} exhibit={x} />
               ))}
-            </ol>
-          </Section>
-        )}
-        {(r?.exhibits ?? []).map((x) => (
-          <Exhibit key={x.id} symbol={symbol} exhibit={x} />
-        ))}
+            </Drawer>
+          )}
+        </Drawers>
         <SourceNote sources={sources.length ? sources : ["claude"]} />
       </>
     ),
