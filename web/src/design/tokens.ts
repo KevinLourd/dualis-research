@@ -120,8 +120,8 @@ export const COLOR = {
     "dark": "#7E77B8"
   },
   "chart-line": {
-    "light": "#E0592A",
-    "dark": "#E0592A"
+    "light": "#8B5CF6",
+    "dark": "#C77DFF"
   },
   "chart-light-base": {
     "light": "#B8B6C4",
