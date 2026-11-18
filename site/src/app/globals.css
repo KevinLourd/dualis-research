@@ -1735,7 +1735,9 @@ h2 + .lead,
   color: var(--muted);
 }
 
-/* The carousel: one card large in the middle, its neighbours smaller, blurred and dimmed on each side. */
+/* The carousel: one card large in the middle, its neighbours smaller, blurred and dimmed on each side. The cards
+   turn from one place to the next as on a ring seen from the front (Kevin 2026-11-18): each card keeps its element and
+   only its place changes, the fourth one waits behind the middle card. */
 .carousel {
   margin-top: 48px;
 }
@@ -1743,9 +1745,9 @@ h2 + .lead,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 24px;
 }
-.carousel-side,
+.carousel-card,
 .carousel-arrow,
 .carousel-dots button {
   padding: 0;
@@ -1753,17 +1755,49 @@ h2 + .lead,
   background: none;
   cursor: pointer;
 }
-.carousel-side {
+.carousel-ring {
+  position: relative;
   flex: none;
-  transform: scale(0.72);
+  width: 940px;
+  height: 540px;
+  perspective: 1600px;
+}
+.carousel-card {
+  position: absolute;
+  top: 0;
+  left: calc(50% - 200px);
+  transition:
+    transform 0.6s var(--ease),
+    filter 0.6s var(--ease),
+    opacity 0.6s var(--ease);
+}
+.carousel-card[data-place="main"] {
+  z-index: 3;
+  cursor: default;
+}
+.carousel-card[data-place="next"] {
+  z-index: 2;
+  transform: translateX(300px) scale(0.72) rotateY(-28deg);
   filter: blur(3px);
   opacity: 0.5;
-  margin: 0 -44px;
 }
-.carousel-main {
-  position: relative;
+.carousel-card[data-place="prev"] {
+  z-index: 2;
+  transform: translateX(-300px) scale(0.72) rotateY(28deg);
+  filter: blur(3px);
+  opacity: 0.5;
+}
+.carousel-card[data-place="back"] {
   z-index: 1;
-  flex: none;
+  transform: scale(0.5);
+  filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .carousel-card {
+    transition: none;
+  }
 }
 .carousel-arrow {
   flex: none;
@@ -1876,9 +1910,18 @@ h2 + .lead,
   color: var(--muted);
 }
 
-@media (max-width: 1100px) {
-  .carousel-side {
-    display: none;
+@media (max-width: 1180px) {
+  .carousel-ring {
+    width: 400px;
+    max-width: 100%;
+  }
+  .carousel-card {
+    left: 0;
+  }
+  .carousel-card[data-place="next"],
+  .carousel-card[data-place="prev"] {
+    opacity: 0;
+    pointer-events: none;
   }
 }
 @media (max-width: 900px) {
@@ -1894,15 +1937,21 @@ h2 + .lead,
 @media (max-width: 560px) {
   .pcard {
     width: min(400px, calc(100vw - 2 * var(--gutter)));
-    height: auto;
-    min-height: 480px;
-  }
-  .pc-frame {
-    min-height: 456px;
+    height: 600px;
   }
   .pc-face {
-    position: static;
-    padding: 60px 26px;
+    inset: 44px 20px;
+  }
+  .pc-face h3,
+  .section.deep .pc-face h3 {
+    font-size: 26px;
+  }
+  .pc-face p {
+    font-size: 14.5px;
+  }
+  .carousel-ring {
+    width: min(400px, calc(100vw - 2 * var(--gutter)));
+    height: 600px;
   }
   .carousel-arrow {
     display: none;
