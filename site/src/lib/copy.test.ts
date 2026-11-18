@@ -56,7 +56,7 @@ describe("site copy and colours", () => {
   // card icon before the poker lines. Thierry 2026-11-17: no hand of cards on Research (four kinds of research instead),
   // Company's cards are a carousel with a suit in the corners and no Dualis logo, and Home, Research and Company carry
   // no poker line.
-  it("shows the cards as Thierry asked, never animated", () => {
+  it("shows the cards as Thierry asked, only the carousel turning", () => {
     const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
     expect(text(join("app", "research", "page.tsx"))).toContain("<Formats ");
     expect(text(join("app", "company", "page.tsx"))).toContain("<CardCarousel ");
@@ -65,9 +65,13 @@ describe("site copy and colours", () => {
     expect(files.filter((f) => /WINNABLE\.(home|company|research)|thread="research"/.test(f.text)).map((f) => f.path)).toEqual([]);
     expect(files.filter((f) => /Play winnable games\.<|Pick the table before|hand behind the call/i.test(f.text)).map((f) => f.path)).toEqual([]);
     const css = text(join("app", "globals.css"));
-    const cardRules = css.match(/\.(pcard|pc-[a-z]+|carousel[a-z-]*)[^{]*\{[^}]*\}/g) ?? [];
+    // The cards themselves never move; the carousel alone turns them from one place to the next (Kevin 2026-11-18),
+    // and stands still for a visitor who asks for reduced motion.
+    const cardRules = css.match(/\.(pcard|pc-[a-z]+)[^{]*\{[^}]*\}/g) ?? [];
     expect(cardRules.length).toBeGreaterThan(5);
     expect(cardRules.filter((r) => /transition|animation/.test(r))).toEqual([]);
+    expect(css).toMatch(/\.carousel-card \{[^}]*transition:/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.carousel-card \{\s*transition: none;/);
   });
 
   // Thierry 2026-11-17: his lines for Home, Company's hero and the footer.
