@@ -6,7 +6,8 @@ import { TableSearch } from "@/console/table-search";
 import { Card, PageHeader } from "@/console/ui";
 import { ChartSample } from "@/design/chart-sample";
 import { ColorForm } from "@/design/color-form";
-import { DESIGN_ON_GITHUB, type DesignSystem, getDesignSystem, SKILL_ZIP } from "@/design/queries";
+import { MCP_URL } from "@/connector/oauth";
+import { DESIGN_ON_GITHUB, type DesignSystem, getDesignSystem, SKILL_ZIP, WORDING_ZIP } from "@/design/queries";
 
 export const metadata = { title: "Design system" };
 export const dynamic = "force-dynamic";
@@ -159,27 +160,28 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
         </div>
       </Card>
 
-      <Card title="Charts with Claude">
+      <Card title="Claude Desktop">
         <div className="flex max-w-prose flex-col gap-4 p-4 text-base text-kumo-default">
-          <p>
-            The Dualis chart skill redraws any chart in this style from its numbers. Give Claude the data (a CSV, a table or the
-            filing) and say what the chart should show.
-          </p>
+          <p>Claude changes this design system and the website&apos;s words for you, and publishes each change you approve.</p>
           <ol className="flex list-decimal flex-col gap-1.5 pl-5">
-            <li>Download the skill with the button below.</li>
-            <li>In Claude Desktop, open Settings, then Capabilities, and turn on code execution.</li>
-            <li>In Settings, then Capabilities, then Skills, choose Upload skill and pick the file.</li>
-            <li>In any chat or stock project, ask: &quot;Chart this in the Dualis style&quot; with the data attached.</li>
+            <li>
+              Settings, Connectors, Add custom connector: name Dualis Research, URL <code className="text-sm">{MCP_URL}</code>, then Connect and Allow.
+            </li>
+            <li>Settings, Capabilities: turn on code execution.</li>
+            <li>Settings, Capabilities, Skills, Upload skill: add both skills below.</li>
           </ol>
-          <p>
-            To change a colour, use Edit on the table above. Claude Code changes the same file through a pull request. Both
-            land in design/tokens.json, so the site, the console and the skill always agree.
-          </p>
-          <a href={SKILL_ZIP} className="self-start">
-            <Button variant="primary" tabIndex={-1}>
-              Download the chart skill
-            </Button>
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a href={SKILL_ZIP}>
+              <Button variant="primary" tabIndex={-1}>
+                Chart skill
+              </Button>
+            </a>
+            <a href={WORDING_ZIP}>
+              <Button variant="secondary" tabIndex={-1}>
+                Website wording skill
+              </Button>
+            </a>
+          </div>
         </div>
       </Card>
 

@@ -8,6 +8,7 @@ import { REPO } from "@/content/dispatch";
 export const DESIGN_RAW = `https://raw.githubusercontent.com/${REPO}/main/`;
 export const DESIGN_ON_GITHUB = `https://github.com/${REPO}/tree/main/design`;
 export const SKILL_ZIP = `https://github.com/${REPO}/releases/download/design-skill/dualis-charts.zip`;
+export const WORDING_ZIP = `https://github.com/${REPO}/releases/download/design-skill/site-wording.zip`;
 
 export type ColorTokenDef = { name: string; value: { light: string; dark: string }; usage: string };
 export type TypeStyle = { name: string; fontSize: string; lineHeight: string; fontWeight: number };

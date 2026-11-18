@@ -38,18 +38,23 @@ the claim; green and red only for long / short data; a chart with more than two 
 
 A whole report: draw every chart with the same theme, one call per exhibit, number them Exhibit 1, 2, 3 in the text.
 
-## Changing the design system
+## Changing the design system: publish it at once
+Every change to colours, chart style or any token is published to GitHub main the moment Thierry approves it. A change
+kept only in the chat, in a local copy or in this skill's tokens.json does not exist: the site and the next chart never see it.
+- Claude Desktop (Thierry): through the **Dualis Research** connector (tools `read_design_system`, `set_colours`,
+  `edit_files`, `change_status`). Read the current tokens, show him before -> after, and on his OK call `set_colours` (a
+  colour) or `edit_files` (any other token: chart rules, type, spacing), then `change_status` until it says live, and
+  give him the commit link. The website redeploys by itself in about 3 minutes; the next chart reads the new tokens.
+  Connector missing in this chat: tell him to turn it on (chat "+" menu > Connectors) or to add it (Install, step 1).
 - Claude Code (Kevin, in the repo): edit `design/tokens.json`, run `node design/build.mjs`, open a PR. CI fails if a
   generated file is out of date.
-- Thierry: console > Design system > Edit on a colour. The console commits the change to the same file on GitHub; the
-  website follows within minutes, this skill on its next run.
-- From Claude Desktop, never edit a local copy: write the change you want (token name, light and dark value, why) and
-  Thierry applies it on the Design system page.
 
 ## Install in Claude Desktop (Thierry)
-1. Download `dualis-charts.zip`: console > Design system > Download the chart skill
-   (https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip).
-2. Claude Desktop > Settings > Capabilities: turn on code execution.
-3. Settings > Capabilities > Skills > Upload skill > pick the zip.
+1. Settings > Connectors > Add custom connector: name `Dualis Research`, URL `https://console.dualisresearch.com/mcp`,
+   Add, then Connect: sign in to the Dualis console and click Allow.
+2. Settings > Capabilities: turn on code execution.
+3. Settings > Capabilities > Skills > Upload skill: `dualis-charts.zip`
+   (https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip), and the same for
+   `site-wording.zip` (same address, the website's words). Links also on https://console.dualisresearch.com/design.
 4. In any chat or stock project: attach the data and ask "Chart this in the Dualis style".
 The zip carries a copy of tokens.json for sandboxes without internet; with internet the skill reads the live file.
