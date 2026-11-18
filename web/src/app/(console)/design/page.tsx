@@ -129,6 +129,20 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                 <img src={l.dataUri} alt={l.file.split("/").pop()} className="h-20 w-20 object-contain" />
               </div>
               <figcaption className="text-sm text-kumo-subtle">{l.usage}</figcaption>
+              <div className="flex flex-wrap gap-2">
+                {l.pngSizes.map((size) => (
+                  <a key={size} href={`/api/design/logos/${l.name}.png?size=${size}&download=1`} download>
+                    <Button size="sm" variant="secondary" tabIndex={-1}>
+                      PNG {size}
+                    </Button>
+                  </a>
+                ))}
+                <a href={`/api/design/logos/${l.name}.svg?download=1`} download>
+                  <Button size="sm" variant="secondary" tabIndex={-1}>
+                    SVG
+                  </Button>
+                </a>
+              </div>
             </figure>
           ))}
         </div>

@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   // The trace root is web/ itself: a lockfile further up the disk otherwise nests the server under that path.
   outputFileTracingRoot: path.resolve("."),
   images: { unoptimized: true },
+  // Native renderer (a .node binary) for the logo PNG downloads: required at run time, never bundled.
+  serverExternalPackages: ["@resvg/resvg-js"],
   // A page loaded ahead (console links prefetch in full) or already visited stays in the browser 5 minutes: a click
   // renders at once. Server actions (Thierry's edits) still refresh it right away.
   experimental: { staleTimes: { dynamic: 300, static: 300 } },
