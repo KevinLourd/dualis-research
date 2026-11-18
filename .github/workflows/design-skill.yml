@@ -1,12 +1,13 @@
 name: Design skill
 
-# Packs the Dualis chart skill for Claude Desktop (Thierry): SKILL.md + dualis_charts.py + a copy of
-# design/tokens.json (for sandboxes without internet) + IBM Plex Sans. Published as the release asset
-# https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip
+# Packs Thierry's Claude Desktop skills as release assets of `design-skill`:
+#   dualis-charts.zip: SKILL.md + dualis_charts.py + a copy of design/tokens.json (sandboxes without internet) + IBM Plex Sans
+#   site-wording.zip:  SKILL.md (the website's words; publishing goes through the console connector, /mcp)
+# https://github.com/dualis-research/dualis-research/releases/download/design-skill/<name>.zip
 on:
   push:
     branches: [main]
-    paths: ["design/tokens.json", ".claude/skills/dualis-charts/**", ".github/workflows/design-skill.yml"]
+    paths: ["design/tokens.json", ".claude/skills/dualis-charts/**", ".claude/skills/site-wording/**", ".github/workflows/design-skill.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -28,9 +29,13 @@ jobs:
           cp .claude/skills/dualis-charts/SKILL.md .claude/skills/dualis-charts/dualis_charts.py design/tokens.json "$d/"
           cp web/src/collectors/dimensions/growth-brief/fonts/*.ttf "$d/fonts/"
           (cd "$RUNNER_TEMP" && zip -r dualis-charts.zip dualis-charts)
+          mkdir -p "$RUNNER_TEMP/site-wording"
+          cp .claude/skills/site-wording/SKILL.md "$RUNNER_TEMP/site-wording/"
+          (cd "$RUNNER_TEMP" && zip -r site-wording.zip site-wording)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view design-skill >/dev/null 2>&1 || gh release create design-skill --title "Dualis chart skill" --notes "Claude skill that draws Dualis charts from data. Install: console > Design system." --latest=false
-          gh release upload design-skill "$RUNNER_TEMP/dualis-charts.zip" --clobber
+          gh release view design-skill >/dev/null 2>&1 || gh release create design-skill --title "Dualis Claude skills" --notes "Claude Desktop skills: dualis-charts (charts from data) and site-wording (the website's words). Install: https://console.dualisresearch.com/design" --latest=false
+          gh release edit design-skill --title "Dualis Claude skills" --notes "Claude Desktop skills: dualis-charts (charts from data) and site-wording (the website's words). Install: https://console.dualisresearch.com/design"
+          gh release upload design-skill "$RUNNER_TEMP/dualis-charts.zip" "$RUNNER_TEMP/site-wording.zip" --clobber

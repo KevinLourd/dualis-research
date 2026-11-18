@@ -37,12 +37,14 @@ jobs:
       ONEDRIVE_TOKEN_KEY: ${{ secrets.ONEDRIVE_TOKEN_KEY }}
       # Optional: lets Create draft (Content > Ideas) start draft.yml at once; without it a request waits for the next collect.
       DRAFT_DISPATCH_TOKEN: ${{ secrets.DRAFT_DISPATCH_TOKEN }}
+      # Seals the Claude connector's OAuth codes and tokens (web/src/connector/oauth.ts).
+      MCP_OAUTH_KEY: ${{ secrets.MCP_OAUTH_KEY }}
     steps:
       - name: Required secrets are set
         working-directory: .
         run: |
           missing=""
-          for name in DATABASE_URL DATABASE_URL_UNPOOLED CLERK_SECRET_KEY NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CONSOLE_DEPLOY_KEY CONSOLE_DEPLOY_HOST CONSOLE_DEPLOY_KNOWN_HOSTS AZURE_CLIENT_ID AZURE_TENANT_ID ONEDRIVE_TOKEN_KEY; do
+          for name in DATABASE_URL DATABASE_URL_UNPOOLED CLERK_SECRET_KEY NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CONSOLE_DEPLOY_KEY CONSOLE_DEPLOY_HOST CONSOLE_DEPLOY_KNOWN_HOSTS AZURE_CLIENT_ID AZURE_TENANT_ID ONEDRIVE_TOKEN_KEY MCP_OAUTH_KEY; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -82,6 +84,7 @@ jobs:
             printf 'CLERK_SECRET_KEY=%s\n' "$CLERK_SECRET_KEY"
             printf 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=%s\n' "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
             printf 'AZURE_CLIENT_ID=%s\nAZURE_TENANT_ID=%s\nONEDRIVE_TOKEN_KEY=%s\n' "$AZURE_CLIENT_ID" "$AZURE_TENANT_ID" "$ONEDRIVE_TOKEN_KEY"
+            printf 'MCP_OAUTH_KEY=%s\n' "$MCP_OAUTH_KEY"
             if [ -n "$DRAFT_DISPATCH_TOKEN" ]; then printf 'DRAFT_DISPATCH_TOKEN=%s\n' "$DRAFT_DISPATCH_TOKEN"; fi
             if [ -n "$BELL_TOKEN" ]; then printf 'BELL_TOKEN=%s\n' "$BELL_TOKEN"; fi
           } > "$out/console.env"

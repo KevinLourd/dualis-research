@@ -1,0 +1,80 @@
+name: Desktop edit
+run-name: "Desktop edit ${{ inputs.change_id }}"
+
+# A change Thierry approved in Claude Desktop, sent through the console's connector (https://console.dualisresearch.com/mcp,
+# web/src/connector/): words of the website and/or the design system. Applied to main exactly like a Claude Code PR
+# would be (design/build.mjs regenerates, the site's copy tests and type check must pass), then committed and the site
+# redeployed. A push by this job's token starts no workflow, so the site deploy and the skill zips are started here.
+on:
+  workflow_dispatch:
+    inputs:
+      change_id:
+        description: Id the connector polls this run by
+        required: true
+      change:
+        description: 'JSON {summary, edits: [{path, find, replace}], colours: [{name, light, dark}]}'
+        required: true
+      author:
+        description: First name of the signed-in console user
+        required: true
+
+concurrency:
+  group: desktop-edit
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - name: Apply the change
+        id: apply
+        env:
+          CHANGE: ${{ inputs.change }}
+        run: node .github/scripts/desktop-edit.mjs
+      - name: Regenerate the design files
+        if: steps.apply.outputs.design == 'true'
+        run: |
+          node design/build.mjs
+          node design/build.mjs --check
+      - name: Site checks (copy tests + type check)
+        working-directory: site
+        run: |
+          pnpm install --frozen-lockfile
+          set -o pipefail
+          pnpm test 2>&1 | tee "$RUNNER_TEMP/site-test.log" || { grep -E "FAIL|AssertionError|expected" "$RUNNER_TEMP/site-test.log" | head -15 | while IFS= read -r l; do echo "::error::$l"; done; exit 1; }
+          pnpm typecheck 2>&1 | tee "$RUNNER_TEMP/site-tsc.log" || { grep "error TS" "$RUNNER_TEMP/site-tsc.log" | head -10 | while IFS= read -r l; do echo "::error::$l"; done; exit 1; }
+      - name: Commit to main
+        env:
+          CHANGE: ${{ inputs.change }}
+          CHANGE_ID: ${{ inputs.change_id }}
+          AUTHOR: ${{ inputs.author }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then echo "::error::Nothing changed: main already has this text"; exit 1; fi
+          summary=$(node -e 'console.log(JSON.parse(process.env.CHANGE).summary)')
+          git config user.name "dualis-console"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A design site web/src/design/tokens.css web/src/design/tokens.ts
+          git commit -q -m "$summary (Claude Desktop, $AUTHOR) [change $CHANGE_ID]"
+          for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
+          git fetch -q origin main
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::Could not push to main (it moved 3 times in a row): try again"; exit 1; }
+          echo "### $summary, by $AUTHOR: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Redeploy the site and rebuild the skill zips
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy-site.yml -R "$GITHUB_REPOSITORY" --ref main
+          if [ "${{ steps.apply.outputs.design }}" = "true" ]; then gh workflow run design-skill.yml -R "$GITHUB_REPOSITORY" --ref main; fi
