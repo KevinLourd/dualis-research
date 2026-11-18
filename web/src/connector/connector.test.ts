@@ -170,13 +170,16 @@ describe("tools", () => {
 });
 
 describe("MCP", () => {
-  const ctx = { author: "Kevin" };
+  const ctx = { author: "Kevin", userId: "user_1" };
   it("initializes, lists the tools and ignores notifications", async () => {
     const init = (await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, ctx)) as { result: { protocolVersion: string; instructions: string } };
     expect(init.result.protocolVersion).toBe("2025-06-18");
     expect(init.result.instructions).toMatch(/publish it at once/);
     const list = (await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ctx)) as { result: { tools: { name: string }[] } };
-    expect(list.result.tools.map((t) => t.name)).toEqual(["read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status"]);
+    expect(list.result.tools.map((t) => t.name)).toEqual([
+      "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
+      "list_ideas", "draft_idea", "list_drafts", "set_draft_status", "list_positions", "edit_position", "set_fair_value", "update_outreach",
+    ]);
     expect(await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ctx)).toBeNull();
   });
 

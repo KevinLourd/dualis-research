@@ -124,7 +124,7 @@ export const contentDrafts = silver.table(
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     status: draftStatusEnum("status").notNull().default("draft"),
     statusAt: timestamp("status_at", { withTimezone: true }).notNull().defaultNow(),
-    /** Link of the published post, when Thierry pasted it on "Mark posted". */
+    /** Link of the published post, when the draft was marked posted (connector set_draft_status). */
     postedUrl: text("posted_url"),
     model: text("model").notNull(),
     sources: text("sources").array().notNull(),
@@ -331,7 +331,7 @@ export const contentReplies = silver.table("content_replies", {
 /**
  * Ideas (Kevin 2026-11-06): what Dualis could publish next, proposed once a day by Claude from the analysis objects
  * (Signal Changes, Evidence, Narrative Drivers, Fair Values, Research Reports) and the publication history, then scored
- * per channel x format. A draft is made from an Idea on request (the Create draft button).
+ * per channel x format. A draft is made from an Idea on request (through Claude: connector tool draft_idea).
  */
 export const IDEA_SOURCE_KINDS = ["signal", "change", "evidence", "driver", "fair-value", "report"] as const;
 export type IdeaSourceKind = (typeof IDEA_SOURCE_KINDS)[number];

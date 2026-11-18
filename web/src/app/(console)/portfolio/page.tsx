@@ -1,13 +1,10 @@
 import { Badge } from "@cloudflare/kumo";
-import { ChartLineUpIcon, PencilSimpleIcon } from "@phosphor-icons/react/ssr";
-import Link from "@/console/link";
+import { ChartLineUpIcon } from "@phosphor-icons/react/ssr";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { day, price, signedPct } from "@/console/format";
 import { CompanyLogo } from "@/console/market";
 import { type PortfolioRow, portfolioView } from "@/console/portfolio-queries";
-import { PositionForm } from "@/console/position-form";
 import { ReturnChart } from "@/console/return-chart";
-import { SlideOver } from "@/console/slide-over";
 import { Card, ComingNext, PageHeader } from "@/console/ui";
 import { TableSearch } from "@/console/table-search";
 
@@ -50,10 +47,8 @@ function ReturnCell({ row }: { row: PortfolioRow }) {
 }
 
 /** Thierry's positions: his P&L against the S&P 500 since he entered, then one row per position. */
-export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
-  const { edit } = await searchParams;
+export default async function PortfolioPage() {
   const { positions, lines, allWeighted } = await portfolioView();
-  const editing = edit ? positions.find((p) => p.symbol === edit) : undefined;
 
   return (
     <>
@@ -84,10 +79,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
               <KTableHead className="text-right">Entry</KTableHead>
               <KTableHead className="text-right">Current</KTableHead>
               <KTableHead className="text-right">Return</KTableHead>
-              <KTableHead className="text-right">Weight</KTableHead>
-              <KTableHead className="pr-6">
-                <span className="sr-only">Edit</span>
-              </KTableHead>
+              <KTableHead className="pr-6 text-right">Weight</KTableHead>
             </KTableRow>
           </KTableHeader>
           <KTableBody>
@@ -144,16 +136,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
                 <KTableCell className="py-4 text-right">
                   <ReturnCell row={p} />
                 </KTableCell>
-                <KTableCell className="py-4 text-right font-mono tabular">{p.weight !== null ? `${(p.weight * 100).toFixed(1)}%` : empty}</KTableCell>
-                <KTableCell className="py-4 pr-6 text-right">
-                  <Link
-                    href={`/portfolio?edit=${encodeURIComponent(p.symbol)}`}
-                    scroll={false}
-                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-kumo-default hover:bg-kumo-tint"
-                  >
-                    <PencilSimpleIcon size={14} aria-hidden /> Edit
-                  </Link>
-                </KTableCell>
+                <KTableCell className="py-4 pr-6 text-right font-mono tabular">{p.weight !== null ? `${(p.weight * 100).toFixed(1)}%` : empty}</KTableCell>
               </KTableRow>
             ))}
           </KTableBody>
@@ -161,15 +144,6 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       </div>
       </TableSearch>
 
-      {editing && (
-        <SlideOver title={editing.name ?? editing.symbol} subtitle={`${editing.symbol}, your position`} closeHref="/portfolio">
-          <PositionForm
-            symbol={editing.symbol}
-            currency={editing.currency}
-            initial={{ direction: editing.direction, entryDate: editing.entryDate, entryPrice: editing.entryPrice, weight: editing.weight, status: editing.status }}
-          />
-        </SlideOver>
-      )}
     </>
   );
 }

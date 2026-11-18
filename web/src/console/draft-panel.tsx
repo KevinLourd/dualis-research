@@ -1,7 +1,6 @@
 import { Badge, Button } from "@cloudflare/kumo";
 import Link from "@/console/link";
 import { FORMAT_LABEL, publishLink, X_LIMIT } from "@/collectors/dimensions/content-drafts/format";
-import { updateDraftStatus } from "@/content/actions";
 import { CopyButton } from "@/console/content-ui";
 import { relativeTime, utc } from "@/console/format";
 import { SlideOver } from "@/console/slide-over";
@@ -22,7 +21,7 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={s.variant}>{s.text}</Badge>;
 }
 
-/** Right panel of one draft: the text, publish / copy, status, and what it was built from. */
+/** Right panel of one draft, read only: the text, publish / copy, status, and what it was built from. Its status changes through Claude (connector tool set_draft_status) or WhatsApp. */
 export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldContentDraft; closeHref: string; visuals?: GoldContentVisual[] }) {
   const text = draft.title ? `${draft.title}\n\n${draft.body}` : draft.body;
   const link = publishLink(draft.format, draft.body);
@@ -66,44 +65,19 @@ export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldCont
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg p-4 ring-1 ring-kumo-hairline">
-        <h3 className="text-sm font-medium text-kumo-subtle">Status</h3>
-        <div className="flex flex-wrap gap-2">
-          {draft.status !== "approved" && draft.status !== "posted" && <StatusForm id={draft.id} status="approved" label="Approve" variant="primary" />}
-          {draft.status !== "dismissed" && draft.status !== "posted" && <StatusForm id={draft.id} status="dismissed" label="Dismiss" variant="secondary" />}
-          {draft.status !== "draft" && <StatusForm id={draft.id} status="draft" label="Back to review" variant="ghost" />}
-        </div>
-        {draft.status === "posted" ? (
-          <p className="text-base text-kumo-default">
-            Posted {relativeTime(draft.statusAt)}
-            {draft.postedUrl && (
-              <>
-                {": "}
-                <a href={draft.postedUrl} target="_blank" rel="noreferrer" className="text-kumo-link hover:underline">
-                  open the post
-                </a>
-              </>
-            )}
-          </p>
-        ) : (
-          <form action={updateDraftStatus} className="flex items-end gap-2">
-            <input type="hidden" name="id" value={draft.id} />
-            <input type="hidden" name="status" value="posted" />
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-kumo-subtle">
-              Link of the published post (optional)
-              <input
-                name="postedUrl"
-                type="url"
-                placeholder="https://"
-                className="h-9 rounded-lg bg-kumo-base px-3 text-base text-kumo-default ring-1 ring-kumo-line focus:ring-2 focus:ring-kumo-brand focus:outline-none"
-              />
-            </label>
-            <Button type="submit" variant="secondary">
-              Mark posted
-            </Button>
-          </form>
-        )}
-      </section>
+      {draft.status === "posted" && (
+        <p className="text-base text-kumo-default">
+          Posted {relativeTime(draft.statusAt)}
+          {draft.postedUrl && (
+            <>
+              {": "}
+              <a href={draft.postedUrl} target="_blank" rel="noreferrer" className="text-kumo-link hover:underline">
+                open the post
+              </a>
+            </>
+          )}
+        </p>
+      )}
 
       <section className="rounded-lg ring-1 ring-kumo-hairline">
         <h3 className="border-b border-kumo-hairline px-4 py-3 text-sm font-medium text-kumo-subtle">Built from</h3>
@@ -136,18 +110,6 @@ export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldCont
         </FactList>
       </section>
     </SlideOver>
-  );
-}
-
-function StatusForm({ id, status, label, variant }: { id: string; status: string; label: string; variant: "primary" | "secondary" | "ghost" }) {
-  return (
-    <form action={updateDraftStatus}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <Button type="submit" variant={variant}>
-        {label}
-      </Button>
-    </form>
   );
 }
 

@@ -15,7 +15,7 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }, { status: 400 });
   }
-  const out = await handleRpc(body, { author: user.name });
+  const out = await handleRpc(body, { author: user.name, userId: userId! });
   if (out === null) return new Response(null, { status: 202 });
   return Response.json(out, { headers: { "cache-control": "no-store" } });
 }

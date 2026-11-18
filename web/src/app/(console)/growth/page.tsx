@@ -9,7 +9,6 @@ import { getGrowthRow, type GrowthRow, lastNetworkRun, listAudience, listGrowthT
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { SlideOver } from "@/console/slide-over";
 import { Card, ComingNext, Fact, FactList, Missing, PageHeader } from "@/console/ui";
-import { saveOutreachMessage, updateOutreachStatus } from "@/growth/actions";
 import { GOAL, planned, progress } from "@/growth/goal";
 import { dailyOutreach } from "@/growth/daily";
 import { TableSearch } from "@/console/table-search";
@@ -28,14 +27,6 @@ const STATUS: Record<string, { text: string; variant: "neutral" | "primary" | "w
   declined: { text: "Declined", variant: "outline" },
   dropped: { text: "Dropped", variant: "outline" },
 };
-const STATUS_ACTIONS = [
-  { status: "sent", label: "Mark sent" },
-  { status: "replied", label: "Replied" },
-  { status: "cited", label: "Cited us" },
-  { status: "declined", label: "Declined" },
-  { status: "dropped", label: "Drop" },
-  { status: "draft", label: "Back to draft" },
-] as const;
 const FIT: Record<string, string> = { yes: "Same reader", partly: "Overlaps", no: "Other reader" };
 
 function StatusBadge({ status, recommends = false }: { status: string; recommends?: boolean }) {
@@ -270,25 +261,11 @@ function TargetPanel({ row: { target: t, outreach: o } }: { row: GrowthRow }) {
       {o ? (
         <>
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium text-kumo-subtle">
-              Message {o.bodySource === "console" ? "(your version)" : "(drafted by Claude, edit it to make it yours)"}
-            </h3>
-            <form action={saveOutreachMessage} className="flex flex-col gap-3">
-              <input type="hidden" name="handle" value={o.handle} />
-              <textarea
-                name="body"
-                defaultValue={o.body}
-                rows={14}
-                aria-label="Message"
-                className="w-full rounded-lg bg-kumo-base p-3 text-base text-kumo-default ring-1 ring-kumo-line focus:ring-2 focus:ring-kumo-brand focus:outline-none"
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" variant="primary">
-                  Save message
-                </Button>
-                <CopyButton text={o.body} />
-              </div>
-            </form>
+            <h3 className="text-sm font-medium text-kumo-subtle">Message</h3>
+            <p className="rounded-lg p-3 text-base whitespace-pre-wrap text-kumo-default ring-1 ring-kumo-line">{o.body}</p>
+            <div className="flex flex-wrap gap-2">
+              <CopyButton text={o.body} />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-kumo-subtle">Send it yourself:</span>
               {o.contacts.map((c) => (
@@ -300,21 +277,6 @@ function TargetPanel({ row: { target: t, outreach: o } }: { row: GrowthRow }) {
               ))}
             </div>
             <p className="text-sm text-kumo-subtle">One follow-up after 4 days, then stop.</p>
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-lg p-4 ring-1 ring-kumo-hairline">
-            <h3 className="text-sm font-medium text-kumo-subtle">Status{o.statusAt ? `, changed ${relativeTime(o.statusAt)}` : ""}</h3>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_ACTIONS.filter((a) => a.status !== o.status).map((a) => (
-                <form key={a.status} action={updateOutreachStatus}>
-                  <input type="hidden" name="handle" value={o.handle} />
-                  <input type="hidden" name="status" value={a.status} />
-                  <Button type="submit" variant={a.status === "sent" ? "primary" : a.status === "draft" ? "ghost" : "secondary"}>
-                    {a.label}
-                  </Button>
-                </form>
-              ))}
-            </div>
           </section>
 
           {o.bodySource === "console" && o.claudeBody && (
