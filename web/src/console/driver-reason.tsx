@@ -1,5 +1,5 @@
 import { Badge } from "@cloudflare/kumo";
-import { FileTextIcon } from "@phosphor-icons/react/ssr";
+import { ArrowsClockwiseIcon, FileTextIcon, TrendUpIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import { findQuote } from "@/collectors/dimensions/filing-documents/text";
 import type { DocCitation, GoldNarrativeState, GoldPriceMove, GoldPriceMoveCause, ThesisSide } from "@/db/schema/analysis";
@@ -76,12 +76,12 @@ export function DriverReason({ state, side, moves, hrefFor, children }: { state:
       )}
       <Drawers>
       {state?.explanation && (
-        <Drawer title="What changed">
+        <Drawer icon={<ArrowsClockwiseIcon size={16} aria-hidden />} title="What changed">
           <ExplanationWithCitations text={state.explanation} citations={state.citations ?? []} hrefFor={hrefFor} />
         </Drawer>
       )}
       {moves.length > 0 && (
-        <Drawer title={`What moved the stock · ${moves.length}`}>
+        <Drawer icon={<TrendUpIcon size={16} aria-hidden />} title={`What moved the stock · ${moves.length}`}>
           <ul className="flex flex-col gap-3">
             {moves.map((x) => (
               <li key={x.id}>

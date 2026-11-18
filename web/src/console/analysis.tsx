@@ -1,5 +1,5 @@
 import { Button, Input } from "@cloudflare/kumo";
-import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, ClockCounterClockwiseIcon, FileTextIcon, ListBulletsIcon, NewspaperIcon, PencilSimpleIcon, ScalesIcon, TargetIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import type { GoldEvidence, GoldExhibit, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
@@ -217,7 +217,7 @@ export function Drivers({ symbol, drivers, side, thesis }: { symbol: string; dri
       {moving.length > 0 ? rows(moving) : <p className="text-lg text-kumo-subtle">No driver is turning.</p>}
       {rest.length > 0 && (
         <Drawers>
-          <Drawer title={moving.length > 0 ? `${rest.length} other ${rest.length === 1 ? "driver" : "drivers"}, not turning` : `${rest.length} ${rest.length === 1 ? "driver" : "drivers"}`}>{rows(rest)}</Drawer>
+          <Drawer icon={<ListBulletsIcon size={16} aria-hidden />} title={moving.length > 0 ? `${rest.length} other ${rest.length === 1 ? "driver" : "drivers"}, not turning` : `${rest.length} ${rest.length === 1 ? "driver" : "drivers"}`}>{rows(rest)}</Drawer>
         </Drawers>
       )}
     </div>
@@ -279,26 +279,26 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
 
       {variant === "page" && (
         <Drawers>
-          <Drawer title="KPIs vs consensus">
+          <Drawer icon={<TargetIcon size={16} aria-hidden />} title="KPIs vs consensus">
             <Kpis symbol={symbol} rows={consensus} />
           </Drawer>
           {objects.signalChanges.length > 0 && (
-            <Drawer title={`Signal history · ${objects.signalChanges.length}`}>
+            <Drawer icon={<ClockCounterClockwiseIcon size={16} aria-hidden />} title={`Signal history · ${objects.signalChanges.length}`}>
               <SignalHistory changes={objects.signalChanges} />
             </Drawer>
           )}
           {valuation.methods.length > 0 && (
-            <Drawer title="Valuation">
+            <Drawer icon={<ScalesIcon size={16} aria-hidden />} title="Valuation">
               <ValuationField v={valuation} />
               <MethodsTable symbol={symbol} v={valuation} />
             </Drawer>
           )}
           {objects.drivers.length > 0 && objects.evidence.length > 0 && (
-            <Drawer title={`News · ${objects.evidence.length}`}>
+            <Drawer icon={<NewspaperIcon size={16} aria-hidden />} title={`News · ${objects.evidence.length}`}>
               <NewsTable rows={newsRows(symbol, objects, keep)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} side={side} />
             </Drawer>
           )}
-          <Drawer title="Your fair value">
+          <Drawer icon={<PencilSimpleIcon size={16} aria-hidden />} title="Your fair value">
             <form action={saveFairValue.bind(null, symbol, thesis?.currency ?? row.currency)} className="flex flex-wrap items-end gap-3">
               <Input name="value" label={`Fair value per share${row.currency ? ` (${row.currency})` : ""}`} inputMode="decimal" defaultValue={thesis?.fairValue ?? ""} className="w-40" />
               <Input name="basis" label="How you got it" placeholder="10x EV/EBITDA on 2027 EBITDA" defaultValue={thesis?.fairValueBasis ?? ""} className="w-80" />
@@ -306,7 +306,7 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
             </form>
           </Drawer>
           {objects.report && (
-            <Drawer title="Research report">
+            <Drawer icon={<FileTextIcon size={16} aria-hidden />} title="Research report">
               <article className="flex max-w-3xl flex-col gap-4">
                 <h3 className="text-2xl font-bold text-kumo-strong">{objects.report.title}</h3>
                 <ArticleBody

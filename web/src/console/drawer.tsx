@@ -8,11 +8,14 @@ import { CaretDownIcon } from "@phosphor-icons/react";
  * table or chart one click away. A page or panel shows its conclusion first; everything else sits in drawers.
  * The content stays mounted while closed, so the browser's find-in-page and the tests still read it.
  */
-export function Drawer({ title, defaultOpen = false, children }: { title: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+export function Drawer({ title, icon, defaultOpen = false, children }: { title: React.ReactNode; /** One icon per kind of drawer, so a reader finds it at a glance (Kevin 2026-11-18). */ icon?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
   return (
     <Collapsible.Root defaultOpen={defaultOpen}>
       <Collapsible.Trigger className="m-0 flex w-full items-start justify-between gap-4 border-none bg-transparent px-0 py-3.5 text-left text-base font-medium text-kumo-strong shadow-none transition-colors hover:text-kumo-link">
-        <span className="min-w-0">{title}</span>
+        <span className="flex min-w-0 items-start gap-3">
+          {icon && <span className="mt-1 shrink-0 text-kumo-subtle">{icon}</span>}
+          <span className="min-w-0">{title}</span>
+        </span>
         <CaretDownIcon aria-hidden size={14} weight="bold" className="mt-1 shrink-0 text-kumo-subtle transition-transform duration-100 ease-out [[data-panel-open]_&]:rotate-180" />
       </Collapsible.Trigger>
       <Collapsible.Panel keepMounted className="[&[hidden]]:hidden">
