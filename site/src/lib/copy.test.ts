@@ -52,17 +52,30 @@ describe("site copy and colours", () => {
     expect(company?.text).not.toMatch(/CallsBoard|Track record|Every published call/);
   });
 
-  // Kevin 2026-11-11: engraved playing cards are the site's thread (Research hand, Company cards), static like everything else.
-  // Thierry 2026-11-12: « remove everywhere the small card icon » before the poker lines.
-  it("deals the winnable games as cards, never animated", () => {
+  // Kevin 2026-11-11: playing cards are the site's thread, static like everything else. Thierry 2026-11-12: no small
+  // card icon before the poker lines. Thierry 2026-11-17: no hand of cards on Research (four kinds of research instead),
+  // Company's cards are a carousel with a suit in the corners and no Dualis logo, and Home, Research and Company carry
+  // no poker line.
+  it("shows the cards as Thierry asked, never animated", () => {
     const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
-    expect(text(join("app", "research", "page.tsx"))).toContain("<Hand ");
-    expect(text(join("app", "company", "page.tsx"))).toContain("<PlayingCard ");
-    expect(files.filter((f) => /CardGlyph|card-glyph/.test(f.text)).map((f) => f.path)).toEqual([]);
+    expect(text(join("app", "research", "page.tsx"))).toContain("<Formats ");
+    expect(text(join("app", "company", "page.tsx"))).toContain("<CardCarousel ");
+    expect(files.filter((f) => /CardGlyph|card-glyph|<Hand |GAMES/.test(f.text)).map((f) => f.path)).toEqual([]);
+    expect(text(join("components", "cards.tsx"))).not.toMatch(/mark\.svg|seal\.svg|<img/);
+    expect(files.filter((f) => /WINNABLE\.(home|company|research)|thread="research"/.test(f.text)).map((f) => f.path)).toEqual([]);
+    expect(files.filter((f) => /Play winnable games\.<|Pick the table before|hand behind the call/i.test(f.text)).map((f) => f.path)).toEqual([]);
     const css = text(join("app", "globals.css"));
-    const cardRules = css.match(/\.(pcard|pc-[a-z]+|hand[a-z-]*)[^{]*\{[^}]*\}/g) ?? [];
+    const cardRules = css.match(/\.(pcard|pc-[a-z]+|carousel[a-z-]*)[^{]*\{[^}]*\}/g) ?? [];
     expect(cardRules.length).toBeGreaterThan(5);
     expect(cardRules.filter((r) => /transition|animation/.test(r))).toEqual([]);
+  });
+
+  // Thierry 2026-11-17: his lines for Home, Company's hero and the footer.
+  it("carries Thierry's lines of 2026-11-17", () => {
+    const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
+    expect(text(join("app", "page.tsx"))).toContain("Long and short ideas in under-covered global equities.");
+    expect(text(join("app", "company", "page.tsx"))).toContain("Constantly on the lookout for asymmetric opportunities where we feel we have the most edge.");
+    expect(text(join("components", "chrome.tsx"))).toContain("Independent equity research focused on finding asymmetric inflections in under-covered markets.");
   });
 
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.

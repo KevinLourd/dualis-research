@@ -7,20 +7,21 @@ import type { Complete } from "@/llm/complete";
 
 /**
  * Where one of Thierry's own published articles sits on the website's research portal (Thierry 2026-11-04:
- * "watchlist coverage / deep dives", "industry / thematic primers", a catch-all for memos and process).
+ * "watchlist coverage / deep dives", "industry / thematic primers"; 2026-11-17: deep dives, primers, updates, other).
  * Judged ONCE per post by Claude from its title, subtitle and opening text, stored in silver.judgments,
  * read by the gold rebuild. Bump the key to re-ask every post.
  */
-export const CATEGORY_QUESTION_KEY = "research-category@v1";
+export const CATEGORY_QUESTION_KEY = "research-category@v2";
 export const CATEGORY_SUBJECT_KIND = "content-post";
-export const RESEARCH_CATEGORIES = ["coverage", "primer", "memo"] as const;
+export const RESEARCH_CATEGORIES = ["coverage", "primer", "update", "other"] as const;
 export type ResearchCategory = (typeof RESEARCH_CATEGORIES)[number];
 
 const QUESTION = [
   "Which section of an equity research firm's library does this published article belong to?",
   "coverage = the article pitches or follows ONE company (a long or short idea, a deep dive on a single stock), even when it opens with a theme;",
   "primer = it explains an industry, a theme or a macro regime across many companies, with no single stock as the point;",
-  "memo = anything else: a performance or portfolio update, the author's process, a short take, a housekeeping post.",
+  "update = a follow-up on ideas already published: earnings, filings, catalysts hit or missed, a change of view, a performance or portfolio update, a thesis closed;",
+  "other = anything else: the investment process, the market environment, a housekeeping post.",
 ].join(" ");
 
 /** Own Substack articles with no stored category yet get one judgment each. Notes and reference posts are never judged. */

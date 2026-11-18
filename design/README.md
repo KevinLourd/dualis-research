@@ -1,6 +1,6 @@
 # Dualis Research
 
-Independent research for buy-side opportunities: long and short ideas in small and mid caps. Play winnable games.
+Independent research for buy-side opportunities: long and short ideas in under-covered global equities.
 
 Version 4, November 2026 (v4: Notes and X charts on deep indigo, a 10-colour series palette; v3: one indigo colour; v2: purple accent, dark charts, Aurelion-style website). Built from the references Thierry picked: Altas (calm institutional restraint), Aurelion Research (navy, serif voice, numbered sections, "What if we're wrong"), Pernas Research (layout of a research firm), Citrini (one iconic mark). Nothing here is final: comment on anything.
 
@@ -47,7 +47,7 @@ Two themes (Thierry 2026-11-09, he picked them from rendered options). **Substac
 The paywall sits after item 4 or 5.
 
 ## Website (Aurelion's pages, our own rendering)
-Thread (Kevin 2026-11-11): engraved playing cards, indigo line art on white, the knot as suit, static; three places only (Research hand of winnable games, Company What we look for, a small card before each page's poker line), `site/src/components/cards.tsx`.
+Thread (Kevin 2026-11-11; Thierry 2026-11-17): playing cards, indigo line art on white, a suit in two corners, an icon, title and text, no logo, static; one place only (Company What we look for, a carousel), `site/src/components/cards.tsx`. Wordmark: « Research » centred under « Dualis ».
 
 Pages (Kevin 2026-11-05): Home (one full-bleed hero), Company, Research (with the research portal), About (Thierry, photo; his name nowhere else, Thierry 2026-11-09), no Portfolio page (Thierry 2026-11-09), Contact, Subscribe (the plans), Disclaimer. Rendering of our own (Thierry 2026-11-06, "we copy them too closely"): every inner page opens on a deep indigo band (section name, one serif statement, white) and closes on a deep indigo band (statement left, one action right); between them white sections, with deep indigo for the track record. Blocks come from the competitors' best (Altas's latest-research rows, Pernas's proof block, trust cards and FAQ), never Aurelion's sequence. Section headings in IBM Plex Sans, statements in Newsreader, sentence case. The portal lists only what Thierry published: a black and white list, the row under the pointer shows its report. Covers: a Wikimedia Commons photo of the company or its industry under an indigo veil, with shelf, title, date and mark, never AI images. The reports also run as a black horizontal strip: black and white covers, the one under the pointer grows and turns to colour. Home background: a 31 s loop of the newest frontier technology (Artemis II, Starship, AI combat drone, humanoid robot, fusion, AI data center, B-21), under a light veil on the left only.
 

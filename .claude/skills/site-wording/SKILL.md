@@ -11,14 +11,14 @@ Thierry owns the site's wording since 2026-11-09. You change TEXT only: the word
 | Page | File | What |
 |---|---|---|
 | Home | `app/page.tsx` | title, line under it, link |
-| Company | `app/company/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 playing cards), the quote, closing band |
+| Company | `app/company/page.tsx` | hero title + line, statement, `PILLARS` (3 columns), `LOOK_FOR` (4 carousel cards), `SETUPS` (2 panels), the two lines beside the figures, the quote, closing band |
 | Research | `app/research/page.tsx` | page line, section titles, closing band |
-| Research, winnable games | `components/blocks.tsx` `GAMES` | the 5 cards of the hand (the ace in the middle); its caption sits in `app/research/page.tsx` |
+| Research, four kinds of research | `lib/model.ts` `CATEGORIES` | title and text of Deep Dives, Primers, Updates, Other (also the portal's tabs) |
 | Research, FAQ | `components/blocks.tsx` `FAQ` | questions and answers |
 | Team | `app/team/page.tsx` | his name, role, bio paragraphs |
 | Team, career | `components/blocks.tsx` `CAREER` | dates, firms, roles |
 | Contact | `app/contact/page.tsx` | `TOPICS`, lines, link labels |
-| Poker line of each page | `lib/winnable.ts` `WINNABLE` | one short line per page |
+| Poker line of Team, Contact, Subscribe | `lib/winnable.ts` `WINNABLE` | one short line per page (none on Home, Research, Company) |
 | Plans and prices | `lib/model.ts` `PLANS`, `app/subscribe/page.tsx` | |
 | Track record figures | `lib/model.ts` `TRACK_RECORD`, `BEST_CALLS` | only figures he published |
 | Footer | `components/chrome.tsx` | brand line, link labels |

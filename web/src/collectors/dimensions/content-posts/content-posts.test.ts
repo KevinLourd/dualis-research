@@ -83,9 +83,9 @@ beforeEach(async () => {
 });
 afterEach(async () => close());
 
-// Claude filing Thierry's own articles on the research portal: "Up 45% YTD" is a performance memo.
+// Claude filing Thierry's own articles on the research portal: "Up 45% YTD" is a performance update.
 const categorize = () =>
-  vi.fn(async () => ({ text: JSON.stringify({ verdict: "memo", probability: 0.9, cited_sentence: null, reason: "A performance update." }), model: "test" }));
+  vi.fn(async () => ({ text: JSON.stringify({ verdict: "update", probability: 0.9, cited_sentence: null, reason: "A performance update." }), model: "test" }));
 let complete = categorize();
 const ctx = (failArchiveFor: string[] = []): SourceContext => ({ env: {}, fetch: fakeFetch(failArchiveFor), complete });
 
@@ -155,7 +155,7 @@ describe("content-posts dimension", () => {
     expect(complete).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(complete.mock.calls[0])).toContain("Title: Up 45% YTD");
     const library = await db.select().from(content.goldContentLibrary);
-    expect(library.find((p) => p.title === "Up 45% YTD")?.researchCategory).toBe("memo");
+    expect(library.find((p) => p.title === "Up 45% YTD")?.researchCategory).toBe("update");
     expect(library.find((p) => p.title === "Why BOOT is cheap")?.researchCategory).toBeNull();
     await runDimension(db, contentPosts, { trigger: "test", ctx: ctx() });
     expect(complete).toHaveBeenCalledTimes(1);

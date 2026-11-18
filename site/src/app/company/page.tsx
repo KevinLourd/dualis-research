@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { CtaBand } from "@/components/blocks";
-import { type Card, PlayingCard } from "@/components/cards";
+import { CardCarousel } from "@/components/card-carousel";
+import type { Card } from "@/components/cards";
+import { AsymmetryFigure, DispersionFigure } from "@/components/edge-figures";
 import { MARKETS } from "@/lib/model";
-import { WINNABLE } from "@/lib/winnable";
 
 export const metadata: Metadata = { title: "Company" };
 
 /**
  * Company (Kevin 2026-11-06: « level up le professionalism, copie ce qui se fait de mieux chez les concurrents »):
- * Altas's photo hero and statement with three columns; what we look for as cards; the « play winnable games » line.
+ * Altas's photo hero and statement with three columns; what we look for as a card carousel, two setups and two figures (Thierry 2026-11-17); the « play winnable games » line.
  * Thierry 2026-11-06: no price vs value figure. Thierry 2026-11-09: no track record and no list of calls here (two
  * calls « makes it look like I've only got two things », the research portal holds them), and the line is unsigned
  * (« I haven't accomplished enough yet to start quoting myself »).
@@ -20,16 +21,46 @@ const PILLARS = [
 ] as const;
 
 /**
- * Thierry's tables (call 2026-11-06): « You're at a poker table... Ideally you want to sit in tables where you feel like
- * you have an advantage... in financial markets it's the same thing. » The narrative turn is one strategy among them,
- * « probably the one that I train the most ». The site never names where he lives, so the market list stays generic.
+ * What we look for, in Thierry's words (file of 2026-11-17): four cards flipped through as a carousel, then two setups
+ * side by side, then dispersion and asymmetry with a plain figure each. The site never names where he lives.
  */
 const LOOK_FOR: readonly Card[] = [
-  { rank: "10", title: "Small caps", line: "Fewer expert investors look here, so prices stray further from value." },
-  { rank: "J", title: "Cyclical stocks", line: "Big funds avoid timing cycles, so each turn meets fewer rivals." },
-  { rank: "Q", title: "Turnaround stories", line: "Few dare to own a stock that got crushed. A story turning there is the play we train most." },
-  { rank: "K", title: "Under-covered geographies", line: "Korea, Japan, China and India get a fraction of the analyst coverage." },
+  {
+    suit: "spade",
+    icon: "small-caps",
+    title: "Small caps",
+    line: "Given the barriers to larger pools of capital, fewer institutional investors participate in small/micro-cap opportunities. The smaller number of sophisticated investors leads to an increased probability of mispricings.",
+  },
+  {
+    suit: "heart",
+    icon: "cycle",
+    title: "Cyclical stocks",
+    line: "Investors tend to extrapolate current earnings, so cyclicals look cheapest at the peak and most expensive at the trough. Many investors who are uncomfortable with top-down work avoid the space altogether, which leaves opportunities on both sides of the cycle.",
+  },
+  {
+    suit: "club",
+    icon: "globe",
+    title: "Under-covered geographies",
+    line: "Language barriers, local disclosure norms and thin sell-side or foreign coverage keep most global capital out of many non-western markets. Policy catalysts, such as governance reforms, can force re-ratings that domestic investors are slow to anticipate.",
+  },
+  {
+    suit: "diamond",
+    icon: "themes",
+    title: "Under-covered themes",
+    line: "Crowded narratives are priced at the megacap level, but their second- and third-order effects across the value chain often aren’t priced as efficiently. Lesser-known themes in under-appreciated markets also tend to go unnoticed until the fundamentals begin to attract incremental buyers.",
+  },
 ];
+
+const SETUPS = [
+  {
+    title: "Inflections",
+    body: "Consensus often extrapolates a recent trend linearly, which can lead to turning points in the fundamentals getting mispriced in both directions. Businesses priced for permanent decline can re-rate sharply on structural improvement. Stocks priced on a growth story can de-rate hard once earnings power stops supporting it. At the extremes, narrative and fundamentals reinforce each other, so outcomes are more lopsided than consensus models assume.",
+  },
+  {
+    title: "Overlooked quality",
+    body: "Businesses with strong competitive advantages and high ROICs with durable cash flows can often trade at discounts since the market undervalues the firm’s terminal cash flows. Low beta equities under this category provide an opportunity to add leverage.",
+  },
+] as const;
 
 export default function Company() {
   return (
@@ -41,7 +72,7 @@ export default function Company() {
         <div className="wrap photo-hero-inner">
           <p className="band-label">Company</p>
           <h1>Independent equity research</h1>
-          <p>Small and mid caps, long and short, read from the buy side.</p>
+          <p>Constantly on the lookout for asymmetric opportunities where we feel we have the most edge.</p>
         </div>
       </section>
 
@@ -64,16 +95,31 @@ export default function Company() {
           <div className="tables-head">
             <div>
               <h2 className="h-bold">What we look for</h2>
-              <p className="tables-intro">A good poker player picks the table first. We pick opportunities where we see edge.</p>
-              <p className="band-thread">
-                {WINNABLE.company}
+              <p className="tables-intro">
+                We look for markets where we believe we have edge. Our small scale and willingness to hunt where institutions won’t provide us opportunities. We play at
+                tables where competition is sparse.
               </p>
             </div>
           </div>
-          <div className="look-for">
-            {LOOK_FOR.map((c) => (
-              <PlayingCard key={c.title} card={c} />
+          <CardCarousel cards={LOOK_FOR} />
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <div className="setups">
+            {SETUPS.map((s) => (
+              <article key={s.title}>
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
+              </article>
             ))}
+          </div>
+          <div className="edge-panel">
+            <p>We look for opportunities with a low dispersion of outcomes. The wider the range of possible outcomes, the more difficult it is to size a probability adjusted bet.</p>
+            <DispersionFigure />
+            <p>We look for asymmetric bets where the upside is skewed in our favor relative to the potential downside of our trades.</p>
+            <AsymmetryFigure />
           </div>
         </div>
       </section>

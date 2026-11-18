@@ -7,9 +7,10 @@ export function Logo() {
   return (
     <span className="flex items-center gap-2.5 px-1 text-kumo-brand">
       <KnotMark className="size-7 shrink-0" />
-      <span className="flex flex-col uppercase leading-none">
-        <span className="text-[16px] font-medium tracking-[0.34em]">Dualis</span>
-        <span className="mt-1.5 text-[8px] font-medium tracking-[0.62em]">Research</span>
+      {/* Thierry 2026-11-17: « Research » centred under « Dualis »; each line gives back its last letter's tracking. */}
+      <span className="flex flex-col items-center uppercase leading-none">
+        <span className="mr-[-0.34em] text-[16px] font-medium tracking-[0.34em]">Dualis</span>
+        <span className="mt-1.5 mr-[-0.62em] text-[8px] font-medium tracking-[0.62em]">Research</span>
       </span>
     </span>
   );

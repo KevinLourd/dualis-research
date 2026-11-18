@@ -64,7 +64,7 @@ export function Footer({ substackUrl }: { substackUrl: string | null }) {
               <span>Research</span>
             </span>
           </Link>
-          <p>Independent equity research on small and mid caps, long and short.</p>
+          <p>Independent equity research focused on finding asymmetric inflections in under-covered markets.</p>
           <Social substackUrl={substackUrl} />
         </div>
         {FOOTER_COLUMNS.map((c) => (

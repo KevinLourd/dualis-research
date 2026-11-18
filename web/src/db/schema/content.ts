@@ -204,7 +204,7 @@ export const goldContentLibrary = gold.table(
     topics: text("topics").array().notNull(),
     tickers: text("tickers").array().notNull(),
     sources: text("sources").array().notNull(),
-    /** Own articles only: where the website's research portal files it ("coverage" | "primer" | "memo"), judged once. */
+    /** Own articles only: where the website's research portal files it ("coverage" | "primer" | "update" | "other"), judged once. */
     researchCategory: text("research_category"),
     /** Own articles only: the photo behind the website's report cover (cover-photos dimension), its credit line and Commons page. */
     coverPhotoUrl: text("cover_photo_url"),

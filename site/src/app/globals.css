@@ -185,6 +185,8 @@ p {
 .wordmark {
   display: flex;
   flex-direction: column;
+  /* Thierry 2026-11-17: « Research » centred under « Dualis ». Each line gives back its last letter's tracking. */
+  align-items: center;
   text-transform: uppercase;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -195,12 +197,14 @@ p {
   font-weight: 500;
   font-size: 19px;
   letter-spacing: 0.34em;
+  margin-right: -0.34em;
 }
 .wordmark span:last-child {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 500;
   font-size: 9.5px;
   letter-spacing: 0.62em;
+  margin-right: -0.62em;
   margin-top: 6px;
 }
 .nav {
@@ -1536,13 +1540,6 @@ body:has(.hero) .site-footer {
   text-transform: uppercase;
   color: var(--ink);
 }
-/* What we look for: the four idea types from Thierry's own fund site, as cards. */
-.look-for {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-top: 40px;
-}
 
 /* The « Play winnable games » line on Company, unsigned (Thierry 2026-11-09). */
 .founder-quote {
@@ -1600,10 +1597,6 @@ body:has(.hero) .site-footer {
   .portal-preview {
     display: none;
   }
-  .look-for {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .latest a {
     grid-template-columns: 1fr;
   }
@@ -1679,178 +1672,242 @@ h2 + .lead,
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-/* Playing cards, the site's thread (Kevin 2026-11-11): engraved indigo line art on white, the knot as the suit.
-   Static: no hover, no motion. Used on Research (the hand), Company (What we look for) and before each poker line. */
+/* Playing cards, the site's thread (Kevin 2026-11-11; Thierry 2026-11-17: a suit in two corners, an icon, the title
+   and its text, no logo). Static: no hover, no motion. Used on Company only (What we look for, a carousel). */
 .pcard {
-  width: 196px;
-  height: 280px;
-  padding: 9px;
+  width: 400px;
+  height: 540px;
+  padding: 12px;
   background: #fff;
   border: 1px solid var(--brand);
-  border-radius: 12px;
-  box-shadow: 0 10px 24px -14px rgba(23, 20, 46, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -20px rgba(10, 8, 30, 0.6);
+  text-align: left;
 }
 .pc-frame {
   position: relative;
   height: 100%;
   border: 1px solid var(--brand);
-  border-radius: 6px;
-  outline: 1px solid var(--brand);
-  outline-offset: -5px;
-  background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(43, 36, 99, 0.045) 5px 6px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(43, 36, 99, 0.045) 5px 6px);
+  border-radius: 8px;
 }
 .pc-idx {
   position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-weight: 500;
-  font-size: 19px;
-  line-height: 1;
+  width: 24px;
   color: var(--brand);
 }
-.pc-idx img {
-  width: 14px;
+.pc-idx svg {
+  display: block;
+  width: 100%;
 }
 .pc-idx.tl {
-  top: 8px;
-  left: 9px;
+  top: 14px;
+  left: 14px;
 }
 .pc-idx.br {
-  bottom: 8px;
-  right: 9px;
+  bottom: 14px;
+  right: 14px;
   transform: rotate(180deg);
 }
 .pc-face {
   position: absolute;
-  inset: 40px 24px;
+  inset: 52px 34px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14px 12px 10px;
+  justify-content: center;
   text-align: center;
-  background: #fff;
-  border: 1px solid rgba(43, 36, 99, 0.35);
 }
-.pc-pip {
-  width: 26px;
-  margin-bottom: 10px;
+.pc-icon {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 20px;
+  color: var(--brand);
 }
-.pc-face h3 {
+.pc-face h3,
+.section.deep .pc-face h3 {
   font-weight: 400;
-  font-size: 21px;
-  line-height: 1.1;
+  font-size: 30px;
+  line-height: 1.12;
   color: var(--ink);
 }
 .pc-face p {
-  margin-top: 8px;
+  margin-top: 16px;
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 15.5px;
+  line-height: 1.55;
   color: var(--muted);
 }
-.pcard.ace {
-  background: var(--deep);
-  border-color: var(--deep);
+
+/* The carousel: one card large in the middle, its neighbours smaller, blurred and dimmed on each side. */
+.carousel {
+  margin-top: 48px;
 }
-.pcard.ace .pc-frame {
-  border-color: rgba(255, 255, 255, 0.55);
-  outline-color: rgba(255, 255, 255, 0.55);
-  background:
-    repeating-linear-gradient(45deg, transparent 0 5px, rgba(255, 255, 255, 0.06) 5px 6px),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(255, 255, 255, 0.06) 5px 6px);
+.carousel-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
-.pcard.ace .pc-face {
-  background: var(--deep);
-  border-color: rgba(255, 255, 255, 0.4);
+.carousel-side,
+.carousel-arrow,
+.carousel-dots button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
-.pcard.ace .pc-idx,
-.pcard.ace h3 {
+.carousel-side {
+  flex: none;
+  transform: scale(0.72);
+  filter: blur(3px);
+  opacity: 0.5;
+  margin: 0 -44px;
+}
+.carousel-main {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+.carousel-arrow {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 20px;
   color: #fff;
 }
-.pcard.ace p {
-  color: rgba(255, 255, 255, 0.75);
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
 }
-.pcard.ace .pc-pip {
-  width: 40px;
+.carousel-dots button {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+}
+.carousel-dots button[aria-current="true"] {
+  background: #fff;
 }
 
-/* The hand (Research): cards fanned around one point below them, the ace on top, the knot faint behind. */
-.hand {
-  position: relative;
-  height: 560px;
-  margin-top: 24px;
+/* Company: the two setups side by side, then dispersion and asymmetry, text left and its figure right. */
+.setups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
 }
-.hand-knot {
-  position: absolute;
-  left: 50%;
-  top: 330px;
-  width: 600px;
-  transform: translate(-50%, -50%);
-  opacity: 0.06;
+.setups article {
+  padding: 40px;
+  border: 1px solid var(--rule);
+  background: var(--grey);
 }
-.hand-cards .pcard {
-  position: absolute;
-  left: calc(50% - 98px);
-  top: 70px;
-  transform-origin: 50% 300%;
-  transform: rotate(var(--angle));
+.setups h3 {
+  font-weight: 400;
+  font-size: clamp(26px, 2.4vw, 34px);
+  color: var(--ink);
 }
-.hand-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 480px;
-  text-align: center;
+.setups p {
+  margin-top: 16px;
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.edge-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 40px 56px;
+  margin-top: 28px;
+  padding: 48px 40px;
+  border: 1px solid var(--rule);
+}
+.edge-panel p {
+  font-size: clamp(21px, 1.9vw, 27px);
+  line-height: 1.4;
+  color: var(--ink);
+}
+.edge-figure {
+  width: 100%;
+  height: auto;
+}
+.ef-label {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  fill: var(--muted);
+}
+.ef-strong {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+/* Research: the four kinds of research as numbered blocks, two per row. */
+.formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 72px;
+  margin-top: 36px;
+  padding: 0;
+  list-style: none;
+}
+.formats li {
+  padding: 28px 0 36px;
+  border-top: 1px solid var(--rule);
+}
+.fm-num {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.formats h3 {
+  margin-top: 10px;
+  font-weight: 400;
+  font-size: clamp(24px, 2.2vw, 30px);
+  color: var(--brand);
+}
+.formats p {
+  margin-top: 10px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
   color: var(--muted);
 }
 
-/* What we look for (Company): the four games as upright cards, a little larger for their longer lines. */
-.look-for {
-  justify-items: center;
-}
-.look-for .pcard {
-  width: 100%;
-  max-width: 250px;
-  height: 340px;
-}
-.section.deep .pcard:not(.ace) .pc-face h3 {
-  color: var(--ink);
-}
-.look-for .pc-face p {
-  font-size: 13.5px;
-}
-
-/* A small card before each page's poker line. */
-@media (max-width: 900px) {
-  .hand {
-    height: auto;
-  }
-  .hand-knot {
+@media (max-width: 1100px) {
+  .carousel-side {
     display: none;
   }
-  .hand-cards {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 16px;
+}
+@media (max-width: 900px) {
+  .setups,
+  .edge-panel,
+  .formats {
+    grid-template-columns: 1fr;
   }
-  .hand-cards .pcard {
-    position: static;
-    transform: none;
-  }
-  .hand-caption {
-    position: static;
-    margin-top: 24px;
+  .edge-panel {
+    padding: 32px 24px;
   }
 }
 @media (max-width: 560px) {
-  .look-for {
-    grid-template-columns: 1fr;
+  .pcard {
+    width: min(400px, calc(100vw - 2 * var(--gutter)));
+    height: auto;
+    min-height: 480px;
+  }
+  .pc-frame {
+    min-height: 456px;
+  }
+  .pc-face {
+    position: static;
+    padding: 60px 26px;
+  }
+  .carousel-arrow {
+    display: none;
   }
 }

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { WINNABLE } from "@/lib/winnable";
 
 /**
  * Home: one full-bleed hero on one screen, no scroll (Kevin 2026-11-05). Background = a 27 s loop of the industries
@@ -22,10 +21,8 @@ export default function Home() {
           <br />
           for Buy-Side Opportunities
         </h1>
-        <p className="hero-sub">Long and short ideas in small and mid caps.</p>
-        <p className="band-thread">
-          {WINNABLE.home}
-        </p>
+        {/* Thierry 2026-11-17: this line, and no poker line under it. */}
+        <p className="hero-sub">Long and short ideas in under-covered global equities.</p>
         <Link href="/research" className="hero-link">
           Read the research
         </Link>

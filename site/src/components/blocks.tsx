@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { BEST_CALLS, categoryLabel, DISCLAIMER, formatDate, PLANS, TRACK_RECORD } from "@/lib/model";
+import { BEST_CALLS, CATEGORIES, categoryLabel, DISCLAIMER, formatDate, PLANS, TRACK_RECORD } from "@/lib/model";
 import type { Publication } from "@/lib/queries";
 import { Cover } from "./cover";
 import { SubscribeButton } from "./subscribe-button";
-import type { Card } from "./cards";
 import { YtdChart } from "./ytd-chart";
 
 export function Plans({ substackUrl }: { substackUrl: string | null }) {
@@ -202,14 +201,17 @@ export function Proof() {
   );
 }
 
-/**
- * The winnable games we look for (Thierry 2026-11-09: the types of winnable games, never a timeline of steps), dealt as
- * a hand on Research (Kevin 2026-11-11: option A). The narrative turn, the play Thierry trains most, is the ace.
- */
-export const GAMES: readonly Card[] = [
-  { rank: "10", title: "Small caps", line: "Fewer experts, wider mispricing" },
-  { rank: "J", title: "Cyclical stocks", line: "Each turn meets fewer rivals" },
-  { rank: "A", title: "Narrative turns", line: "Long when a bad story turns, short when a hyped one cracks", ace: true },
-  { rank: "Q", title: "Turnaround stories", line: "Crushed names few dare to own" },
-  { rank: "K", title: "Under-covered geographies", line: "Markets most analysts skip" },
-];
+/** The four kinds of research, as four numbered blocks (Thierry 2026-11-17, his words): the portal's four shelves. */
+export function Formats() {
+  return (
+    <ol className="formats">
+      {CATEGORIES.map((c) => (
+        <li key={c.key}>
+          <span className="fm-num">{c.number}</span>
+          <h3>{c.title}</h3>
+          <p>{c.body}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}

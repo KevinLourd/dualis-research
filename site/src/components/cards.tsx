@@ -1,55 +1,80 @@
 /**
- * Playing cards, the site's thread (Kevin 2026-11-11, after Thierry's « something like this but with a deck of cards »,
- * 2026-11-09): engraved indigo line art on white, the knot as the suit, never animated. Three places only: the hand of
- * winnable games on Research, the What we look for cards on Company, and a small card before each page's poker line.
+ * Playing cards, the site's thread (Kevin 2026-11-11, after Thierry's « something like this but with a deck of cards »).
+ * Thierry 2026-11-17: no Dualis logo on a card, a suit in two corners, nothing in the middle but an icon that fits the
+ * title, the title and its text. One place only: What we look for on Company, as a carousel (`card-carousel.tsx`).
+ * Static: no transition, no animation.
  */
 
-export type Card = { rank: string; title: string; line: string; ace?: boolean };
+export type Suit = "spade" | "heart" | "club" | "diamond";
+export type CardIcon = "small-caps" | "cycle" | "globe" | "themes";
+export type Card = { suit: Suit; icon: CardIcon; title: string; line: string };
 
-/** One engraved card: rank and knot in two corners, the knot as the pip, the title and one line on its face. */
-export function PlayingCard({ card, style }: { card: Card; style?: React.CSSProperties }) {
-  const mark = card.ace ? "/brand/mark-white.svg" : "/brand/mark.svg";
+const SUIT_PATHS: Record<Suit, string> = {
+  spade: "M12 2C8 7 3 10 3 14.5A4.2 4.2 0 0 0 10.6 17L9.4 22h5.2l-1.2-5A4.2 4.2 0 0 0 21 14.5C21 10 16 7 12 2Z",
+  heart: "M12 21.5C6.5 16.5 2.5 13 2.5 8.6A4.9 4.9 0 0 1 12 6.4a4.9 4.9 0 0 1 9.5 2.2c0 4.4-4 7.9-9.5 12.9Z",
+  club: "M12 2.5a4.2 4.2 0 0 0-3.6 6.4 4.2 4.2 0 1 0 2.5 7.2L9.6 22h4.8l-1.3-5.9a4.2 4.2 0 1 0 2.5-7.2A4.2 4.2 0 0 0 12 2.5Z",
+  diamond: "M12 2 20 12 12 22 4 12Z",
+};
+
+function SuitGlyph({ suit }: { suit: Suit }) {
   return (
-    <div className={`pcard${card.ace ? " ace" : ""}`} style={style}>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d={SUIT_PATHS[suit]} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Line icons, one per card title. */
+function Icon({ name }: { name: CardIcon }) {
+  const common = { viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+  if (name === "small-caps")
+    return (
+      <svg {...common} className="pc-icon" aria-hidden="true">
+        <path d="M6 42h36M10 42V30h7v12M20.5 42V22h7v20M31 42V10h7v32" />
+      </svg>
+    );
+  if (name === "cycle")
+    return (
+      <svg {...common} className="pc-icon" aria-hidden="true">
+        <path d="M4 24c5-16 11-16 16 0s11 16 16 0 6-9 8-9M4 40h40" />
+      </svg>
+    );
+  if (name === "globe")
+    return (
+      <svg {...common} className="pc-icon" aria-hidden="true">
+        <circle cx="24" cy="24" r="18" />
+        <path d="M6 24h36M24 6c-6 5-9 11-9 18s3 13 9 18c6-5 9-11 9-18s-3-13-9-18Z" />
+      </svg>
+    );
+  return (
+    <svg {...common} className="pc-icon" aria-hidden="true">
+      <circle cx="24" cy="9" r="4" />
+      <circle cx="10" cy="26" r="4" />
+      <circle cx="38" cy="26" r="4" />
+      <circle cx="17" cy="41" r="3" />
+      <circle cx="31" cy="41" r="3" />
+      <path d="M21 12 13 23M27 12l8 11M11.5 30l4 8M36.5 30l-4 8" />
+    </svg>
+  );
+}
+
+/** One card: its suit in two corners, an icon, the title and its text. */
+export function PlayingCard({ card }: { card: Card }) {
+  return (
+    <div className="pcard">
       <div className="pc-frame">
-        <span className="pc-idx tl" aria-hidden="true">
-          {card.rank}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mark} alt="" />
+        <span className="pc-idx tl">
+          <SuitGlyph suit={card.suit} />
         </span>
-        <span className="pc-idx br" aria-hidden="true">
-          {card.rank}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mark} alt="" />
+        <span className="pc-idx br">
+          <SuitGlyph suit={card.suit} />
         </span>
         <div className="pc-face">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="pc-pip" src={card.ace ? "/brand/seal-white.svg" : "/brand/seal.svg"} alt="" aria-hidden="true" />
+          <Icon name={card.icon} />
           <h3>{card.title}</h3>
           <p>{card.line}</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Cards held as a fanned hand, the ace in the middle and on top; the knot faint behind. Flat grid on phones. */
-export function Hand({ cards, caption }: { cards: readonly Card[]; caption: string }) {
-  const mid = (cards.length - 1) / 2;
-  return (
-    <div className="hand">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="hand-knot" src="/brand/seal.svg" alt="" aria-hidden="true" />
-      <div className="hand-cards">
-        {cards.map((c, i) => (
-          <PlayingCard
-            key={c.title}
-            card={c}
-            style={{ "--angle": `${(i - mid) * 14}deg`, zIndex: 10 - Math.abs(i - mid) * 3 } as React.CSSProperties}
-          />
-        ))}
-      </div>
-      <p className="hand-caption">{caption}</p>
     </div>
   );
 }
