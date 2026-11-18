@@ -23,19 +23,20 @@ export type DesignTokens = {
     themes: Record<"dark" | "light", { background: string; grid: string; baseline: string; text: string; axis: string; series: string[] }>;
     rules: string[];
   };
-  logos: { file: string; usage: string }[];
+  /** `pngSizes`: the PNG downloads offered, px on the long side (default 1024 and 2048). */
+  logos: { file: string; usage: string; pngSizes?: number[] }[];
   components: { name: string; path: string }[];
 };
 
 export type DesignSystem = {
   tokens: DesignTokens;
-  logos: { file: string; usage: string; dataUri: string }[];
+  logos: { file: string; usage: string; name: string; pngSizes: number[]; dataUri: string }[];
   components: { name: string; height: number; srcDoc: string }[];
   /** tokens.css + bundle.css, for any preview drawn in an iframe. */
   previewCss: string;
 };
 
-async function raw(path: string, f: typeof fetch): Promise<string> {
+export async function raw(path: string, f: typeof fetch): Promise<string> {
   const res = await f(`${DESIGN_RAW}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${path}`);
   return res.text();
@@ -63,7 +64,7 @@ export async function getDesignSystem(f: typeof fetch = fetch): Promise<DesignSy
   return {
     tokens,
     previewCss,
-    logos: tokens.logos.map((l, i) => ({ ...l, dataUri: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoSvgs[i])}` })),
+    logos: tokens.logos.map((l, i) => ({ ...l, name: logoName(l.file), pngSizes: l.pngSizes ?? [1024, 2048], dataUri: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoSvgs[i])}` })),
     components: tokens.components.map((c, i) => ({ name: c.name, ...previewDoc(componentHtml[i], previewCss) })),
   };
 }
@@ -73,4 +74,16 @@ export function colorValue(tokens: DesignTokens, name: string, theme: "light" | 
   const t = tokens.color.tokens.find((c) => c.name === name);
   if (!t) throw new Error(`design/tokens.json has no colour "${name}"`);
   return t.value[theme];
+}
+
+/** The SVG source of one logo of design/tokens.json `logos`, by its file name without `.svg`; null when not listed. */
+export async function getLogoSource(name: string, f: typeof fetch = fetch): Promise<string | null> {
+  const tokens = JSON.parse(await raw("design/tokens.json", f)) as DesignTokens;
+  const logo = tokens.logos.find((l) => logoName(l.file) === name);
+  return logo ? raw(logo.file, f) : null;
+}
+
+/** `design/assets/Logos/dualis-mark.svg` -> `dualis-mark`. */
+export function logoName(file: string): string {
+  return file.split("/").pop()!.replace(/\.svg$/, "");
 }
