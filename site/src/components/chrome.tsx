@@ -7,7 +7,7 @@ import { SubscribeButton } from "./subscribe-button";
 
 const NAV = [
   { href: "/research", label: "Research" },
-  { href: "/company", label: "Company" },
+  { href: "/investment-process", label: "Investment Process" },
   { href: "/team", label: "Team" },
   { href: "/contact", label: "Contact" },
 ];
@@ -61,7 +61,7 @@ export function Header({ substackUrl }: { substackUrl: string | null }) {
 
 const FOOTER_COLUMNS = [
   { title: "Research", links: [{ href: "/research", label: "Latest research" }, { href: "/research#portal", label: "Research portal" }, { href: "/subscribe", label: "Plans" }] },
-  { title: "Firm", links: [{ href: "/company", label: "Company" }, { href: "/team", label: "Team" }, { href: "/contact", label: "Contact" }] },
+  { title: "Firm", links: [{ href: "/investment-process", label: "Investment Process" }, { href: "/team", label: "Team" }, { href: "/contact", label: "Contact" }] },
   { title: "Legal", links: [{ href: "/terms", label: "Terms of Use" }, { href: "/privacy", label: "Privacy Policy" }, { href: "/disclaimer", label: "Disclaimer" }] },
 ];
 

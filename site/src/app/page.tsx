@@ -5,12 +5,13 @@ import Link from "next/link";
  * Thierry invests in (Thierry 2026-11-09: « I really like the manufacturing, the data center. I don't like the planes
  * and the rockets »): robotic arms, semiconductors, data centers, power, the grid, oil and gas, ports, mining,
  * agriculture (Mixkit free licence). No plane, rocket, space or defense clip. Never a caption in the footage. Muted;
- * reduced motion = poster.
+ * reduced motion = poster. The poster is the video's own first frame (`ffmpeg -i hero.mp4 -frames:v 1`), so nothing jumps
+ * when playback starts (Kevin 2026-11-18: a glitch on arrival, the old poster was another moment of the clip).
  */
 export default function Home() {
   return (
     <section className="hero">
-      <video className="hero-video" autoPlay muted loop playsInline preload="auto" poster="/video/hero-poster.jpg" aria-hidden="true">
+      <video className="hero-video" autoPlay muted loop playsInline preload="auto" poster="/video/hero-first-frame.jpg" aria-hidden="true">
         <source src="/video/hero.mp4" type="video/mp4" />
       </video>
       <div className="hero-veil" />

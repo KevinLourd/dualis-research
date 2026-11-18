@@ -48,7 +48,7 @@ describe("site copy and colours", () => {
   // Thierry 2026-11-09: no Portfolio page, no track record or list of calls on Company.
   it("has no Portfolio page or link, and Company shows no calls", () => {
     expect(files.filter((f) => f.text.includes('"/portfolio"')).map((f) => f.path)).toEqual([]);
-    const company = files.find((f) => f.path.endsWith(join("app", "company", "page.tsx")));
+    const company = files.find((f) => f.path.endsWith(join("app", "investment-process", "page.tsx")));
     expect(company?.text).not.toMatch(/CallsBoard|Track record|Every published call/);
   });
 
@@ -59,7 +59,7 @@ describe("site copy and colours", () => {
   it("shows the cards as Thierry asked, only the carousel turning", () => {
     const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
     expect(text(join("app", "research", "page.tsx"))).toContain("<Formats ");
-    expect(text(join("app", "company", "page.tsx"))).toContain("<CardCarousel ");
+    expect(text(join("app", "investment-process", "page.tsx"))).toContain("<CardCarousel ");
     expect(files.filter((f) => /CardGlyph|card-glyph|<Hand |GAMES/.test(f.text)).map((f) => f.path)).toEqual([]);
     expect(text(join("components", "cards.tsx"))).not.toMatch(/mark\.svg|seal\.svg|<img/);
     expect(files.filter((f) => /WINNABLE\.(home|company|research)|thread="research"/.test(f.text)).map((f) => f.path)).toEqual([]);
@@ -78,8 +78,26 @@ describe("site copy and colours", () => {
   it("carries Thierry's lines of 2026-11-17", () => {
     const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
     expect(text(join("app", "page.tsx"))).toContain("Long and short ideas in under-covered global equities.");
-    expect(text(join("app", "company", "page.tsx"))).toContain("Constantly on the lookout for asymmetric opportunities where we feel we have the most edge.");
+    expect(text(join("app", "investment-process", "page.tsx"))).toContain("Constantly on the lookout for asymmetric opportunities where we feel we have the most edge.");
     expect(text(join("components", "chrome.tsx"))).toContain("Independent equity research focused on finding asymmetric inflections in under-covered markets.");
+  });
+
+  // Kevin 2026-11-18: the page is « Investment Process » (/company redirects), its two figures carry no words, the
+  // track record reads the chart's own +56%, one width for the bar and the pages, the poster is the video's first frame.
+  it("carries Kevin's round of 2026-11-18", () => {
+    const text = (end: string) => files.find((f) => f.path.endsWith(end))?.text ?? "";
+    expect(text(join("components", "chrome.tsx")).match(/href: "\/investment-process", label: "Investment Process"/g)).toHaveLength(2);
+    expect(files.filter((f) => f.text.includes('"/company"')).map((f) => f.path)).toEqual([]);
+    const page = text(join("app", "investment-process", "page.tsx"));
+    expect(page).toContain("Primary Setups");
+    expect(page).toContain("We seek to play winnable games. The best odds sit where fewer eyes look.");
+    expect(text(join("components", "edge-figures.tsx"))).not.toContain("<text");
+    expect(text(join("app", "research", "page.tsx"))).toContain("The research we publish");
+    expect(text(join("lib", "model.ts"))).toMatch(/ytdPct: 56,[\s\S]*benchmarkPct: 14,/);
+    const css = text(join("app", "globals.css"));
+    expect(css).toMatch(/--wrap: 1340px;/);
+    expect(css).not.toMatch(/max-width: 1340px/);
+    expect(text(join("app", "page.tsx"))).toContain('poster="/video/hero-first-frame.jpg"');
   });
 
   // Kevin 2026-11-06: dark professional indigo, no light purple anywhere.

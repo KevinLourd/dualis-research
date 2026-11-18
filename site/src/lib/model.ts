@@ -25,13 +25,15 @@ export function formatMonth(iso: string | null): string | null {
 }
 
 /**
- * The portfolio's year-to-date performance, as Thierry PUBLISHED it ("Up 45%+ YTD vs 11.5% for the S&P500", Analysis
- * Paralysis, 2026-10-16). Replace with the brokerage statement figure when he shares it.
+ * The portfolio's year-to-date performance: the end of the curve in Thierry's post "Up 45%+ YTD vs 11.5% for the
+ * S&P500" (Analysis Paralysis, 2026-10-16), +56% vs +14% (`track-record.ts`), so the figures and the chart beside them
+ * say the same thing (Kevin 2026-11-18: « +56% partout, comme sur le graph »). The 45% lives only in that report's own
+ * title. Replace with the brokerage statement figure when he shares it.
  */
 export const TRACK_RECORD = {
-  ytdPct: 45,
+  ytdPct: 56,
   benchmark: "S&P 500",
-  benchmarkPct: 11.5,
+  benchmarkPct: 14,
   asOf: "2026-10-16",
   sourceUrl: "https://analysisparalysis888.substack.com/p/up-45-ytd-vs-115-for-the-s-and-p500",
   note: "Portfolio return year to date as of October 16, 2026, as published on Substack. Gross of fees, not audited. Past performance does not guarantee future results.",
