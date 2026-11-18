@@ -4,7 +4,7 @@ import Link from "@/console/link";
 import { findQuote } from "@/collectors/dimensions/filing-documents/text";
 import type { DocCitation, GoldNarrativeState, GoldPriceMove, GoldPriceMoveCause, ThesisSide } from "@/db/schema/analysis";
 import { docItemId } from "./document-page";
-import { Section } from "./signal";
+import { Drawer, Drawers } from "./drawer";
 import { TagBadge } from "./tag-badge";
 
 /**
@@ -56,7 +56,7 @@ export function ExplanationWithCitations({ text, citations, hrefFor }: { text: s
 
 export type DriverMove = GoldPriceMove & { cause: GoldPriceMoveCause | null };
 
-export function DriverReason({ state, side, moves, hrefFor }: { state: GoldNarrativeState | null; side: ThesisSide; moves: DriverMove[]; hrefFor: (item: string) => string }) {
+export function DriverReason({ state, side, moves, hrefFor, children }: { state: GoldNarrativeState | null; side: ThesisSide; moves: DriverMove[]; hrefFor: (item: string) => string; /** More drawers of the panel, after these. */ children?: React.ReactNode }) {
   const top = state?.reason ?? state?.why ?? null;
   const m = state?.magnitude;
   return (
@@ -74,13 +74,14 @@ export function DriverReason({ state, side, moves, hrefFor }: { state: GoldNarra
           {top && <p className="text-xl leading-snug font-semibold text-kumo-strong">{top}</p>}
         </div>
       )}
+      <Drawers>
       {state?.explanation && (
-        <Section title="What changed">
+        <Drawer title="What changed">
           <ExplanationWithCitations text={state.explanation} citations={state.citations ?? []} hrefFor={hrefFor} />
-        </Section>
+        </Drawer>
       )}
       {moves.length > 0 && (
-        <Section title={`What moved the stock · ${moves.length}`}>
+        <Drawer title={`What moved the stock · ${moves.length}`}>
           <ul className="flex flex-col gap-3">
             {moves.map((x) => (
               <li key={x.id}>
@@ -93,8 +94,10 @@ export function DriverReason({ state, side, moves, hrefFor }: { state: GoldNarra
               </li>
             ))}
           </ul>
-        </Section>
+        </Drawer>
       )}
+      {children}
+      </Drawers>
     </>
   );
 }

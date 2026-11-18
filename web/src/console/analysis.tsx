@@ -1,13 +1,14 @@
-import { Badge, Button, Input } from "@cloudflare/kumo";
-import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, FileTextIcon, QuestionIcon } from "@phosphor-icons/react/ssr";
+import { Button, Input } from "@cloudflare/kumo";
+import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
-import type { GoldEvidence, GoldExhibit, GoldNarrativeState, ThesisSide } from "@/db/schema/analysis";
+import type { GoldEvidence, GoldExhibit, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
 import { type DriverWithExhibits, getTickerAnalysis, getValuation, priceMoveMarkers } from "./analysis-queries";
 import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
-import { CallBadge, FairValue, QuoteGap, TickerTag } from "./board";
+import { CallBadge, TickerTag } from "./board";
+import { Drawer, Drawers } from "./drawer";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "./kumo";
 import { RowLink } from "./row-link";
 import { signalWordsOf } from "./signal-history";
@@ -15,7 +16,7 @@ import { ExhibitChart } from "./driver-chart";
 import { NewsTable, type NewsRow } from "./news-table";
 import { PriceFairValueChart } from "./price-fair-chart";
 import { TagBadge } from "./tag-badge";
-import { day, numberFormat, price, relativeTime, utc } from "./format";
+import { day, numberFormat, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
 import { getThesis } from "./thesis-queries";
@@ -52,37 +53,12 @@ export async function analysisData(symbol: string, thesis: ThesisSide | null = n
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
 
-/** A's facts, each figure opening its own detail: those cards carry a caret and a stronger ring, so they read as buttons. */
-function Facts({ row, wide, range }: { row: BoardRow; wide: boolean; range: { low: number; high: number } | null }) {
-  const cell = "flex flex-col gap-1.5 rounded-lg px-4 py-3 ring-1 ring-kumo-hairline";
-  const clickable = "group relative flex flex-col gap-1.5 rounded-lg px-4 py-3 pr-10 ring-1 ring-kumo-line shadow-xs transition-colors hover:bg-kumo-tint hover:ring-kumo-brand";
-  const caret = <CaretRightIcon size={16} weight="bold" aria-hidden className="absolute top-1/2 right-3 -translate-y-1/2 text-kumo-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-kumo-link" />;
+/** The verdict in one line (Kevin 2026-11-18: the fair value and quote cards repeated the chart under them). */
+function Verdict({ row }: { row: BoardRow }) {
   return (
-    <div className={`grid grid-cols-2 gap-3 ${wide ? "sm:grid-cols-4" : ""}`}>
-      <div className={cell}>
-        <span className="text-sm text-kumo-subtle">Signal</span>
-        <span><CallBadge call={row.call} /></span>
-      </div>
-      <div className={cell}>
-        <span className="text-sm text-kumo-subtle">Strength</span>
-        <span><TickerTag row={row} /></span>
-      </div>
-      {/* The number only: how it was computed opens in its own panel (Kevin 2026-11-05). */}
-      <Link href={itemHref(row.symbol, "fair-value")} scroll={false} className={clickable} title="How the fair value was computed">
-        <span className="text-sm text-kumo-subtle">Fair value</span>
-        <span><FairValue row={row} /></span>
-        {range && (
-          <span className="font-mono text-sm tabular text-kumo-default">
-            Range {price(range.low)} to {price(range.high)}
-          </span>
-        )}
-        {caret}
-      </Link>
-      <Link href={itemHref(row.symbol, "price")} scroll={false} className={clickable} title="Price history and sources">
-        <span className="text-sm text-kumo-subtle">Quote</span>
-        <span><QuoteGap row={row} align="left" /></span>
-        {caret}
-      </Link>
+    <div className="flex flex-wrap items-center gap-3">
+      <CallBadge call={row.call} />
+      <TickerTag row={row} />
     </div>
   );
 }
@@ -202,64 +178,48 @@ export function EvidenceRows({ symbol, rows, driverId, side }: { symbol: string;
 
 export { PRICED_WORD };
 
-/** A state's timing: since when it holds, how much the price already moved, and when the judge last looked. */
-function StateTiming({ state }: { state: GoldNarrativeState }) {
+const turning = (d: DriverWithExhibits) => d.state?.effect === "reversal" && d.state.strength !== "noise";
+
+/** One driver: its category, its title, its tag. Text, exhibits and news open in the driver's panel. */
+function DriverRow({ symbol, d, side, thesis }: { symbol: string; d: DriverWithExhibits; side: ThesisSide; thesis: ThesisSide | null }) {
   return (
-    <span className="flex flex-col gap-0.5 text-sm text-kumo-subtle md:items-end">
-      {state.headline && state.effect !== "noise" && <span className="font-medium text-kumo-strong md:text-right">{state.headline}</span>}
-      {state.since && state.effect !== "noise" && <span className="tabular">Since {day(state.since)}</span>}
-      {state.pricedIn && state.effect !== "noise" && <span>{PRICED_WORD[state.pricedIn]}</span>}
-      <time dateTime={state.asOf.toISOString()} title={utc(state.asOf)} className="tabular">
-        Checked {relativeTime(state.asOf)}
-      </time>
-    </span>
+    <li>
+      <Link href={itemHref(symbol, `driver:${d.id}`, thesis)} scroll={false} className="-mx-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-lg px-3 py-3 transition-colors hover:bg-kumo-tint">
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="text-sm text-kumo-subtle">{d.category}</span>
+          <span className="text-lg font-semibold text-kumo-strong">{d.title}</span>
+        </span>
+        <span className="flex items-center gap-2">
+          {d.state ? <TagBadge effect={d.state.effect} strength={d.state.strength} side={side} durability={d.state.durability} /> : <span className="text-sm text-kumo-subtle">Not judged yet</span>}
+          <CaretRightIcon size={16} weight="bold" aria-hidden className="text-kumo-subtle" />
+        </span>
+      </Link>
+    </li>
   );
 }
 
-/** Drivers by the day their current state started, newest first (Kevin 2026-11-09); no date (noise, not judged) last, by rank. */
-function byLatestTurn<T extends { state: GoldNarrativeState | null }>(drivers: T[]): T[] {
-  const since = (d: T) => (d.state && d.state.effect !== "noise" ? d.state.since : null) ?? "";
-  return [...drivers].sort((a, b) => since(b).localeCompare(since(a)));
-}
-
 /**
- * Narrative Drivers at a glance (Kevin 2026-11-09): the driver (category, title, one sentence) on the left, its Status
- * on the right (its tag, since when, how much is in the price, when it was last judged). Text, exhibits and news open
- * in the driver's panel.
+ * Narrative Drivers (Kevin 2026-11-18: « pourquoi tu les affiches si c'est du noise ou de la continuation ? »): only the
+ * drivers that turn show, strongest first; the ones that hold or do not move sit in a closed drawer.
  */
-function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
+export function Drivers({ symbol, drivers, side, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
+  const moving = drivers.filter(turning).sort((a, b) => Number(b.state!.strength === "strong") - Number(a.state!.strength === "strong") || a.rank - b.rank);
+  const rest = drivers.filter((d) => !turning(d));
+  const rows = (list: DriverWithExhibits[]) => (
+    <ol className="flex flex-col">
+      {list.map((d) => (
+        <DriverRow key={d.id} symbol={symbol} d={d} side={side} thesis={thesis} />
+      ))}
+    </ol>
+  );
   return (
-    <div className="flex flex-col rounded-lg ring-1 ring-kumo-hairline">
-      <div className="grid grid-cols-[1fr_auto] gap-6 border-b border-kumo-hairline px-4 py-2 text-sm font-medium text-kumo-subtle">
-        <span>Driver</span>
-        <span className="w-44 text-right">Status</span>
-      </div>
-      <ol className="flex flex-col divide-y divide-kumo-hairline">
-        {byLatestTurn(drivers).map((d) => (
-          <li key={d.id}>
-            <Link href={itemHref(symbol, `driver:${d.id}`, thesis)} scroll={false} className="grid grid-cols-[1fr_auto] gap-6 px-4 py-3.5 transition-colors hover:bg-kumo-tint">
-              <span className="flex flex-col gap-2">
-                <span className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{d.category}</Badge>
-                  {d.evidence.length > 0 && <span className="text-sm text-kumo-subtle">{d.evidence.length} news</span>}
-                </span>
-                <span className="text-lg font-semibold text-kumo-strong">{d.title}</span>
-                {d.summary && <span className="max-w-prose text-base text-kumo-default">{d.summary}</span>}
-              </span>
-              <span className="flex w-44 flex-col items-end gap-1.5">
-                {d.state ? (
-                  <>
-                    <TagBadge effect={d.state.effect} strength={d.state.strength} side={side} durability={d.state.durability} />
-                    <StateTiming state={d.state} />
-                  </>
-                ) : (
-                  <span className="text-sm text-kumo-subtle">Not judged yet</span>
-                )}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ol>
+    <div className="flex flex-col gap-2">
+      {moving.length > 0 ? rows(moving) : <p className="text-lg text-kumo-subtle">No driver is turning.</p>}
+      {rest.length > 0 && (
+        <Drawers>
+          <Drawer title={moving.length > 0 ? `${rest.length} other ${rest.length === 1 ? "driver" : "drivers"}, not turning` : `${rest.length} ${rest.length === 1 ? "driver" : "drivers"}`}>{rows(rest)}</Drawer>
+        </Drawers>
+      )}
     </div>
   );
 }
@@ -285,34 +245,23 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
           <ArrowSquareOutIcon size={16} aria-hidden /> Open the full analysis
         </Link>
       )}
-      <Facts row={row} wide={variant === "page"} range={objects.fairValue?.low != null && objects.fairValue?.high != null ? { low: objects.fairValue.low, high: objects.fairValue.high } : null} />
+      <Verdict row={row} />
 
       {chart.bars.length > 0 && (
-        <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} moves={variant === "page" ? moves : []} />
+        <PriceFairValueChart symbol={symbol} bars={chart.bars} fair={chart.fair} currency={chart.fair?.currency ?? row.currency} sources={chart.sources} moves={variant === "page" ? moves : []} priceHref={itemHref(symbol, "price")} fairHref={chart.fair ? itemHref(symbol, "fair-value") : null} />
       )}
 
       <Section title="Narrative">
         {narrative ? (
           <>
             <p className={`max-w-prose leading-snug text-kumo-strong ${variant === "page" ? "text-2xl" : "text-xl"}`}>{narrative}</p>
-            {(objects.narrative?.detail || objects.rationale) && (
-              <Link href={itemHref(symbol, "narrative", keep)} scroll={false} className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-kumo-link hover:underline">
-                <QuestionIcon size={16} aria-hidden /> Why
-              </Link>
-            )}
+            <Link href={itemHref(symbol, "narrative", keep)} scroll={false} className="inline-flex items-center gap-1 self-start text-sm font-medium text-kumo-link hover:underline">
+              Why <CaretRightIcon size={14} weight="bold" aria-hidden />
+            </Link>
           </>
         ) : (
-          <p className="text-lg text-kumo-subtle">Not drafted yet. The next run writes it once the ticker has a fair value.</p>
+          <p className="text-lg text-kumo-subtle">Not drafted yet.</p>
         )}
-        {objects.narrativeState && side ? (
-          <div className="flex flex-col gap-2">
-            <span className="flex flex-wrap items-center gap-3">
-              <TagBadge effect={objects.narrativeState.effect} strength={objects.narrativeState.strength} side={side} />
-              <StateTiming state={objects.narrativeState} />
-            </span>
-            {objects.narrativeState.why && <p className="max-w-prose text-base leading-relaxed text-kumo-default">{objects.narrativeState.why}</p>}
-          </div>
-        ) : null}
       </Section>
 
       <Section title="Narrative drivers">
@@ -323,43 +272,41 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
             size="sm"
             icon={<ChartLineIcon size={28} className="text-kumo-inactive" />}
             title="No driver yet"
-            description="Up to five drivers per ticker, each in its category with charts of reported data. The news that cracks or turns each driver will sit under it."
+            description="The next run writes them."
           />
         )}
       </Section>
 
       {variant === "page" && (
-        <>
-          <Section title="KPIs vs consensus">
+        <Drawers>
+          <Drawer title="KPIs vs consensus">
             <Kpis symbol={symbol} rows={consensus} />
-          </Section>
+          </Drawer>
           {objects.signalChanges.length > 0 && (
-            <Section title="Signal history">
+            <Drawer title={`Signal history · ${objects.signalChanges.length}`}>
               <SignalHistory changes={objects.signalChanges} />
-            </Section>
+            </Drawer>
           )}
           {valuation.methods.length > 0 && (
-            <Section title="Valuation">
-              {valuation.report && <p className="max-w-prose text-lg leading-relaxed text-kumo-strong">{valuation.report.summary}</p>}
+            <Drawer title="Valuation">
               <ValuationField v={valuation} />
               <MethodsTable symbol={symbol} v={valuation} />
-            </Section>
+            </Drawer>
           )}
           {objects.drivers.length > 0 && objects.evidence.length > 0 && (
-            <Section title={`News · ${objects.evidence.length}`}>
+            <Drawer title={`News · ${objects.evidence.length}`}>
               <NewsTable rows={newsRows(symbol, objects, keep)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} side={side} />
-            </Section>
+            </Drawer>
           )}
-          <Section title="Your fair value">
+          <Drawer title="Your fair value">
             <form action={saveFairValue.bind(null, symbol, thesis?.currency ?? row.currency)} className="flex flex-wrap items-end gap-3">
               <Input name="value" label={`Fair value per share${row.currency ? ` (${row.currency})` : ""}`} inputMode="decimal" defaultValue={thesis?.fairValue ?? ""} className="w-40" />
               <Input name="basis" label="How you got it" placeholder="10x EV/EBITDA on 2027 EBITDA" defaultValue={thesis?.fairValueBasis ?? ""} className="w-80" />
               <Button type="submit" variant="secondary">Save</Button>
             </form>
-            {thesis?.fairValueBasis && <p className="text-base text-kumo-subtle">{thesis.fairValueBasis}</p>}
-          </Section>
-          <Section title="Research report">
-            {objects.report ? (
+          </Drawer>
+          {objects.report && (
+            <Drawer title="Research report">
               <article className="flex max-w-3xl flex-col gap-4">
                 <h3 className="text-2xl font-bold text-kumo-strong">{objects.report.title}</h3>
                 <ArticleBody
@@ -370,16 +317,9 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
                   }}
                 />
               </article>
-            ) : (
-              <ComingNext
-                size="sm"
-                icon={<FileTextIcon size={28} className="text-kumo-inactive" />}
-                title="No report yet"
-                description="An equity research report on the company: business, five years of reported numbers, the narrative and your fair value."
-              />
-            )}
-          </Section>
-        </>
+            </Drawer>
+          )}
+        </Drawers>
       )}
     </div>
   );

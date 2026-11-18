@@ -9,9 +9,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { MoveMarker } from "./analysis-queries";
 import { openPanel } from "./item-nav";
+import PanelLink from "./link";
 import { FONT, INK, SOURCE_LABEL } from "./driver-chart";
 import { monthYear } from "./exhibit-format";
-import { dateFormat, numberFormat } from "./format";
+import { numberFormat } from "./format";
 import { FitWidth } from "./fit-width";
 import { usePageDark } from "./use-page-dark";
 
@@ -29,7 +30,6 @@ const MONTHS: Record<Range, number> = { "6M": 6, "1Y": 12, "5Y": 60 };
 const ZONE = { buy: "rgba(22, 128, 61, 0.06)", sell: "rgba(190, 18, 60, 0.06)", range: "rgba(43, 36, 99, 0.10)" };
 
 const fmtNum = (v: number) => numberFormat({ maximumFractionDigits: Math.abs(v) < 1 ? 4 : Math.abs(v) >= 1000 ? 0 : 2 }).format(v);
-const day = (d: string) => dateFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
 function startOf(last: string, months: number): string {
   const d = new Date(`${last}T00:00:00Z`);
@@ -44,6 +44,8 @@ export function PriceFairValueChart({
   currency,
   sources,
   moves = [],
+  priceHref,
+  fairHref,
 }: {
   symbol: string;
   bars: { date: string; close: number }[];
@@ -52,6 +54,9 @@ export function PriceFairValueChart({
   sources: string[];
   /** Significant moves (Analysis page only): a marker each, a click opens its cause. */
   moves?: MoveMarker[];
+  /** The two figures the chart draws each open their own panel: the price history, how the fair value was computed. */
+  priceHref: string;
+  fairHref: string | null;
 }) {
   const dark = usePageDark();
   const router = useRouter();
@@ -74,7 +79,6 @@ export function PriceFairValueChart({
   const yMin = Math.max(0, lo - pad);
   const yMax = hi + pad;
   const fairLabel = fair ? (fair.author === "thierry" ? "Your fair value" : "Fair value (Claude)") : null;
-  const gap = fair ? last.close / fair.value - 1 : null;
 
   const markLines = fair
     ? [
@@ -170,10 +174,16 @@ export function PriceFairValueChart({
           <span className="text-[13px] font-bold text-kumo-strong">
             {symbol}: price vs fair value
           </span>
-          <span className="text-[11px] text-kumo-subtle">
-            Daily close{currency ? `, ${currency}` : ""}, {day(shown[0].date)} to {day(last.date)}
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
+            <PanelLink href={priceHref} scroll={false} className="font-medium text-kumo-link hover:underline">
+              Price ›
+            </PanelLink>
+            {fair && fairHref && (
+              <PanelLink href={fairHref} scroll={false} className="font-medium text-kumo-link hover:underline">
+                Fair value ›
+              </PanelLink>
+            )}
           </span>
-          {markers.length > 0 && <span className="text-[11px] text-kumo-subtle">Triangles: significant moves vs the S&amp;P 500, dark when a business fact caused it. Click one for its cause.</span>}
         </span>
         <Tabs variant="segmented" size="sm" value={range} onValueChange={(v) => setRange(v as Range)} tabs={ranges.map((r) => ({ value: r, label: r }))} />
       </figcaption>
@@ -193,17 +203,6 @@ export function PriceFairValueChart({
           }}
         /></FitWidth>
       </div>
-      <p className="text-[12px] text-kumo-default">
-        {fair && gap !== null ? (
-          <>
-            Last close {fmtNum(last.close)} is {Math.abs(Math.round(gap * 100))}% {gap < 0 ? "below" : "above"} {fair.author === "thierry" ? "your fair value" : "the fair value (Claude)"} of {fmtNum(fair.value)}
-            {fvRange ? ` (range ${fmtNum(fvRange.low)} to ${fmtNum(fvRange.high)})` : ""}
-            {fair.since ? `, set ${day(fair.since)}` : ""}: {gap < 0 ? "BUY zone" : "SELL zone"}.
-          </>
-        ) : (
-          "No fair value yet: the line appears once the analysis sets one."
-        )}
-      </p>
       <p className="border-t border-kumo-hairline pt-1 text-[10px] text-kumo-subtle">
         Source: {sources.map((s) => SOURCE_LABEL[s] ?? s).join("; ") || "not collected"}; Dualis Research.
       </p>
