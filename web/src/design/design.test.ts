@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { checkColorEdit, COLOR_VALUE } from "./color";
+import { COLOR_VALUE } from "./color";
 import { DESIGN_RAW, getDesignSystem, previewDoc } from "./queries";
 
 const ROOT = join(__dirname, "../../..");
@@ -33,11 +33,6 @@ describe("design tokens: one source", () => {
     expect(() => build.setColor(build.readTokens(), "nope", "light", "#112233")).toThrow(/Unknown colour token/);
     expect(() => build.setColor(build.readTokens(), "brand", "light", "indigo")).toThrow(/not a colour/);
     expect(String(build.COLOR_VALUE)).toBe(String(COLOR_VALUE));
-  });
-
-  it("the console checks an edit before starting GitHub", () => {
-    expect(checkColorEdit({ name: " brand ", light: "#2B2463 ", dark: "rgba(255, 255, 255, 0.8)" })).toEqual({ name: "brand", light: "#2B2463", dark: "rgba(255, 255, 255, 0.8)" });
-    expect(() => checkColorEdit({ name: "brand", light: "#2B246", dark: "#000000" })).toThrow(/not a colour/);
   });
 });
 

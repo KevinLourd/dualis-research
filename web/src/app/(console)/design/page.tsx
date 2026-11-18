@@ -1,11 +1,8 @@
 import { Badge, Button } from "@cloudflare/kumo";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
-import Link from "@/console/link";
-import { SlideOver } from "@/console/slide-over";
 import { TableSearch } from "@/console/table-search";
 import { Card, PageHeader } from "@/console/ui";
 import { ChartSample } from "@/design/chart-sample";
-import { ColorForm } from "@/design/color-form";
 import { MCP_URL } from "@/connector/oauth";
 import { DESIGN_ON_GITHUB, type DesignSystem, getDesignSystem, SKILL_ZIP, WORDING_ZIP } from "@/design/queries";
 
@@ -37,10 +34,10 @@ function Swatch({ value }: { value: string }) {
   return <span className="inline-block size-7 rounded-md ring-1 ring-kumo-line align-middle" style={{ background: value }} aria-hidden />;
 }
 
-export default async function DesignPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
-  const [{ edit }, ds] = await Promise.all([searchParams, getDesignSystem()]);
+/** Read only (Kevin 2026-11-18, « JE NE VEUX PAS DE CES BOUTONS »): the design system changes through Claude only. */
+export default async function DesignPage() {
+  const ds = await getDesignSystem();
   const { tokens } = ds;
-  const editing = edit ? tokens.color.tokens.find((c) => c.name === edit) : undefined;
   const typeHeight = tokens.type.groups.reduce((n, g) => n + g.styles.length, 0) * 66 + 24;
 
   return (
@@ -69,7 +66,6 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                   <KTableHead>Dark</KTableHead>
                   <KTableHead>Name</KTableHead>
                   <KTableHead>Use</KTableHead>
-                  <KTableHead />
                 </KTableRow>
               </KTableHeader>
               <KTableBody>
@@ -89,11 +85,6 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                     </KTableCell>
                     <KTableCell className="font-mono">{c.name}</KTableCell>
                     <KTableCell className="max-w-md text-sm text-kumo-default">{c.usage}</KTableCell>
-                    <KTableCell className="text-right whitespace-nowrap">
-                      <Link href={`/design?edit=${c.name}`} scroll={false} className="text-kumo-link hover:underline">
-                        Edit ›
-                      </Link>
-                    </KTableCell>
                   </KTableRow>
                 ))}
               </KTableBody>
@@ -184,12 +175,6 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
       </Card>
-
-      {editing && (
-        <SlideOver title={`Edit ${editing.name}`} subtitle={editing.usage} closeHref="/design">
-          <ColorForm name={editing.name} light={editing.value.light} dark={editing.value.dark} />
-        </SlideOver>
-      )}
     </>
   );
 }

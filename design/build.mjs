@@ -11,7 +11,7 @@
  *   node design/build.mjs --check    exit 1 if a generated file differs from tokens.json (CI runs this)
  *   node design/build.mjs --set <token> <light|dark|both> <value>   edit one colour, then regenerate
  *
- * No dependency: runs from the repo root in CI, in the design-edit workflow and on a laptop.
+ * No dependency: runs from the repo root in CI, in the desktop-edit workflow (Claude connector) and on a laptop.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
