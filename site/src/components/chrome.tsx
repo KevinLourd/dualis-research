@@ -12,16 +12,31 @@ const NAV = [
   { href: "/contact", label: "Contact" },
 ];
 
+/**
+ * The wordmark, justified (Thierry 2026-11-17): D over R flush left, S over H flush right. Each word's letters are
+ * spread over the same width, set by « Dualis » at its tracking; « Research » takes whatever spacing fills it.
+ */
+function Wordmark() {
+  return (
+    <span className="wordmark" aria-hidden="true">
+      {["Dualis", "Research"].map((word) => (
+        <span key={word}>
+          {[...word].map((letter, i) => (
+            <span key={i}>{letter}</span>
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function Header({ substackUrl }: { substackUrl: string | null }) {
   return (
     <header className="site-header">
       <div className="wrap bar">
         <Link href="/" className="brand" aria-label={`${BRAND}, home`}>
           <Mark />
-          <span className="wordmark">
-            <span>Dualis</span>
-            <span>Research</span>
-          </span>
+          <Wordmark />
         </Link>
         <nav className="nav" aria-label="Main">
           {NAV.map((n) => (
@@ -59,10 +74,7 @@ export function Footer({ substackUrl }: { substackUrl: string | null }) {
         <div className="footer-brand">
           <Link href="/" className="brand" aria-label={`${BRAND}, home`}>
             <Mark tone="white" />
-            <span className="wordmark">
-              <span>Dualis</span>
-              <span>Research</span>
-            </span>
+            <Wordmark />
           </Link>
           <p>Independent equity research focused on finding asymmetric inflections in under-covered markets.</p>
           <Social substackUrl={substackUrl} />

@@ -182,29 +182,26 @@ p {
   width: 30px;
   height: 30px;
 }
+/* Wordmark of the seal logo: wide-tracked sans caps (Kevin 2026-11-06, option C), justified (Thierry 2026-11-17):
+   D over R flush left, S over H flush right. « Dualis » sets the width (its letters 0.34em apart); the letters of
+   « Research » are spread edge to edge over that same width. */
 .wordmark {
-  display: flex;
-  flex-direction: column;
-  /* Thierry 2026-11-17: « Research » centred under « Dualis ». Each line gives back its last letter's tracking. */
-  align-items: center;
+  display: inline-grid;
   text-transform: uppercase;
   line-height: 1;
-  letter-spacing: 0.04em;
-}
-/* Wordmark of the seal logo: wide-tracked sans caps (Kevin 2026-11-06, option C). */
-.wordmark span:first-child {
   font-family: var(--font-sans), system-ui, sans-serif;
   font-weight: 500;
+}
+.wordmark > span {
+  display: flex;
+  justify-content: space-between;
+}
+.wordmark > span:first-child {
   font-size: 19px;
-  letter-spacing: 0.34em;
-  margin-right: -0.34em;
+  gap: 0.34em;
 }
-.wordmark span:last-child {
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-weight: 500;
+.wordmark > span:last-child {
   font-size: 9.5px;
-  letter-spacing: 0.62em;
-  margin-right: -0.62em;
   margin-top: 6px;
 }
 .nav {
