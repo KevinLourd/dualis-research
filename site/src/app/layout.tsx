@@ -36,7 +36,7 @@ const mono = localFont({
 
 export const metadata: Metadata = {
   title: { default: "Dualis Research | Independent Equity Research", template: "%s | Dualis Research" },
-  description: "Independent research for buy-side opportunities. Long and short ideas in under-covered global equities.",
+  description: "Independent research for buy-side opportunities. Long and short ideas in under-covered global equities. Test.",
   // Private preview for Thierry: no search engine indexing until launch.
   robots: { index: false, follow: false },
   icons: {
