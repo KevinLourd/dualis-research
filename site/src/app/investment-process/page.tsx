@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CtaBand } from "@/components/blocks";
 import { CardCarousel } from "@/components/card-carousel";
-import type { Card } from "@/components/cards";
+import { Icon, type Card } from "@/components/cards";
 import { AsymmetryFigure, DispersionFigure } from "@/components/edge-figures";
 import { MARKETS } from "@/lib/model";
 
@@ -55,10 +55,12 @@ const LOOK_FOR: readonly Card[] = [
 const SETUPS = [
   {
     title: "Inflections",
+    icon: "inflection",
     body: "Consensus often extrapolates a recent trend linearly, which can lead to turning points in the fundamentals getting mispriced in both directions. Businesses priced for permanent decline can re-rate sharply on structural improvement. Stocks priced on a growth story can de-rate hard once earnings power stops supporting it. At the extremes, narrative and fundamentals reinforce each other, so outcomes are more lopsided than consensus models assume.",
   },
   {
     title: "Overlooked quality",
+    icon: "quality",
     body: "Businesses with strong competitive advantages and high ROICs with durable cash flows can often trade at discounts since the market undervalues the firm’s terminal cash flows. Low beta equities under this category provide an opportunity to add leverage.",
   },
 ] as const;
@@ -112,7 +114,10 @@ export default function InvestmentProcess() {
           <div className="setups">
             {SETUPS.map((s) => (
               <article key={s.title}>
-                <h3>{s.title}</h3>
+                <h3>
+                  <Icon name={s.icon} className="setup-icon" />
+                  {s.title}
+                </h3>
                 <p>{s.body}</p>
               </article>
             ))}

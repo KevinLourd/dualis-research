@@ -6,7 +6,7 @@
  */
 
 export type Suit = "spade" | "heart" | "club" | "diamond";
-export type CardIcon = "small-caps" | "cycle" | "globe" | "themes";
+export type CardIcon = "small-caps" | "cycle" | "globe" | "themes" | "inflection" | "quality";
 export type Card = { suit: Suit; icon: CardIcon; title: string; line: string };
 
 const SUIT_PATHS: Record<Suit, string> = {
@@ -24,30 +24,43 @@ function SuitGlyph({ suit }: { suit: Suit }) {
   );
 }
 
-/** Line icons, one per card title. */
-function Icon({ name }: { name: CardIcon }) {
+/** Line icons, one per card title; also beside the Primary Setups titles (Kevin 2026-11-18). */
+export function Icon({ name, className = "pc-icon" }: { name: CardIcon; className?: string }) {
   const common = { viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
   if (name === "small-caps")
     return (
-      <svg {...common} className="pc-icon" aria-hidden="true">
+      <svg {...common} className={className} aria-hidden="true">
         <path d="M6 42h36M10 42V30h7v12M20.5 42V22h7v20M31 42V10h7v32" />
       </svg>
     );
   if (name === "cycle")
     return (
-      <svg {...common} className="pc-icon" aria-hidden="true">
+      <svg {...common} className={className} aria-hidden="true">
         <path d="M4 24c5-16 11-16 16 0s11 16 16 0 6-9 8-9M4 40h40" />
       </svg>
     );
   if (name === "globe")
     return (
-      <svg {...common} className="pc-icon" aria-hidden="true">
+      <svg {...common} className={className} aria-hidden="true">
         <circle cx="24" cy="24" r="18" />
         <path d="M6 24h36M24 6c-6 5-9 11-9 18s3 13 9 18c6-5 9-11 9-18s-3-13-9-18Z" />
       </svg>
     );
+  if (name === "inflection")
+    return (
+      <svg {...common} className={className} aria-hidden="true">
+        <path d="M4 10c6 4 10 14 14 22 2 4 4 6 6 6s4-2 6-6c3-7 7-14 14-18M6 44h36" />
+        <circle cx="24" cy="38" r="2.5" fill="currentColor" />
+      </svg>
+    );
+  if (name === "quality")
+    return (
+      <svg {...common} className={className} aria-hidden="true">
+        <path d="M14 8h20l8 10-18 22L6 18Z M6 18h36 M20 18l4-10 4 10 M20 18l4 22 4-22" />
+      </svg>
+    );
   return (
-    <svg {...common} className="pc-icon" aria-hidden="true">
+    <svg {...common} className={className} aria-hidden="true">
       <circle cx="24" cy="9" r="4" />
       <circle cx="10" cy="26" r="4" />
       <circle cx="38" cy="26" r="4" />

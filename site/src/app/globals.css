@@ -1842,9 +1842,19 @@ h2 + .lead,
   background: var(--grey);
 }
 .setups h3 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   font-weight: 400;
   font-size: clamp(26px, 2.4vw, 34px);
   color: var(--ink);
+}
+/* An icon beside each setup title (Kevin 2026-11-18), the cards' line style. */
+.setup-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  color: var(--brand);
 }
 .setups p {
   margin-top: 16px;
