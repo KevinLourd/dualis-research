@@ -210,7 +210,7 @@ export function KpiDrivers({ symbol, kpis }: { symbol: string; kpis: GoldKpiDriv
   return (
     <ol className="flex flex-col">
       {shown.map((k) => (
-        <KpiRow key={k.id} href={itemHref(symbol, `kdriver:${k.id}`)} name={k.name} sub={`Confirmed on ${k.confirmed} of ${k.rows.length} releases`} badge={<ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />} />
+        <KpiRow key={k.id} href={itemHref(symbol, `kdriver:${k.id}`)} name={k.name} sub={`Confirmed ${k.confirmed} times, invalidated ${k.invalidated}`} badge={<ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />} />
       ))}
     </ol>
   );

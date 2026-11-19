@@ -460,7 +460,7 @@ async function kpiDriverItem(symbol: string, id: string): Promise<ItemView | nul
           </span>
           <p className="text-lg leading-snug font-medium text-kumo-strong">{k.reason}</p>
           <p className="text-sm text-kumo-subtle">
-            ✓ {k.confirmed} · ✗ {k.invalidated} of {k.rows.length} results releases
+            ✓ {k.confirmed} · ✗ {k.invalidated} of {k.rows.length} moments tested
           </p>
         </div>
         <Drawers>
