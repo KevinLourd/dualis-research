@@ -128,7 +128,8 @@ export async function changeStatus(changeId: string, env: Env = process.env, f: 
 export function errorLines(log: string): string[] {
   const out = log
     .split("\n")
-    .map((l) => /##\[error\](.*)$/.exec(l)?.[1]?.trim())
-    .filter((l): l is string => !!l && !/^Process completed with exit code/.test(l));
+    // eslint-disable-next-line no-control-regex
+    .map((l) => /##\[error\](.*)$/.exec(l.replace(/\x1b\[[0-9;]*m/g, ""))?.[1]?.trim())
+    .filter((l): l is string => !!l && !/^Process completed with exit code/.test(l) && !l.startsWith("::error file="));
   return [...new Set(out)].slice(0, 20);
 }

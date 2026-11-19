@@ -166,6 +166,7 @@ describe("tools", () => {
   it("reads why a run refused the change from its log", () => {
     const log = "2026-11-18T10:00:00Z ##[error]site/src/app/page.tsx: text not found\n2026-11-18T10:00:01Z ##[error]Process completed with exit code 1.\n";
     expect(errorLines(log)).toEqual(["site/src/app/page.tsx: text not found"]);
+    expect(errorLines("x ##[error]\x1b[31mAssertionError\x1b[39m: expected a\nx ##[error]::error file=/a.ts,line=1::AssertionError\n")).toEqual(["AssertionError: expected a"]);
   });
 });
 
