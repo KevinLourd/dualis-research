@@ -32,7 +32,8 @@ export const REACTION_DAYS = 5;
 /** v2 (Kevin 2026-11-19, Worldex: the why ran to 4 lines in the panel): a why of at most 15 words. */
 export const CANDIDATES_QUESTION = "kpi-candidates@v2";
 /** v3 (Kevin 2026-11-19): an invalidation weighs (one caps at weak, two or more = none); a strong turn needs a strong KPI; the reason is a plain 15-word conclusion. */
-export const TEST_QUESTION = "kpi-test@v3";
+/** v4 (Kevin 2026-11-19: « pas de règle de proportion… laisse l'AI décider »): no count rule, the judge weighs every release. */
+export const TEST_QUESTION = "kpi-test@v4";
 /** Pages of each report a judge reads (the results discussion first) and how much of each page. */
 const PAGES_PER_RELEASE = 2;
 const PAGE_CHARS = 3_500;
@@ -132,7 +133,7 @@ export const TEST_SYSTEM = [
   "For each release: read what the KPI did (from the figures given, else from the report's own words and tables), compare with the price over the 5 trading days after, against the S&P 500.",
   "verdict: confirms = the KPI changed clearly and the price moved the way that change implies; invalidates = the KPI changed strongly and the price did not react, or moved the other way; neutral = the KPI barely changed, or something else clearly moved the price.",
   "Every release gets a row. from / to / change = the KPI values the release shows (with units), null when the release does not show it. why = at most 15 words, the fact. cite = the release label, page and an EXACT quote of the report that shows the figure or management's words about it, null when none.",
-  "level: an invalidation is strong evidence against the hypothesis. strong = it confirms on at least 3 releases and NO release invalidates it. weak = it confirms on at least 2 releases and at most ONE release invalidates it. none = anything else: two or more invalidations, or fewer than 2 confirmations.",
+  "level: decide it yourself, as the analyst would, from everything above: never by counting. Weigh each release: how big the KPI move was, how clear the price reaction was against the market, whether another fact in the same report (another KPI, a one-off, a guidance change) or the market at large could explain the reaction, and whether the confirmations are recent. A small cap's price is noisy: one contrary release can be noise, a clean, large KPI move the price ignored says much more. strong = the market clearly trades the stock on this KPI; weak = it does sometimes, or the evidence is thin; none = it does not.",
   "reason = ONE plain sentence, at most 15 words, that a reader landing on the page understands at once: the conclusion about how the stock reacts to this KPI (\"The stock usually follows revenue growth, but not in the last two releases.\"). No dates, no list of figures, no R label: the release table shows them.",
   "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest release, by enough to change the story, with the price not reacting yet? strong (only for a strong KPI) / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved at the latest release.",
   "No em dash. JSON only, no prose, no code fence:",
