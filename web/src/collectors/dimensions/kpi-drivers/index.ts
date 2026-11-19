@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { KPI_LEVELS, KPI_VERDICTS, kpiDrivers, type DocCitation, type KpiLevel, type KpiRelease, type KpiTestRow, type KpiVerdict } from "@/db/schema/analysis";
 import { documentPages, documents } from "@/db/schema/documents";
+import { goldNewsItems, goldNewsLinks } from "@/db/schema/news";
 import * as gold from "@/db/schema/gold";
 import * as silver from "@/db/schema/silver";
 import type { BronzeFetch } from "@/db/schema/bronze";
@@ -33,13 +34,16 @@ export const REACTION_DAYS = 5;
 export const CANDIDATES_QUESTION = "kpi-candidates@v2";
 /** v3 (Kevin 2026-11-19): an invalidation weighs (one caps at weak, two or more = none); a strong turn needs a strong KPI; the reason is a plain 15-word conclusion. */
 /** v4 (Kevin 2026-11-19: « pas de règle de proportion… laisse l'AI décider »): no count rule, the judge weighs every release. */
-export const TEST_QUESTION = "kpi-test@v4";
+/** v5 (Kevin 2026-11-19): two tests per KPI, B1 on every release and news item, B2 on any other filing where the KPI moved. */
+export const TEST_QUESTION = "kpi-test@v5";
 /** Pages of each report a judge reads (the results discussion first) and how much of each page. */
 const PAGES_PER_RELEASE = 2;
 const PAGE_CHARS = 3_500;
 const DAY = 86_400_000;
 
 type Release = KpiRelease & { pages: { page: number; text: string }[] };
+/** A dated moment a KPI may have moved at: a results release (its pages), a news item or another filing (its title). */
+export type KpiEvent = { label: string; kind: "release" | "news" | "filing"; id: string; day: string; title: string; text: string | null; stock: number | null; bench: number | null; reaction: number | null; unusual: number | null; pages: { page: number; text: string }[] };
 export type KpiCandidate = { name: string; why: string; series: string | null; approximation: string | null };
 type Test = { level: KpiLevel; reason: string; rows: KpiTestRow[]; signal: KpiLevel | null; signalWhy: string | null; direction: "up" | "down" | null };
 
@@ -50,6 +54,60 @@ export function reactionAfter(bars: { date: string; close: number }[], day: stri
   const i = bars.findIndex((b) => b.date >= day);
   if (i <= 0 || i + n - 1 >= bars.length) return null;
   return bars[i + n - 1].close / bars[i - 1].close - 1;
+}
+
+/**
+ * How unusual a 5-day move against the S&P 500 is for this stock: the move over the standard deviation of its own
+ * 5-day moves (against the S&P 500) over the year before the day. Null with less than 60 such moves.
+ */
+export function unusualness(stock: { date: string; close: number }[], bench: { date: string; close: number }[], day: string, reaction: number | null): number | null {
+  if (reaction === null) return null;
+  const b = new Map(bench.map((x) => [x.date, x.close]));
+  const i = stock.findIndex((x) => x.date >= day);
+  if (i <= 0) return null;
+  const moves: number[] = [];
+  for (let j = Math.max(REACTION_DAYS, i - 250); j < i; j++) {
+    const s0 = stock[j - REACTION_DAYS].close;
+    const s1 = stock[j].close;
+    const b0 = b.get(stock[j - REACTION_DAYS].date);
+    const b1 = b.get(stock[j].date);
+    moves.push(s1 / s0 - 1 - (b0 && b1 ? b1 / b0 - 1 : 0));
+  }
+  if (moves.length < 60) return null;
+  const mean = moves.reduce((a, x) => a + x, 0) / moves.length;
+  const sd = Math.sqrt(moves.reduce((a, x) => a + (x - mean) ** 2, 0) / moves.length);
+  return sd > 0 ? reaction / sd : null;
+}
+
+/** Every release, news item and other filing of the last 3 years, oldest first, each with its 5-day reaction. */
+export async function eventsOf(db: Db, symbol: string, now = new Date()): Promise<KpiEvent[]> {
+  const since = new Date(now.getTime() - KPI_YEARS * 365.25 * DAY);
+  const [releases, news, filed, stock, bench] = await Promise.all([
+    releasesOf(db, symbol, now),
+    db
+      .select({ id: goldNewsItems.id, title: goldNewsItems.title, summary: goldNewsItems.summary, publishedAt: goldNewsItems.publishedAt, firstSeenAt: goldNewsItems.firstSeenAt })
+      .from(goldNewsLinks)
+      .innerJoin(goldNewsItems, eq(goldNewsItems.id, goldNewsLinks.newsItemId))
+      .where(and(eq(goldNewsLinks.symbol, symbol), gte(goldNewsLinks.firstSeenAt, since))),
+    db.select().from(gold.filings).where(and(eq(gold.filings.symbol, symbol), gte(gold.filings.filedAt, since))),
+    db.select({ date: gold.priceBars.date, close: gold.priceBars.close }).from(gold.priceBars).where(eq(gold.priceBars.symbol, symbol)).orderBy(asc(gold.priceBars.date)),
+    db.select({ date: gold.priceBars.date, close: gold.priceBars.close }).from(gold.priceBars).where(eq(gold.priceBars.symbol, "^GSPC")).orderBy(asc(gold.priceBars.date)),
+  ]);
+  const at = (day: string) => {
+    const s = reactionAfter(stock, day);
+    const b = reactionAfter(bench, day);
+    const reaction = s === null ? null : s - (b ?? 0);
+    return { stock: s, bench: b, reaction, unusual: unusualness(stock, bench, day, reaction) };
+  };
+  const reports = new Set(releases.map((r) => r.id));
+  const raw = [
+    ...releases.map((r) => ({ kind: "release" as const, id: r.id, day: r.day, title: r.title, text: null, pages: r.pages })),
+    ...news.map((n) => ({ kind: "news" as const, id: String(n.id), day: (n.publishedAt ?? n.firstSeenAt).toISOString().slice(0, 10), title: n.title, text: n.summary ? n.summary.replace(/\s+/g, " ").slice(0, 300) : null, pages: [] })),
+    ...filed.filter((f) => !reports.has(f.id)).map((f) => ({ kind: "filing" as const, id: f.id, day: f.filedAt.toISOString().slice(0, 10), title: f.form ? `${f.form}: ${f.title}` : f.title, text: null, pages: [] })),
+  ].sort((a, b) => a.day.localeCompare(b.day));
+  const prefix = { release: "R", news: "N", filing: "F" } as const;
+  const n = { release: 0, news: 0, filing: 0 };
+  return raw.map((e) => ({ ...e, label: `${prefix[e.kind]}${++n[e.kind]}`, ...at(e.day) }));
 }
 
 /** Every results report of the last 3 years with its 5-day reaction vs the S&P 500 and its best results pages. */
@@ -108,15 +166,9 @@ async function once<T>(db: Db, complete: Complete, kind: string, subjectId: stri
   return parsed;
 }
 
-const releasesText = (rs: Release[], withPages: boolean) =>
-  rs
-    .map((r, i) =>
-      [
-        `R${i + 1} ${r.day} ${r.title}: price ${signedPct(r.stock)} over the next ${REACTION_DAYS} trading days, S&P 500 ${signedPct(r.bench)}, so ${signedPct(r.reaction)} against the market.`,
-        ...(withPages ? r.pages.map((p) => `  [R${i + 1} page ${p.page}]\n${p.text}`) : []),
-      ].join("\n"),
-    )
-    .join("\n\n");
+const eventLine = (e: KpiEvent) =>
+  `${e.label} ${e.day} ${e.kind === "release" ? "results release" : e.kind}: ${e.title}${e.text ? `. ${e.text}` : ""}. Price ${signedPct(e.stock)} over the next ${REACTION_DAYS} trading days, S&P 500 ${signedPct(e.bench)}, so ${signedPct(e.reaction)} against the market${e.unusual === null ? "" : ` (${Math.abs(e.unusual).toFixed(1)} standard deviations of its usual 5-day moves)`}.`;
+const eventsText = (es: KpiEvent[]) => es.map((e) => [eventLine(e), ...e.pages.map((p) => `  [${e.label} page ${p.page}]\n${p.text}`)].join("\n")).join("\n\n");
 
 export const CANDIDATES_SYSTEM = [
   "You are the equity research associate of a small-cap long/short analyst. He trusts only fundamental KPIs: figures about the business that the market trades the stock on.",
@@ -129,15 +181,16 @@ export const CANDIDATES_SYSTEM = [
 ].join("\n");
 
 export const TEST_SYSTEM = [
-  "You test ONE hypothesis for a small-cap long/short analyst: « this KPI moves this stock ». A hypothesis is checked against every results release, like a scientist.",
-  "For each release: read what the KPI did (from the figures given, else from the report's own words and tables), compare with the price over the 5 trading days after, against the S&P 500.",
-  "verdict: confirms = the KPI changed clearly and the price moved the way that change implies; invalidates = the KPI changed strongly and the price did not react, or moved the other way; neutral = the KPI barely changed, or something else clearly moved the price.",
-  "Every release gets a row. from / to / change = the KPI values the release shows (with units), null when the release does not show it. why = at most 15 words, the fact. cite = the release label, page and an EXACT quote of the report that shows the figure or management's words about it, null when none.",
-  "level: decide it yourself, as the analyst would, from everything above: never by counting. Weigh each release: how big the KPI move was, how clear the price reaction was against the market, whether another fact in the same report (another KPI, a one-off, a guidance change) or the market at large could explain the reaction, and whether the confirmations are recent. A small cap's price is noisy: one contrary release can be noise, a clean, large KPI move the price ignored says much more. strong = the market clearly trades the stock on this KPI; weak = it does sometimes, or the evidence is thin; none = it does not.",
-  "reason = ONE plain sentence, at most 15 words, that a reader landing on the page understands at once: the conclusion about how the stock reacts to this KPI (\"The stock usually follows revenue growth, but not in the last two releases.\"). No dates, no list of figures, no R label: the release table shows them.",
-  "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest release, by enough to change the story, with the price not reacting yet? strong (only for a strong KPI) / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved at the latest release.",
+  "You test ONE hypothesis for a small-cap long/short analyst: « this fundamental KPI of the company moves this stock ». Like a scientist, in two tests.",
+  "Every dated moment of 3 years is listed: results releases (R, with the report's pages), news items (N) and the company's other filings (F), each with the price over the 5 trading days after against the S&P 500 and how unusual that move is for this stock.",
+  "B1, on EVERY release and news item: bigMove = did the price move a lot in those 5 days (judge from the move and how unusual it is)? kpiChanged = did THIS KPI change significantly at that moment (from the figures given, the report's words and tables, the news)? verdict: confirms = the KPI changed and the price moved the way that change implies; invalidates = the KPI changed strongly and the price did not react, or moved the other way; neutral = the KPI did not change, or something else clearly moved the price.",
+  "B2, the rest of the time: among the other filings (F), every one where THIS KPI moved strongly (a disclosure of a large change in sales or profit, an order, a capacity or customer event...): did the price move with it? Same verdicts. List only those filings.",
+  "from / to / change = the KPI values at that moment (with units), null when not shown. why = at most 15 words, the fact. cite = the release label, page and an EXACT quote of the report, only for releases, null otherwise.",
+  "level: decide it yourself, as the analyst would, from B1 and B2: never by counting. Weigh each moment: how big the KPI move was, how clear the price reaction was, whether another fact or the market at large explains it, whether the evidence is recent. A small cap's price is noisy: one contrary moment can be noise, a clean, large KPI move the price ignored says much more. strong = the market clearly trades the stock on this KPI; weak = it does sometimes, or the evidence is thin; none = it does not.",
+  "reason = ONE plain sentence, at most 15 words, that a reader landing on the page understands at once: the conclusion about how the stock reacts to this KPI. No dates, no list of figures, no labels.",
+  "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest moment, by enough to change the story, with the price not reacting yet? strong (only for a strong KPI) / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved last.",
   "No em dash. JSON only, no prose, no code fence:",
-  '{"rows": [{"release": "R1", "verdict": "confirms" | "invalidates" | "neutral", "from": string | null, "to": string | null, "change": string | null, "why": string, "cite": {"release": "R1", "page": 12, "quote": "<exact words>"} | null}], "level": "strong" | "weak" | "none", "reason": string, "signal": "strong" | "weak" | "none" | null, "signalWhy": string | null, "direction": "up" | "down" | null}',
+  '{"b1": [{"event": "R1" | "N1", "bigMove": boolean, "kpiChanged": boolean, "verdict": "confirms" | "invalidates" | "neutral", "from": string | null, "to": string | null, "change": string | null, "why": string, "cite": {"release": "R1", "page": 12, "quote": "<exact words>"} | null}], "b2": [{"event": "F3", "bigMove": boolean, "verdict": "confirms" | "invalidates" | "neutral", "from": string | null, "to": string | null, "change": string | null, "why": string}], "level": "strong" | "weak" | "none", "reason": string, "signal": "strong" | "weak" | "none" | null, "signalWhy": string | null, "direction": "up" | "down" | null}',
 ].join("\n");
 
 export function parseCandidates(text: string, catalog: Map<string, StoredSeries>): KpiCandidate[] {
@@ -151,27 +204,52 @@ export function parseCandidates(text: string, catalog: Map<string, StoredSeries>
   });
 }
 
-/** A test answer: one row per release (a missing one = an error), quotes kept only when printed on their page. */
-export async function parseTest(db: Db, text: string, releases: Release[]): Promise<Test> {
+/** A test answer: one B1 row per release and news item (a missing one = an error), B2 rows for other filings only; quotes kept only when printed on their page. */
+export async function parseTest(db: Db, text: string, events: KpiEvent[]): Promise<Test> {
   const obj = JSON.parse(firstJsonObject(text)) as Record<string, unknown>;
   if (!KPI_LEVELS.includes(obj.level as KpiLevel)) throw new Error(`kpi-drivers: level "${String(obj.level)}" is not one of ${KPI_LEVELS.join(", ")}`);
   if (typeof obj.reason !== "string" || !obj.reason.trim()) throw new Error("kpi-drivers: no reason");
-  const byLabel = new Map(releases.map((r, i) => [`R${i + 1}`, r]));
-  const answered = new Map((Array.isArray(obj.rows) ? obj.rows : []).map((r) => [String((r as { release?: unknown }).release), r as Record<string, unknown>]));
-  const rows: KpiTestRow[] = [];
-  for (const [label, r] of byLabel) {
-    const x = answered.get(label);
-    if (!x) throw new Error(`kpi-drivers: no row for ${label}`);
+  const byLabel = new Map(events.map((e) => [e.label, e]));
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? stripDashes(v.trim()) : null);
+  const verdictOf = (x: Record<string, unknown>, label: string) => {
     if (!KPI_VERDICTS.includes(x.verdict as KpiVerdict)) throw new Error(`kpi-drivers: verdict "${String(x.verdict)}" for ${label}`);
-    const str = (v: unknown) => (typeof v === "string" && v.trim() ? stripDashes(v.trim()) : null);
+    return x.verdict as KpiVerdict;
+  };
+  const rowOf = (e: KpiEvent, x: Record<string, unknown>, step: "B1" | "B2", cite: DocCitation | null): KpiTestRow => ({
+    releaseId: e.id,
+    day: e.day,
+    title: e.title,
+    step,
+    kind: e.kind,
+    reaction: e.reaction,
+    unusual: e.unusual,
+    bigMove: x.bigMove === true,
+    kpiChanged: step === "B2" ? true : x.kpiChanged === true,
+    from: str(x.from),
+    to: str(x.to),
+    change: str(x.change),
+    verdict: verdictOf(x, e.label),
+    why: str(x.why) ?? "",
+    cite,
+  });
+  const b1 = new Map((Array.isArray(obj.b1) ? obj.b1 : []).map((r) => [String((r as { event?: unknown }).event), r as Record<string, unknown>]));
+  const rows: KpiTestRow[] = [];
+  for (const e of events.filter((x) => x.kind !== "filing")) {
+    const x = b1.get(e.label);
+    if (!x) throw new Error(`kpi-drivers: no B1 row for ${e.label}`);
     let cite: DocCitation | null = null;
     const c = x.cite as { release?: unknown; page?: unknown; quote?: unknown } | null;
-    if (c && typeof c.page === "number" && typeof c.quote === "string" && byLabel.get(String(c.release))) {
-      const doc = byLabel.get(String(c.release))!;
-      if (await verifyQuote(db, doc.id, c.page, c.quote)) cite = { documentId: doc.id, page: c.page, quote: c.quote, title: doc.title, filedAt: doc.day };
-    }
-    rows.push({ releaseId: r.id, day: r.day, title: r.title, reaction: r.reaction, from: str(x.from), to: str(x.to), change: str(x.change), verdict: x.verdict as KpiVerdict, why: str(x.why) ?? "", cite });
+    const doc = c ? byLabel.get(String(c.release)) : undefined;
+    if (c && doc?.kind === "release" && typeof c.page === "number" && typeof c.quote === "string" && (await verifyQuote(db, doc.id, c.page, c.quote))) cite = { documentId: doc.id, page: c.page, quote: c.quote, title: doc.title, filedAt: doc.day };
+    rows.push(rowOf(e, x, "B1", cite));
   }
+  for (const r of Array.isArray(obj.b2) ? obj.b2 : []) {
+    const x = r as Record<string, unknown>;
+    const e = byLabel.get(String(x.event));
+    if (!e || e.kind !== "filing" || rows.some((y) => y.releaseId === e.id)) continue;
+    rows.push(rowOf(e, x, "B2", null));
+  }
+  rows.sort((a, b) => a.day.localeCompare(b.day));
   const level = obj.level as KpiLevel;
   const asked = level !== "none" && KPI_LEVELS.includes(obj.signal as KpiLevel) ? (obj.signal as KpiLevel) : null;
   // A strong turn needs a KPI the market has shown it trades on (Kevin 2026-11-19): a weak KPI's turn is weak at most.
@@ -190,12 +268,13 @@ export type KpiPayload = { symbol: string; drivers: (KpiCandidate & Test)[] };
 
 /** One ticker end to end: releases, candidates, one test per candidate. */
 export async function judgeKpis(db: Db, complete: Complete, symbol: string): Promise<KpiPayload> {
-  const releases = await releasesOf(db, symbol);
+  const events = await eventsOf(db, symbol);
+  const releases = events.filter((e) => e.kind === "release");
   const catalog = await seriesCatalog(db, symbol);
   const [profile] = await db.select().from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
   const company = `${symbol}${profile?.name ? ` (${profile.name})` : ""}${profile?.industry ? `, ${profile.industry}` : ""}. ${profile?.description ?? ""}`.trim();
   const keys = [...catalog.values()].filter((s) => /^(line|hline|qline|metric|qmetric):/.test(s.key)).map((s) => `${s.label} [${s.key}]`);
-  const docKey = fnv(releases.map((r) => r.id).join(","));
+  const docKey = fnv(events.map((e) => e.id).join(","));
   const latest = releases.slice(-4);
   const candidates = await once(
     db,
@@ -205,13 +284,13 @@ export async function judgeKpis(db: Db, complete: Complete, symbol: string): Pro
     `${CANDIDATES_QUESTION}:${docKey}:${fnv(keys.join("|"))}`,
     `${CANDIDATES_QUESTION}: which fundamental KPIs drive ${symbol}?`,
     CANDIDATES_SYSTEM,
-    [`Company: ${company}`, "", "Stored series:", keys.join("\n") || "none", "", "Its latest reports (best pages):", releasesText(latest, true)].join("\n"),
+    [`Company: ${company}`, "", "Stored series:", keys.join("\n") || "none", "", "Its latest reports (best pages):", eventsText(latest)].join("\n"),
     (text) => parseCandidates(text, catalog),
   );
   const drivers: (KpiCandidate & Test)[] = [];
   for (const k of candidates) {
     const s = k.series ? catalog.get(k.series) : undefined;
-    const figures = releases.map((r, i) => `R${i + 1}: ${(s && seriesAt(s, r.day)) ?? "no stored figure: read it in the report"}`).join("\n");
+    const figures = releases.map((r) => `${r.label}: ${(s && seriesAt(s, r.day)) ?? "no stored figure: read it in the report"}`).join("\n");
     const test = await once(
       db,
       complete,
@@ -227,12 +306,12 @@ export async function judgeKpis(db: Db, complete: Complete, symbol: string): Pro
         "Its stored figure at each release:",
         figures,
         "",
-        `Every results release of the last ${KPI_YEARS} years, oldest first, with the price reaction and the report's best pages:`,
-        releasesText(releases, true),
+        `Every dated moment of the last ${KPI_YEARS} years, oldest first:`,
+        eventsText(events),
         "",
-        `Answer exactly ${releases.length} rows, one per release, R1 to R${releases.length}, none skipped.`,
+        `B1 has exactly ${events.filter((e) => e.kind !== "filing").length} rows, one per release and news item (${events.filter((e) => e.kind !== "filing").map((e) => e.label).join(", ")}), none skipped.`,
       ].join("\n"),
-      (text) => parseTest(db, text, releases),
+      (text) => parseTest(db, text, events),
     );
     drivers.push({ ...k, ...test });
   }
