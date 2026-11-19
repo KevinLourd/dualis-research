@@ -30,7 +30,7 @@ export const KPI_DIMENSION = "kpi-drivers";
 export const KPI_YEARS = 3;
 export const REACTION_DAYS = 5;
 export const CANDIDATES_QUESTION = "kpi-candidates@v1";
-export const TEST_QUESTION = "kpi-test@v1";
+export const TEST_QUESTION = "kpi-test@v2";
 /** Pages of each report a judge reads (the results discussion first) and how much of each page. */
 const PAGES_PER_RELEASE = 2;
 const PAGE_CHARS = 3_500;
@@ -92,13 +92,17 @@ export function seriesAt(s: StoredSeries, day: string): string | null {
   return `${s.label} [${s.key}], period ended ${p}: ${fmt(s.points.get(p), s.unit)} vs ${fmt(s.points.get(prior), s.unit)} a year earlier`;
 }
 
-/** One stored LLM answer per (kind, subject, key): asked once, read back after. */
-async function once(db: Db, complete: Complete, kind: string, subjectId: string, key: string, question: string, system: string, prompt: string): Promise<string> {
+/**
+ * One stored LLM answer per (kind, subject, key): asked once, read back after. Stored only once it parses: an answer
+ * that skips a release would otherwise be read back and fail every run after (Worldex, 2026-11-19).
+ */
+async function once<T>(db: Db, complete: Complete, kind: string, subjectId: string, key: string, question: string, system: string, prompt: string, parse: (text: string) => Promise<T> | T): Promise<T> {
   const [hit] = await db.select().from(silver.judgments).where(and(eq(silver.judgments.subjectKind, kind), eq(silver.judgments.subjectId, subjectId), eq(silver.judgments.questionKey, key)));
-  if (hit) return (hit.raw as { text: string }).text;
+  if (hit) return parse((hit.raw as { text: string }).text);
   const r = await complete({ system, prompt });
+  const parsed = await parse(r.text);
   await db.insert(silver.judgments).values({ subjectKind: kind, subjectId, questionKey: key, question, verdict: "answered", probability: 1, citedSentence: null, reason: null, model: r.model, raw: { text: r.text } }).onConflictDoNothing();
-  return r.text;
+  return parsed;
 }
 
 const releasesText = (rs: Release[], withPages: boolean) =>
@@ -188,7 +192,7 @@ export async function judgeKpis(db: Db, complete: Complete, symbol: string): Pro
   const keys = [...catalog.values()].filter((s) => /^(line|hline|qline|metric|qmetric):/.test(s.key)).map((s) => `${s.label} [${s.key}]`);
   const docKey = fnv(releases.map((r) => r.id).join(","));
   const latest = releases.slice(-4);
-  const candidatesText = await once(
+  const candidates = await once(
     db,
     complete,
     "kpi-candidates",
@@ -197,13 +201,13 @@ export async function judgeKpis(db: Db, complete: Complete, symbol: string): Pro
     `${CANDIDATES_QUESTION}: which fundamental KPIs drive ${symbol}?`,
     CANDIDATES_SYSTEM,
     [`Company: ${company}`, "", "Stored series:", keys.join("\n") || "none", "", "Its latest reports (best pages):", releasesText(latest, true)].join("\n"),
+    (text) => parseCandidates(text, catalog),
   );
-  const candidates = parseCandidates(candidatesText, catalog);
   const drivers: (KpiCandidate & Test)[] = [];
   for (const k of candidates) {
     const s = k.series ? catalog.get(k.series) : undefined;
     const figures = releases.map((r, i) => `R${i + 1}: ${(s && seriesAt(s, r.day)) ?? "no stored figure: read it in the report"}`).join("\n");
-    const text = await once(
+    const test = await once(
       db,
       complete,
       "kpi-test",
@@ -220,9 +224,12 @@ export async function judgeKpis(db: Db, complete: Complete, symbol: string): Pro
         "",
         `Every results release of the last ${KPI_YEARS} years, oldest first, with the price reaction and the report's best pages:`,
         releasesText(releases, true),
+        "",
+        `Answer exactly ${releases.length} rows, one per release, R1 to R${releases.length}, none skipped.`,
       ].join("\n"),
+      (text) => parseTest(db, text, releases),
     );
-    drivers.push({ ...k, ...(await parseTest(db, text, releases)) });
+    drivers.push({ ...k, ...test });
   }
   return { symbol, drivers };
 }

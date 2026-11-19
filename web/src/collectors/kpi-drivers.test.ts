@@ -79,4 +79,15 @@ describe("kpi drivers", () => {
     expect(calls).toBe(2);
     expect(await db.select().from(silver.judgments)).toHaveLength(2);
   });
+
+  it("never stores an answer that skips a release: the next run asks again", async () => {
+    const fake: Complete = async ({ prompt }) => {
+      if (prompt.includes("Stored series")) return { text: JSON.stringify({ kpis: [{ name: "Operating margin", why: "w", series: null, approximation: null }] }), model: "fake" };
+      expect(prompt).toContain("Answer exactly 2 rows, one per release, R1 to R2");
+      return { text: JSON.stringify({ rows: [{ release: "R1", verdict: "neutral", why: "x" }], level: "none", reason: "r" }), model: "fake" };
+    };
+    await expect(kpiSource.fetch(SYMBOL, { env: { CLAUDE_OAUTH_TOKEN: "x" }, fetch, db, complete: fake })).rejects.toThrow(/R2/);
+    const stored = await db.select().from(silver.judgments);
+    expect(stored.map((j) => j.subjectKind)).toEqual(["kpi-candidates"]);
+  });
 });
