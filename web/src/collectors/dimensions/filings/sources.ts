@@ -27,8 +27,16 @@ const withError = (out: FetchOutcome, error: string | null): FetchOutcome => (er
 /** Local exchange time to an instant: "2026-09-08 14:46" at +09:00. */
 const at = (local: string, offset: string) => new Date(`${local.trim().replace(" ", "T")}${local.length <= 10 ? "T00:00" : ""}${offset}`);
 
-/** How many recent SEC filings land in bronze per ticker (a large filer's full history is megabytes). */
-export const SEC_RECENT_LIMIT = 200;
+/**
+ * Every registry is read 5 years back (Kevin 2026-11-19): a driver is found from the significant price moves of the
+ * last years, and a move is explained only by the filings around it. Before, one year (SEC: the last 200 filings,
+ * October 2023 for CareCloud): 2,473 of 3,056 moves had no document to read.
+ */
+export const FILINGS_HISTORY_YEARS = 5;
+export const historyStart = (now = new Date()) => daysAgo(Math.round(FILINGS_HISTORY_YEARS * 365.25), now);
+const compact = (d: Date) => isoDate(d).replace(/-/g, "");
+/** Pages a paginated registry is read for, per ticker and run (100 filings each): a bound, said in the answer. */
+export const MAX_HISTORY_PAGES = 15;
 
 /** SEC EDGAR submissions: every US filing (10-K, 10-Q, 8-K, Form 4, proxy...). No key, needs a contact User-Agent. */
 export const secEdgar: FilingSource = {
@@ -46,10 +54,13 @@ export const secEdgar: FilingSource = {
     const cik = ciks.get(symbol.toUpperCase().replace(".", "-"));
     if (!cik) return { request: { symbol }, httpStatus: null, error: "Not an SEC filer (ticker absent from SEC's company_tickers.json)" };
     const url = `https://data.sec.gov/submissions/CIK${cik}.json`;
-    const out = await getJson(ctx, url, { url, cik, trimmed: `first ${SEC_RECENT_LIMIT} recent filings` }, { headers: SEC_HEADERS });
+    const since = isoDate(historyStart());
+    const out = await getJson(ctx, url, { url, cik, trimmed: `filings since ${since}` }, { headers: SEC_HEADERS });
     if (out.error) return out;
     const p = out.payload as { cik: string; name: string; filings: { recent: Record<string, unknown[]> } };
-    const recent = Object.fromEntries(Object.entries(p.filings.recent).map(([k, v]) => [k, v.slice(0, SEC_RECENT_LIMIT)]));
+    // `recent` holds up to 1,000 filings, newest first: keep the ones of the last 5 years.
+    const keep = (p.filings.recent.filingDate as string[]).filter((d) => d >= since).length;
+    const recent = Object.fromEntries(Object.entries(p.filings.recent).map(([k, v]) => [k, v.slice(0, keep)]));
     return { ...out, payload: { cik: p.cik, name: p.name, filings: { recent } } };
   },
   extract(payload) {
@@ -124,9 +135,14 @@ export const tdnet: FilingSource = {
   requiredEnv: [],
   covers: isMarket("JP"),
   async fetch(symbol, ctx) {
-    const url = `https://webapi.yanoshin.jp/webapi/tdnet/list/${encodeURIComponent(tickerBase(symbol))}.json?limit=100`;
+    // The mirror keeps TDnet's list back to 2009 (Miraial: 289 items); the PDFs themselves expire after ~1 month.
+    const url = `https://webapi.yanoshin.jp/webapi/tdnet/list/${encodeURIComponent(tickerBase(symbol))}.json?limit=500`;
     const out = await getJson(ctx, url, { url });
-    return withError(out, Array.isArray((out.payload as { items?: unknown[] })?.items) ? null : "TDnet mirror returned no item list");
+    if (out.error) return out;
+    const items = (out.payload as { items?: { Tdnet: { pubdate: string } }[] })?.items;
+    if (!Array.isArray(items)) return withError(out, "TDnet mirror returned no item list");
+    const since = isoDate(historyStart());
+    return { ...out, payload: { items: items.filter((i) => i.Tdnet.pubdate.slice(0, 10) >= since) } };
   },
   extract(payload) {
     const items = (payload as { items: { Tdnet: Record<string, string> }[] }).items;
@@ -279,20 +295,31 @@ export const edinet: FilingSource = {
   },
 };
 
-/** OpenDART disclosure list (Korea FSS): one year of filings. Free key. */
+/** OpenDART disclosure list (Korea FSS): 5 years of filings, 100 a page. Free key. */
 export const dart: FilingSource = {
   name: "dart",
   registryName: "DART (Korea FSS)",
   requiredEnv: ["DART_API_KEY"],
   covers: (symbol) => isMarket("KR")(symbol) && dartCorpCode(symbol) !== null,
   async fetch(symbol, ctx) {
-    const q = `corp_code=${dartCorpCode(symbol)}&bgn_de=${isoDate(daysAgo(365)).replace(/-/g, "")}&page_count=100`;
-    const out = await getJson(ctx, `https://opendart.fss.or.kr/api/list.json?${q}&crtfc_key=${ctx.env.DART_API_KEY}`, {
-      url: `https://opendart.fss.or.kr/api/list.json?${q}`,
-    });
-    const status = (out.payload as { status?: string })?.status;
-    // 013 = "no data": a valid answer, the company filed nothing in the window.
-    return withError(out, status === "000" || status === "013" ? null : `DART status ${status}`);
+    const q = `corp_code=${dartCorpCode(symbol)}&bgn_de=${compact(historyStart())}&end_de=${compact(new Date())}&page_count=100`;
+    const list: unknown[] = [];
+    let first: FetchOutcome | null = null;
+    let pages = 0;
+    for (let page = 1; page <= MAX_HISTORY_PAGES; page++) {
+      const out = await getJson(ctx, `https://opendart.fss.or.kr/api/list.json?${q}&page_no=${page}&crtfc_key=${ctx.env.DART_API_KEY}`, {
+        url: `https://opendart.fss.or.kr/api/list.json?${q}&page_no=${page}`,
+      });
+      const p = out.payload as { status?: string; list?: unknown[]; total_page?: number } | undefined;
+      // 013 = "no data": a valid answer, the company filed nothing in the window.
+      const bad = out.error ?? (p?.status === "000" || p?.status === "013" ? null : `DART status ${p?.status}`);
+      if (bad) return withError(out, bad);
+      first ??= out;
+      list.push(...(p?.list ?? []));
+      pages = page;
+      if (page >= (p?.total_page ?? 1)) break;
+    }
+    return { ...first!, request: { url: `https://opendart.fss.or.kr/api/list.json?${q}`, pages }, payload: { status: "000", list } };
   },
   extract(payload) {
     const list = (payload as { list?: Record<string, string>[] }).list ?? [];
@@ -315,8 +342,22 @@ export const companiesHouse: FilingSource = {
   requiredEnv: ["COMPANIES_HOUSE_API_KEY"],
   covers: (symbol) => companiesHouseNumber(symbol) !== null,
   async fetch(symbol, ctx) {
-    const url = `https://api.company-information.service.gov.uk/company/${companiesHouseNumber(symbol)}/filing-history?items_per_page=100`;
-    return getJson(ctx, url, { url }, { headers: { Authorization: `Basic ${btoa(`${ctx.env.COMPANIES_HOUSE_API_KEY}:`)}` } });
+    const base = `https://api.company-information.service.gov.uk/company/${companiesHouseNumber(symbol)}/filing-history?items_per_page=100`;
+    const since = isoDate(historyStart());
+    const items: { date: string }[] = [];
+    let first: FetchOutcome | null = null;
+    let pages = 0;
+    // Newest first, 100 a page: read until a page reaches past 5 years or the history ends.
+    for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
+      const out = await getJson(ctx, `${base}&start_index=${page * 100}`, { url: `${base}&start_index=${page * 100}` }, { headers: { Authorization: `Basic ${btoa(`${ctx.env.COMPANIES_HOUSE_API_KEY}:`)}` } });
+      if (out.error) return out;
+      first ??= out;
+      const got = ((out.payload as { items?: { date: string }[] }).items ?? []);
+      items.push(...got);
+      pages = page + 1;
+      if (got.length < 100 || got.some((f) => f.date < since)) break;
+    }
+    return { ...first!, request: { url: base, pages }, payload: { items: items.filter((f) => f.date >= since) } };
   },
   extract(payload, symbol) {
     const items = (payload as { items?: Record<string, string>[] }).items ?? [];
@@ -353,9 +394,9 @@ export const hkexnews: FilingSource = {
     const json = JSON.parse(text.replace(/^[^(]*\(/, "").replace(/\);?\s*$/, "")) as { stockInfo?: { stockId: number; code: string }[] };
     const stockId = json.stockInfo?.find((s) => s.code === code)?.stockId;
     if (!stockId) return { request: { url: prefixUrl }, httpStatus: res.status, payloadText: text, error: `HKEXnews has no stock id for ${code}` };
-    const from = isoDate(daysAgo(365)).replace(/-/g, "");
+    const from = compact(historyStart());
     const to = isoDate(new Date()).replace(/-/g, "");
-    const url = `https://www1.hkexnews.hk/search/titleSearchServlet.do?sortDir=0&sortByOptions=DateTime&category=0&market=SEHK&stockId=${stockId}&documentType=-1&fromDate=${from}&toDate=${to}&title=&searchType=0&t1code=-2&t2Gcode=-2&t2code=-2&rowRange=200&lang=E`;
+    const url = `https://www1.hkexnews.hk/search/titleSearchServlet.do?sortDir=0&sortByOptions=DateTime&category=0&market=SEHK&stockId=${stockId}&documentType=-1&fromDate=${from}&toDate=${to}&title=&searchType=0&t1code=-2&t2Gcode=-2&t2code=-2&rowRange=3000&lang=E`;
     const out = await getJson(ctx, url, { url, stockId }, { headers: BROWSER_HEADERS });
     return withError(out, typeof (out.payload as { result?: unknown })?.result === "string" ? null : "HKEXnews returned no result list");
   },
