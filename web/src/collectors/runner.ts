@@ -48,7 +48,11 @@ export async function runDimension(
   // ONE context for every source and subject of the run: per-run memos (`memo(ctx, ...)`) key on its identity.
   const ctx: SourceContext = { ...opts.ctx, db };
   try {
-    let subjects = await dimension.subjects(db, ctx);
+    // COLLECT_ONLY=<symbol> (Kevin 2026-11-19, « prends un seul ticker »): a test run on one ticker, every subject of
+    // another ticker left out (subjects are `SYM`, `SYM:side`, `SYM|...`).
+    const only = ctx.env.COLLECT_ONLY;
+    const mine = (x: string) => !only || x === only || x.startsWith(`${only}:`) || x.startsWith(`${only}|`);
+    let subjects = (await dimension.subjects(db, ctx)).filter(mine);
     const fetched = new Set<string>();
     for (let round = 0; round < MAX_ROUNDS && subjects.length > 0; round++) {
       subjects.forEach((x) => fetched.add(x));
@@ -58,7 +62,7 @@ export async function runDimension(
       tallies = tallies.length === 0 ? roundTallies : tallies.map((t, i) => mergeTallies(t, roundTallies[i]));
       if (!dimension.expand) break;
       const soFar = await db.select().from(fetches).where(eq(fetches.runId, run.id));
-      subjects = [...new Set(await dimension.expand(db, soFar, round + 1))].filter((x) => !fetched.has(x));
+      subjects = [...new Set(await dimension.expand(db, soFar, round + 1))].filter((x) => !fetched.has(x) && mine(x));
     }
     const bronzeRows = await db.select().from(fetches).where(eq(fetches.runId, run.id));
     ({ silverRowsBySource } = await dimension.promote(db, bronzeRows, opts.ctx));
