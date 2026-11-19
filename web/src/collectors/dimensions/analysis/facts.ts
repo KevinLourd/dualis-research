@@ -252,7 +252,7 @@ export async function gatherFacts(db: Db, symbol: string): Promise<AnalysisFacts
 
   const q = quote ? { close: quote.close, date: quote.date, currency: quote.currency, stamp: quoteStamp(quote) } : null;
   const fvLine = fairValue
-    ? `Fair value (${fairValue.author === "thierry" ? "the analyst's own number" : "weighted from several valuation methods"}): ${fmt(fairValue.value, "per-share")} ${fairValue.currency ?? ""}${fairValue.low !== null && fairValue.high !== null ? `, range ${fmt(fairValue.low, "per-share")} to ${fmt(fairValue.high, "per-share")}` : ""}; ${fairValue.method ?? ""}.${vreport ? ` ${vreport.summary}` : ""}`
+    ? `Fair value (weighted from several valuation methods): ${fmt(fairValue.value, "per-share")} ${fairValue.currency ?? ""}${fairValue.low !== null && fairValue.high !== null ? `, range ${fmt(fairValue.low, "per-share")} to ${fmt(fairValue.high, "per-share")}` : ""}; ${fairValue.method ?? ""}.${vreport ? ` ${vreport.summary}` : ""}`
     : "Fair value: none yet (no valuation ran).";
   const fvBucket = fairValue && fairValue.value > 0 ? Math.round(Math.log(fairValue.value) / Math.log(1.15)) : "none";
   const priceLine = q ? `Quote: ${fmt(q.close, "per-share")} ${q.currency ?? ""} (${q.stamp}); market cap at that price ${valuation?.marketCap ? fmt(valuation.marketCap) : "n/a"}, EV/EBITDA now ${fmt(valuation?.evEbitda, "multiple")}.` : "Quote: none.";

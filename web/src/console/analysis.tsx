@@ -19,7 +19,6 @@ import { TagBadge } from "./tag-badge";
 import { day, numberFormat, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
-import { getThesis } from "./thesis-queries";
 import { ComingNext } from "./ui";
 import { PRICED_WORD } from "@/content/signal-words";
 
@@ -35,10 +34,9 @@ export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | nul
 export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
 
 export async function analysisData(symbol: string, thesis: ThesisSide | null = null, page = false) {
-  const [row, data, ownFair, consensus, objects, chart, valuation, moves] = await Promise.all([
+  const [row, data, consensus, objects, chart, valuation, moves] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
-    getThesis(symbol),
     consensusOf(symbol),
     getTickerAnalysis(symbol, thesis),
     priceVsFairValue(symbol),
@@ -47,7 +45,7 @@ export async function analysisData(symbol: string, thesis: ThesisSide | null = n
     page ? priceMoveMarkers(symbol) : [],
   ]);
   if (!row || !data) return null;
-  return { row, data, ownFair, consensus, objects, chart, valuation, moves };
+  return { row, data, consensus, objects, chart, valuation, moves };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 

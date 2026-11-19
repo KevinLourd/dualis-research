@@ -8,7 +8,7 @@ import type { Dimension, PromoteResult } from "../../types";
 import { analysedSymbols } from "../watchlist";
 import { rebuildGoldTheses, THESIS_DIMENSION } from "./gold";
 import { claudeResearch, prepareResearch, RESEARCH_SOURCE, type ResearchThesis } from "./research";
-import { CLAUDE_SOURCE, CONSOLE_SOURCE, NOTES_SOURCE, watchlistNotes } from "./sources";
+import { CLAUDE_SOURCE, NOTES_SOURCE, watchlistNotes } from "./sources";
 
 /**
  * The thesis of each ticker, in Thierry's terms (docs/thierry-method.md): the market's NARRATIVE (what the price
@@ -26,7 +26,6 @@ export const thesis: Dimension = {
 };
 
 /** Payload of a console edit (bronze source `console`): one field, its new value. */
-export type ConsoleEdit = { field: string; value: unknown; action: "edit" | "accept"; userId: string | null };
 
 /** Active tickers; those without Claude's narrative draft get their evidence gathered for it. */
 export async function thesisSubjects(db: Db): Promise<string[]> {
@@ -76,9 +75,6 @@ export async function promoteThesis(db: Db, fetches: BronzeFetch[], today: strin
       const note = (f.payload as { note: string | null }).note;
       await retract(db, f.subject, NOTES_SOURCE, "note");
       if (note) push(f.subject, [{ source: NOTES_SOURCE, field: "note", value: note, bronzeId: f.id }]);
-    } else if (f.source === CONSOLE_SOURCE) {
-      const edit = f.payload as ConsoleEdit;
-      push(f.subject, [{ source: CONSOLE_SOURCE, field: edit.field, value: edit.value, bronzeId: f.id }]);
     } else {
       throw new Error(`thesis: no reader for source "${f.source}"`);
     }

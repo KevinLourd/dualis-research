@@ -1,14 +1,13 @@
 import { readPrivateFile } from "@/private/files";
 import type { Source } from "../../types";
 
-/** Author sources of a thesis. `console` = an edit or accept Thierry made in the console (written by the app). */
+/** Author sources of a thesis (no console edit since 2026-11-19: nobody overrides the analysis by hand). */
 export const CLAUDE_SOURCE = "claude";
 export const NOTES_SOURCE = "watchlist";
-export const CONSOLE_SOURCE = "console";
 
-/** Thierry's word wins over Claude's; his console edits win over his older watchlist note. */
-export const THESIS_PRIORITY = [CONSOLE_SOURCE, NOTES_SOURCE, CLAUDE_SOURCE] as const;
-export const THESIS_MANUAL = [CONSOLE_SOURCE, NOTES_SOURCE] as const;
+/** His watchlist note wins over Claude's draft. */
+export const THESIS_PRIORITY = [NOTES_SOURCE, CLAUDE_SOURCE] as const;
+export const THESIS_MANUAL = [NOTES_SOURCE] as const;
 
 
 /** Thierry's thesis note for the ticker in data/watchlist.json (null when he wrote none). */

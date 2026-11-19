@@ -78,7 +78,7 @@ export function PriceFairValueChart({
   const pad = (hi - lo) * 0.08 || hi * 0.05;
   const yMin = Math.max(0, lo - pad);
   const yMax = hi + pad;
-  const fairLabel = fair ? (fair.author === "thierry" ? "Your fair value" : "Fair value (Claude)") : null;
+  const fairLabel = fair ? "Fair value" : null;
 
   const markLines = fair
     ? [

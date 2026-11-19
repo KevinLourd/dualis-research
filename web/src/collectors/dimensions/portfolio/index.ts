@@ -2,8 +2,6 @@ import { and, eq, sql } from "drizzle-orm";
 import { promoteFacts, readFacts } from "@/bsg/facts";
 import { type Assertion, type FactState, pickWinner } from "@/bsg/provenance";
 import type { BronzeFetch } from "@/db/schema/bronze";
-import { fetches } from "@/db/schema/bronze";
-import { runSources, runs } from "@/db/schema/ops";
 import { type PositionCite, type PositionProvenance, portfolioPositions } from "@/db/schema/portfolio";
 import * as silver from "@/db/schema/silver";
 import type { Db } from "@/db/types";
@@ -19,9 +17,9 @@ import type { Dimension, PromoteResult, Source } from "../../types";
 
 export const PORTFOLIO_DIMENSION = "portfolio";
 export const SUBSTACK_SOURCE = "substack";
-export const CONSOLE_SOURCE = "console";
-const PRIORITY = [CONSOLE_SOURCE, SUBSTACK_SOURCE] as const;
-const MANUAL = [CONSOLE_SOURCE] as const;
+/** Only what his posts state (Kevin 2026-11-19: no position typed by hand). */
+const PRIORITY = [SUBSTACK_SOURCE] as const;
+const MANUAL = [] as const;
 const FILE = "data/portfolio/positions.json";
 
 /** Fields Thierry can state per position. `reportedReturn` = `{ ratio, asOf }`. */
@@ -60,15 +58,8 @@ export const portfolio: Dimension = {
   promote: promotePortfolio,
 };
 
-/** A console edit: one field of one position. */
-export type PositionEdit = { field: PositionField; value: unknown; userId: string | null };
-
 /** Assertions read from one bronze row (a post file entry, or a console edit). */
 export function assertionsOf(f: BronzeFetch): Assertion[] {
-  if (f.source === CONSOLE_SOURCE) {
-    const edit = f.payload as PositionEdit;
-    return [{ source: CONSOLE_SOURCE, field: edit.field, value: edit.value, bronzeId: f.id }];
-  }
   const entry = (f.payload ?? {}) as Partial<Record<PositionField, FileEntry>>;
   return Object.entries(entry).flatMap(([field, e]) => {
     if (!e) return [];
@@ -127,23 +118,3 @@ export async function rebuildGoldPortfolio(db: Db): Promise<number> {
   return out.length;
 }
 
-/**
- * One edit Thierry makes on the Portfolio page, recorded like any authored version: an ops run (trigger "console"),
- * a bronze row (source "console"), then the promotion. Fails loud: the run is marked failed and the error rethrown.
- */
-export async function recordPositionEdit(db: Db, symbol: string, edit: PositionEdit): Promise<void> {
-  const started = Date.now();
-  const [run] = await db.insert(runs).values({ dimension: PORTFOLIO_DIMENSION, trigger: "console" }).returning({ id: runs.id });
-  const [row] = await db
-    .insert(fetches)
-    .values({ runId: run.id, dimension: PORTFOLIO_DIMENSION, source: CONSOLE_SOURCE, subject: symbol, request: { field: edit.field, userId: edit.userId }, httpStatus: null, payload: edit })
-    .returning();
-  try {
-    await promotePortfolio(db, [row]);
-  } catch (err) {
-    await db.update(runs).set({ status: "failed", finishedAt: new Date(), error: err instanceof Error ? err.message : String(err) }).where(eq(runs.id, run.id));
-    throw err;
-  }
-  await db.insert(runSources).values({ runId: run.id, source: CONSOLE_SOURCE, status: "ok", requested: 1, succeeded: 1, bronzeRows: 1, silverRows: 1, durationMs: Date.now() - started });
-  await db.update(runs).set({ status: "succeeded", finishedAt: new Date() }).where(eq(runs.id, run.id));
-}

@@ -496,16 +496,15 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
   const r = v.report;
   return {
     title: `Fair value ${price(f.value)}${f.currency ? ` ${f.currency}` : ""}`,
-    subtitle: f.author === "thierry" ? "Your number" : (r?.label ?? f.label ?? "Weighted from several valuation methods"),
+    subtitle: r?.label ?? f.label ?? "Weighted from several valuation methods",
     body: (
       <>
-        {r && <RangeCards low={r.low} base={r.base} high={r.high} currency={r.currency} baseLabel={f.author === "thierry" ? "Weighted methods" : "Fair value"} />}
+        {r && <RangeCards low={r.low} base={r.base} high={r.high} currency={r.currency} baseLabel="Fair value" />}
         {f.conversion && (
           <p className="text-base text-kumo-default">
             Valued in {f.conversion.from} from the company&apos;s statements: {price(f.conversion.value)} {f.conversion.from}, shown in {f.conversion.to} at {f.conversion.rate.toFixed(4)} {f.conversion.to} per {f.conversion.from} ({f.conversion.date}).
           </p>
         )}
-        {f.author === "thierry" && <p className="text-base text-kumo-default">Your number wins{f.method ? ` (${f.method})` : ""}. The methods below are Claude&apos;s, for reference.</p>}
         <Drawers>
           {r && (
             <Drawer icon={<TextAlignLeftIcon size={16} aria-hidden />} title="Why this value">
@@ -526,7 +525,7 @@ async function fairValueItem(symbol: string): Promise<ItemView | null> {
             </Drawer>
           )}
         </Drawers>
-        <SourceNote sources={[...(f.author === "thierry" ? ["console"] : ["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources)))]), ...(f.conversion ? f.conversion.source.split(", ") : [])]} />
+        <SourceNote sources={["claude", ...new Set(v.methods.flatMap((m) => m.inputs.flatMap((i) => i.sources))), ...(f.conversion ? f.conversion.source.split(", ") : [])]} />
       </>
     ),
   };
