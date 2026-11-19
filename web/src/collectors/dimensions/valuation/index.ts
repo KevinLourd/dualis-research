@@ -3,7 +3,6 @@ import { fairValues } from "@/db/schema/analysis";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import { goldFinancialLines } from "@/db/schema/financials";
 import * as gold from "@/db/schema/gold";
-import { theses } from "@/db/schema/thesis";
 import {
   analystTargets,
   goldMethodValuations,
@@ -259,7 +258,6 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
   const sy = sIds.length ? await db.select().from(valuationSyntheses).where(inArray(valuationSyntheses.id, sIds)) : [];
   const methods = new Map(mv.map((r) => [`${r.symbol}|${r.method}`, r]));
   const synth = new Map(sy.map((r) => [`${r.symbol}|synthesis`, r]));
-  const thesisRows = new Map((await db.select().from(theses)).map((t) => [t.symbol, t]));
   const name = (id: ValuationMethodId) => (id === "peers" ? "Listed peers" : methodSpec(id).name);
 
   const mRows: (typeof goldMethodValuations.$inferInsert)[] = [...methods.values()].map((r) => ({
@@ -291,15 +289,14 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
   const fx = fxReader(db);
   for (const symbol of symbols) {
     const s = synth.get(`${symbol}|synthesis`);
-    const t = thesisRows.get(symbol);
-    const thierry = t?.fairValue ?? null;
     const mix = s ? s.result.weights.filter((w) => w.weight > 0).sort((a, b) => b.weight - a.weight).map((w) => `${name(w.method)} ${Math.round(w.weight * 100)}%`).join(", ") : null;
     if (s) rRows.push({ symbol, currency: s.result.currency, low: s.result.low, base: s.result.base, high: s.result.high, weights: s.result.weights, label: s.result.label, summary: s.result.summary, markdown: s.result.report, version: s.id, asOf: s.createdAt });
-    if (!s && thierry === null) continue;
-    const currency = thierry !== null ? (t?.currency ?? s?.result.currency ?? null) : s!.result.currency;
-    const value = thierry ?? s!.result.base;
-    const low = thierry !== null ? null : s!.result.low;
-    const high = thierry !== null ? null : s!.result.high;
+    // Claude's weighted value only: no human override (Kevin 2026-11-19, « NOT READY TO HAVE HUMAN overwriting »).
+    if (!s) continue;
+    const currency = s.result.currency;
+    const value = s.result.base;
+    const low = s.result.low;
+    const high = s.result.high;
     // A dual-listed company (CAD statements, USD listing): the Fair Value is shown and compared in the quote currency,
     // at the latest stored rate; the figure in its own currency stays in `conversion`. No rate stored = left as is,
     // and the analysis writes a failed fetch naming the missing pair (never a silent skip).
@@ -314,10 +311,10 @@ export async function rebuildValuationGold(db: Db, fetches: BronzeFetch[] = []):
       currency: r ? to! : currency,
       low: low === null ? null : low * k,
       high: high === null ? null : high * k,
-      method: thierry !== null ? (t?.fairValueBasis ?? null) : mix,
-      label: thierry !== null ? (t?.fairValueBasis ?? null) : s!.result.label,
-      author: thierry !== null ? "thierry" : "claude",
-      claudeValue: s ? s.result.base * kc : null,
+      method: mix,
+      label: s.result.label,
+      author: "claude",
+      claudeValue: null,
       claudeMethod: mix,
       inputs: s ? s.result.weights.filter((w) => w.weight > 0).map((w) => ({ label: `${name(w.method)} (${Math.round(w.weight * 100)}%)`, value: (methods.get(`${symbol}|${w.method}`)?.result.base ?? 0) * kc, period: "base case" })) : [],
       version: s?.id ?? null,

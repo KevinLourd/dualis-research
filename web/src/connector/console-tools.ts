@@ -1,14 +1,10 @@
 import { desc, eq, sql } from "drizzle-orm";
-import { type PositionEdit, recordPositionEdit } from "@/collectors/dimensions/portfolio";
-import { recordConsoleEdit } from "@/collectors/dimensions/thesis/console";
 import { PROPOSED_FORMATS, type DraftFormat } from "@/collectors/dimensions/content-drafts/format";
-import { portfolioView } from "@/console/portfolio-queries";
 import { dispatchDraftWriter } from "@/content/dispatch";
 import { type DraftStatus, requestDraft, setDraftStatus } from "@/content/manual";
 import { getDb } from "@/db/client";
 import { goldContentDrafts, goldContentIdeas } from "@/db/schema/content";
 import { outreachStatusValues, type OutreachStatus } from "@/db/schema/growth";
-import { theses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
 import { withWriteDb } from "@/db/write";
 import { recordOutreachEdit } from "@/growth/manual";
@@ -46,40 +42,11 @@ export const CONSOLE_TOOLS = [
     inputSchema: { type: "object", properties: { draft_id: str, status: { type: "string", enum: DRAFT_STATUSES }, posted_url: str }, required: ["draft_id", "status"], additionalProperties: false },
   },
   {
-    name: "list_positions",
-    description: "Thierry's portfolio positions as the console shows them (direction, entry date and price, weight, status, current price).",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "edit_position",
-    description: "Record Thierry's own facts on one portfolio position. Give only the fields he stated; his word wins over what a post said.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        symbol: str,
-        direction: { type: "string", enum: ["long", "short"] },
-        entry_date: { type: "string", description: "YYYY-MM-DD" },
-        entry_price: { type: "number" },
-        weight_percent: { type: "number", description: "Percent of the portfolio, 0-100" },
-        status: { type: "string", enum: ["open", "closed"] },
-      },
-      required: ["symbol"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "set_fair_value",
-    description: "Record Thierry's own fair value per share for a ticker (his number wins over Claude's), with how he got it.",
-    inputSchema: { type: "object", properties: { symbol: str, value: { type: "number" }, basis: { type: "string", description: "e.g. 10x EV/EBITDA on 2027 EBITDA" } }, required: ["symbol", "value"], additionalProperties: false },
-  },
-  {
     name: "update_outreach",
     description: "Change an outreach message to a Substack writer and/or its status (sent, replied, cited, declined, dropped, draft), keyed by the writer's handle.",
     inputSchema: { type: "object", properties: { handle: str, status: { type: "string", enum: [...outreachStatusValues] }, message: str }, required: ["handle"], additionalProperties: false },
   },
 ] as const;
-
-const clean = (s: string) => s.replace(/\s*[—–]\s*/g, ", ").trim();
 
 export async function callConsoleTool(name: string, args: Record<string, unknown>, deps: ConsoleToolDeps): Promise<Result | null> {
   const read = deps.read ?? getDb;
@@ -117,34 +84,6 @@ export async function callConsoleTool(name: string, args: Record<string, unknown
       await write((db) => setDraftStatus(db, String(args.draft_id), status, { postedUrl: args.posted_url ? String(args.posted_url) : null, userId }));
       return { text: `Draft ${args.draft_id} is now ${status}.` };
     }
-    case "list_positions": {
-      const { positions } = await portfolioView();
-      return {
-        text: positions
-          .map((p) => `${p.symbol} ${p.name ?? ""} | ${p.direction ?? "?"} | entry ${p.entryDate ?? "?"} @ ${p.entryPrice ?? "?"} | weight ${p.weight !== null ? `${(p.weight * 100).toFixed(1)}%` : "?"} | ${p.status ?? "?"} | now ${p.close ?? "?"} ${p.currency ?? ""}`)
-          .join("\n"),
-      };
-    }
-    case "edit_position": {
-      const symbol = String(args.symbol ?? "").trim();
-      if (!symbol) throw new Error("symbol is required");
-      const edits = positionEdits(args);
-      if (!edits.length) throw new Error("Give at least one field to change");
-      await write(async (db) => {
-        for (const e of edits) await recordPositionEdit(db, symbol, { ...e, userId });
-      });
-      return { text: `${symbol}: ${edits.map((e) => `${e.field} = ${e.field === "weight" ? `${(Number(e.value) * 100).toFixed(1)}%` : e.value}`).join(", ")}. The Portfolio page shows it now.` };
-    }
-    case "set_fair_value": {
-      const symbol = String(args.symbol ?? "").trim();
-      const value = args.value;
-      if (typeof value !== "number" || !(value > 0)) throw new Error("value must be a positive number");
-      const [thesis] = await read().select({ currency: theses.currency }).from(theses).where(eq(theses.symbol, symbol));
-      if (!thesis) throw new Error(`No thesis for ${symbol}: is it an analysed ticker?`);
-      const basis = args.basis ? clean(String(args.basis)) : null;
-      await write((db) => recordConsoleEdit(db, symbol, { field: "fairValue", value: { value, currency: thesis.currency, basis }, action: "edit", userId }));
-      return { text: `${symbol}: Thierry's fair value ${value} ${thesis.currency ?? ""} saved; the next analysis run reads it.` };
-    }
     case "update_outreach": {
       const handle = String(args.handle ?? "").replace(/^@/, "").trim();
       if (!handle) throw new Error("handle is required");
@@ -158,29 +97,3 @@ export async function callConsoleTool(name: string, args: Record<string, unknown
   return null;
 }
 
-/** The same checks the old Portfolio form made. */
-export function positionEdits(args: Record<string, unknown>): Omit<PositionEdit, "userId">[] {
-  const edits: Omit<PositionEdit, "userId">[] = [];
-  if (args.direction !== undefined) {
-    if (args.direction !== "long" && args.direction !== "short") throw new Error("direction is long or short");
-    edits.push({ field: "direction", value: args.direction });
-  }
-  if (args.entry_date !== undefined) {
-    if (typeof args.entry_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(args.entry_date)) throw new Error("entry_date is YYYY-MM-DD");
-    edits.push({ field: "entryDate", value: args.entry_date });
-  }
-  if (args.entry_price !== undefined) {
-    if (typeof args.entry_price !== "number" || !(args.entry_price > 0)) throw new Error("entry_price must be a positive number");
-    edits.push({ field: "entryPrice", value: args.entry_price });
-  }
-  if (args.weight_percent !== undefined) {
-    const w = args.weight_percent;
-    if (typeof w !== "number" || !(w > 0) || w > 100) throw new Error("weight_percent is a percent of the portfolio, above 0 and 100 at most");
-    edits.push({ field: "weight", value: w / 100 });
-  }
-  if (args.status !== undefined) {
-    if (args.status !== "open" && args.status !== "closed") throw new Error("status is open or closed");
-    edits.push({ field: "status", value: args.status });
-  }
-  return edits;
-}

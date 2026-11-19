@@ -6,7 +6,6 @@ import { theses } from "@/db/schema/thesis";
 import type { Db } from "@/db/types";
 import { analyseEveryTicker, testDb } from "@/test/db";
 import { thesis } from "./dimensions/thesis";
-import { recordConsoleEdit } from "./dimensions/thesis/console";
 import { parseResearch, RESEARCH_SYSTEM } from "./dimensions/thesis/research";
 import { watchlist } from "./dimensions/watchlist";
 import { runDimension } from "./runner";
@@ -59,15 +58,6 @@ describe("thesis dimension: narrative + view, no AI number", () => {
     expect(complete.mock.calls.length).toBe(calls); // drafted once
   });
 
-  it("Thierry's edit and fair value win; Claude never writes a fair value", async () => {
-    await runDimension(db, thesis, { trigger: "test", ctx: ctxWith() });
-    await recordConsoleEdit(db, "MNRO", { field: "narrative", value: "The market thinks tires are a commodity.", action: "edit", userId: "u1" });
-    await recordConsoleEdit(db, "MNRO", { field: "fairValue", value: { value: 24, currency: "USD", basis: "8x EV/EBITDA" }, action: "edit", userId: "u1" });
-    const [t] = await db.select().from(theses).where(eq(theses.symbol, "MNRO"));
-    expect(t).toMatchObject({ narrative: "The market thinks tires are a commodity.", narrativeState: "edited", fairValue: 24, fairValueBasis: "8x EV/EBITDA", currency: "USD" });
-    const [other] = await db.select().from(theses).where(eq(theses.symbol, "BOOT"));
-    expect(other.fairValue).toBeNull();
-  });
 
   it("the prompt forbids computed numbers and the parser needs both sentences", () => {
     expect(RESEARCH_SYSTEM).toContain("Never a number you computed");

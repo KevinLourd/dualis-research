@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fairValues } from "@/db/schema/analysis";
 import { financialMetrics, goldFinancialLines, valuations } from "@/db/schema/financials";
-import { theses } from "@/db/schema/thesis";
 import { companyProfiles } from "@/db/schema/gold";
 import { judgments } from "@/db/schema/silver";
 import { analystTargets, goldMethodValuations, peers, valuationMethods, valuationReports } from "@/db/schema/valuation";
@@ -308,11 +307,4 @@ describe("fair value pyramid", () => {
     expect(pb.base).toBeGreaterThan(0);
   });
 
-  it("Thierry's own fair value wins, the weighted one is kept beside it", async () => {
-    await db.insert(theses).values({ symbol: SYMBOL, fairValue: 45000, fairValueBasis: "his model", currency: "KRW" }).onConflictDoUpdate({ target: theses.symbol, set: { fairValue: 45000, fairValueBasis: "his model", currency: "KRW" } });
-    await runDimension(db, valuationDim, { trigger: "test", ctx: ctx() });
-    const [fv] = await db.select().from(fairValues).where(eq(fairValues.symbol, SYMBOL));
-    expect(fv).toMatchObject({ value: 45000, method: "his model", author: "thierry", low: null, high: null });
-    expect(fv.claudeValue).toBeGreaterThan(0);
-  });
 });
