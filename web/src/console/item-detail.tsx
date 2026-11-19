@@ -458,9 +458,9 @@ async function kpiDriverItem(symbol: string, id: string): Promise<ItemView | nul
           <span>
             <ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />
           </span>
-          <p className="text-xl leading-snug font-semibold text-kumo-strong">{k.reason}</p>
+          <p className="text-lg leading-snug font-medium text-kumo-strong">{k.reason}</p>
           <p className="text-sm text-kumo-subtle">
-            Confirmed on {k.confirmed} of {k.rows.length} results releases, invalidated on {k.invalidated}. Price measured over the 5 trading days after each release, against the S&amp;P 500.
+            ✓ {k.confirmed} · ✗ {k.invalidated} of {k.rows.length} results releases
           </p>
         </div>
         <Drawers>

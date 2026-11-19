@@ -29,8 +29,10 @@ import { analysedSymbols } from "../watchlist";
 export const KPI_DIMENSION = "kpi-drivers";
 export const KPI_YEARS = 3;
 export const REACTION_DAYS = 5;
-export const CANDIDATES_QUESTION = "kpi-candidates@v1";
-export const TEST_QUESTION = "kpi-test@v2";
+/** v2 (Kevin 2026-11-19, Worldex: the why ran to 4 lines in the panel): a why of at most 15 words. */
+export const CANDIDATES_QUESTION = "kpi-candidates@v2";
+/** v3 (Kevin 2026-11-19): an invalidation weighs (one caps at weak, two or more = none); a strong turn needs a strong KPI; the reason is a plain 15-word conclusion. */
+export const TEST_QUESTION = "kpi-test@v3";
 /** Pages of each report a judge reads (the results discussion first) and how much of each page. */
 const PAGES_PER_RELEASE = 2;
 const PAGE_CHARS = 3_500;
@@ -122,7 +124,7 @@ export const CANDIDATES_SYSTEM = [
   "Any number of KPIs: none when nothing fundamental drives it, twenty if there are twenty. Never a price, a valuation multiple or a market-wide factor.",
   "series = the stored series key that holds it, copied exactly from the list (null when none does); approximation = the formula from stored keys, else null.",
   "No em dash. JSON only, no prose, no code fence:",
-  '{"kpis": [{"name": "Operating margin", "why": "<one sentence: why it moves this business>", "series": "qmetric:operating-margin" | null, "approximation": string | null}]}',
+  '{"kpis": [{"name": "Operating margin", "why": "<at most 15 words: why it moves this business>", "series": "qmetric:operating-margin" | null, "approximation": string | null}]}',
 ].join("\n");
 
 export const TEST_SYSTEM = [
@@ -130,9 +132,9 @@ export const TEST_SYSTEM = [
   "For each release: read what the KPI did (from the figures given, else from the report's own words and tables), compare with the price over the 5 trading days after, against the S&P 500.",
   "verdict: confirms = the KPI changed clearly and the price moved the way that change implies; invalidates = the KPI changed strongly and the price did not react, or moved the other way; neutral = the KPI barely changed, or something else clearly moved the price.",
   "Every release gets a row. from / to / change = the KPI values the release shows (with units), null when the release does not show it. why = at most 15 words, the fact. cite = the release label, page and an EXACT quote of the report that shows the figure or management's words about it, null when none.",
-  "level: strong = it confirms on several releases and is never clearly invalidated: the market trades the stock on it. weak = it confirms sometimes, or one release invalidates it, or too few releases moved it. none = it never confirms, or releases invalidate it.",
-  "reason = ONE sentence, at most 20 words, for an expert: how many releases it confirms and invalidates, naming the figure; releases named by date, never by their R label.",
-  "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest release, by enough to change the story, with the price not reacting yet? strong / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved at the latest release.",
+  "level: an invalidation is strong evidence against the hypothesis. strong = it confirms on at least 3 releases and NO release invalidates it. weak = it confirms on at least 2 releases and at most ONE release invalidates it. none = anything else: two or more invalidations, or fewer than 2 confirmations.",
+  "reason = ONE plain sentence, at most 15 words, that a reader landing on the page understands at once: the conclusion about how the stock reacts to this KPI (\"The stock usually follows revenue growth, but not in the last two releases.\"). No dates, no list of figures, no R label: the release table shows them.",
+  "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest release, by enough to change the story, with the price not reacting yet? strong (only for a strong KPI) / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved at the latest release.",
   "No em dash. JSON only, no prose, no code fence:",
   '{"rows": [{"release": "R1", "verdict": "confirms" | "invalidates" | "neutral", "from": string | null, "to": string | null, "change": string | null, "why": string, "cite": {"release": "R1", "page": 12, "quote": "<exact words>"} | null}], "level": "strong" | "weak" | "none", "reason": string, "signal": "strong" | "weak" | "none" | null, "signalWhy": string | null, "direction": "up" | "down" | null}',
 ].join("\n");
@@ -170,7 +172,9 @@ export async function parseTest(db: Db, text: string, releases: Release[]): Prom
     rows.push({ releaseId: r.id, day: r.day, title: r.title, reaction: r.reaction, from: str(x.from), to: str(x.to), change: str(x.change), verdict: x.verdict as KpiVerdict, why: str(x.why) ?? "", cite });
   }
   const level = obj.level as KpiLevel;
-  const signal = level !== "none" && KPI_LEVELS.includes(obj.signal as KpiLevel) ? (obj.signal as KpiLevel) : null;
+  const asked = level !== "none" && KPI_LEVELS.includes(obj.signal as KpiLevel) ? (obj.signal as KpiLevel) : null;
+  // A strong turn needs a KPI the market has shown it trades on (Kevin 2026-11-19): a weak KPI's turn is weak at most.
+  const signal = asked === "strong" && level !== "strong" ? "weak" : asked;
   return {
     level,
     reason: stripDashes(obj.reason.trim()),

@@ -59,7 +59,7 @@ describe("kpi drivers", () => {
           ],
           level: "weak",
           reason: "Confirms on the May 2026 release, the Jul 2026 one goes against it.",
-          signal: "none",
+          signal: "strong",
           signalWhy: null,
           direction: "up",
         }),
@@ -71,7 +71,8 @@ describe("kpi drivers", () => {
     expect(out.error).toBeUndefined();
     await promoteKpis(db, [{ id: "b", subject: SYMBOL, error: null, payload: out.payload, fetchedAt: new Date() } as never]);
     const [k] = await db.select().from(kpiDrivers);
-    expect(k).toMatchObject({ name: "Operating margin", level: "weak", confirmed: 1, invalidated: 1, signal: "none", direction: "up" });
+    // A strong turn needs a strong KPI: a weak one turns weak at most.
+    expect(k).toMatchObject({ name: "Operating margin", level: "weak", confirmed: 1, invalidated: 1, signal: "weak", direction: "up" });
     expect(k.rows[0].cite?.quote).toBe("Operating margin rose to 16.7%");
     expect(k.rows[1].cite).toBeNull();
     expect(k.rows[0].reaction).toBeCloseTo(0.15);
