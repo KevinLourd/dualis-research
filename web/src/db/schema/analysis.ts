@@ -609,6 +609,14 @@ export const MOVE_CAUSE_KINDS = ["fundamental", "macro", "technical", "unknown"]
 export type MoveCauseKind = (typeof MOVE_CAUSE_KINDS)[number];
 /** A news item or filing a cause rests on, as the panel links it. */
 export type MoveCite = { kind: "news" | "filing"; id: string; title: string; url: string | null; at: string; publisher: string | null; sources: string[] };
+/**
+ * The reported figure that explains a business move (Kevin 2026-11-19: « quel élément structurel (ratio) a été
+ * l'explication majeure de ce changement de prix »): a stored series key, its value for the period just reported and
+ * the same period a year earlier, as the judge read them in the figures it was given (move-cause@v2).
+ */
+export type MoveMetric = { series: string; label: string; period: string; from: string | null; to: string; change: string | null };
+/** Whether the business fact behind a move lasts (normalized earnings) or not (a one-off, an input price, pulled demand). */
+export type MoveLasting = "structural" | "temporary" | "n-a";
 
 /**
  * The cause of each significant move: one stored judgment per move and candidate set (`silver.judgments`, subject kind
@@ -628,6 +636,9 @@ export const priceMoveCauses = gold.table(
     /** News items and filings the judge saw. */
     candidates: integer("candidates").notNull(),
     confidence: real("confidence"),
+    /** move-cause@v2: the figure that explains a business move, and whether that change lasts. */
+    metric: jsonb("metric").$type<MoveMetric>(),
+    lasting: text("lasting").$type<MoveLasting>(),
     judgmentId: uuid("judgment_id"),
     rebuiltAt,
   },

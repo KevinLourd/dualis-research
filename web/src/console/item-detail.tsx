@@ -264,6 +264,14 @@ async function moveItem(symbol: string, id: string): Promise<ItemView | null> {
           {c?.category && <Badge variant="outline">{c.category}</Badge>}
         </span>
         <p className="text-xl leading-snug font-semibold text-kumo-strong">{conclusion}</p>
+        {c?.metric && (
+          <p className="text-base text-kumo-default">
+            {c.metric.label}: {c.metric.from ? `${c.metric.from} → ` : ""}
+            {c.metric.to}
+            {c.metric.change ? ` (${c.metric.change})` : ""}, period ended {c.metric.period}
+            {c.lasting && c.lasting !== "n-a" ? ` · ${c.lasting === "structural" ? "Structural" : "Temporary"}` : ""}
+          </p>
+        )}
         <Drawers>
         <Drawer icon={<ArrowsDownUpIcon size={16} aria-hidden />} title="The move">
         <FactList>

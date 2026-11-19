@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
-import { DRIVER_CATEGORIES, MOVE_CAUSE_KINDS, priceMoveCauses, priceMoves, type DriverCategory, type GoldPriceMove, type GoldPriceMoveCause, type MoveCauseKind, type MoveCite } from "@/db/schema/analysis";
+import { DRIVER_CATEGORIES, MOVE_CAUSE_KINDS, priceMoveCauses, priceMoves, type DriverCategory, type GoldPriceMove, type GoldPriceMoveCause, type MoveCauseKind, type MoveCite, type MoveLasting, type MoveMetric } from "@/db/schema/analysis";
 import * as gold from "@/db/schema/gold";
 import { goldNewsItems, goldNewsLinks } from "@/db/schema/news";
 import * as silver from "@/db/schema/silver";
 import type { Db } from "@/db/types";
 import { firstJsonObject } from "@/llm/judge";
 import type { Dimension, FetchOutcome, PromoteResult, Source, SourceContext } from "../../types";
-import { fnv } from "../analysis/facts";
+import { fmt, fnv } from "../analysis/facts";
+import { seriesCatalog, type StoredSeries } from "../analysis/series";
 import { analysedSymbols } from "../watchlist";
 
 /**
@@ -20,7 +21,8 @@ import { analysedSymbols } from "../watchlist";
 
 export const MOVE_CAUSES_DIMENSION = "move-causes";
 export const MOVE_SUBJECT_KIND = "price-move";
-export const MOVE_QUESTION = "move-cause@v1";
+/** v2 (Kevin 2026-11-19): the judge also reads the figures just reported and names the one that explains a business move. */
+export const MOVE_QUESTION = "move-cause@v2";
 /** Moves per call (the repo speed rule: never one call per tiny item). */
 export const MOVES_PER_CALL = 15;
 const PARALLEL = 4;
@@ -37,6 +39,37 @@ export const windowOf = (m: Pick<GoldPriceMove, "startDay" | "endDay">) => ({ fr
 
 /** The stored question key of a move and the items it was judged on: a new item around it asks again. */
 export const moveKey = (moveId: string, candidates: MoveCandidate[]) => `${MOVE_QUESTION}:${moveId}:${fnv(candidates.map((c) => `${c.kind}:${c.id}`).sort().join(","))}`;
+
+/** A period counts as « just reported » at a move when it ended at most this many days before the move started. */
+export const REPORTED_WITHIN_DAYS = 120;
+const DAY = 86_400_000;
+/** Series a move can be explained by: reported lines and derived metrics, never the price or the consensus. */
+const explains = (s: StoredSeries) => /^(line|hline|qline|metric|qmetric):/.test(s.key);
+
+/**
+ * The figures the market had just received when a move happened: for each period type, the latest period that ended
+ * within 120 days before the move, every reported line and derived metric for it beside the same period a year earlier.
+ * One block per period, shared by the moves that read it. Pure: the test drives it with a hand-made catalog.
+ */
+export function reportedAt(catalog: Map<string, StoredSeries>, day: string): { period: string; periodType: string; lines: string[] }[] {
+  const at = Date.parse(`${day}T00:00:00Z`);
+  const out: { period: string; periodType: string; lines: string[] }[] = [];
+  for (const periodType of ["quarter", "half", "year"] as const) {
+    const series = [...catalog.values()].filter((s) => s.periodType === periodType && explains(s));
+    const ends = [...new Set(series.flatMap((s) => [...s.points.keys()]))].filter((p) => {
+      const t = Date.parse(`${p.length === 7 ? `${p}-28` : p}T00:00:00Z`);
+      return t < at && at - t <= REPORTED_WITHIN_DAYS * DAY;
+    });
+    const period = ends.sort().at(-1);
+    if (!period) continue;
+    const prior = `${Number(period.slice(0, 4)) - 1}${period.slice(4)}`;
+    const lines = series
+      .filter((s) => s.points.has(period))
+      .map((s) => `${s.label} [${s.key}]: ${fmt(s.points.get(period), s.unit)} vs ${fmt(s.points.get(prior), s.unit)} a year earlier`);
+    if (lines.length) out.push({ period, periodType, lines });
+  }
+  return out;
+}
 
 /** Every news item and filing of the ticker inside any of the moves' windows, per move id (newest first). */
 export async function candidatesOf(db: Db, symbol: string, moves: Pick<GoldPriceMove, "id" | "startDay" | "endDay">[]): Promise<Map<string, MoveCandidate[]>> {
@@ -111,14 +144,17 @@ export const MOVE_SYSTEM = [
   "fact: ONE plain sentence a reader understands without the items: what happened in the business (with the figure the item gives, in management's words when the item quotes them), or the macro or technical event. null when unknown.",
   "category: the one Driver Category the fact belongs to, exactly one of: " + DRIVER_CATEGORIES.join(", ") + "; null when unknown.",
   "cites: the ids of the items the fact rests on (only ids listed under that move). confidence: 0 to 1.",
+  "metric (fundamental moves only): the ONE reported figure that best explains why the market moved, picked from the figures listed under that move (its key in brackets, copied exactly), with its value for the period just reported (to) and a year earlier (from), and the change in words (e.g. \"+8.4 pts\", \"-31%\"). Prefer the ratio that changed the market's view (a margin, a growth rate, backlog to revenue) over a raw total. null when no listed figure explains it.",
+  "lasting (fundamental moves only): structural = the change is in the business as it normally runs and the market projects it forward (a margin that holds, growth that recurs, a backlog that keeps building); temporary = a one-off contract or charge, an input or commodity price, demand pulled forward, over-earning after cuts; n-a for any other kind.",
   "No em dash. Answer with JSON only, no prose, no code fence:",
-  '{"moves": [{"id": "M1", "kind": "fundamental" | "macro" | "technical" | "unknown", "fact": string | null, "category": string | null, "cites": ["I1"], "confidence": number}]}',
+  '{"moves": [{"id": "M1", "kind": "fundamental" | "macro" | "technical" | "unknown", "fact": string | null, "category": string | null, "cites": ["I1"], "confidence": number, "metric": {"series": "qmetric:operating-margin", "from": "9.5%", "to": "16.7%", "change": "+7.2 pts"} | null, "lasting": "structural" | "temporary" | "n-a"}]}',
 ].join("\n");
 
 const pct = (x: number | null) => (x === null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`);
 
 /** The prompt of one batch: each move with its own candidate items, short ids the answer cites. */
-export function batchPrompt(symbol: string, name: string | null, moves: GoldPriceMove[], cands: Map<string, MoveCandidate[]>): { prompt: string; itemIds: Map<string, MoveCandidate>[] } {
+export function batchPrompt(symbol: string, name: string | null, moves: GoldPriceMove[], cands: Map<string, MoveCandidate[]>, catalog: Map<string, StoredSeries> = new Map()): { prompt: string; itemIds: Map<string, MoveCandidate>[] } {
+  const figures = new Map<string, string>();
   const itemIds: Map<string, MoveCandidate>[] = [];
   let n = 0;
   const blocks = moves.map((m, i) => {
@@ -131,15 +167,26 @@ export function batchPrompt(symbol: string, name: string | null, moves: GoldPric
     });
     itemIds.push(ids);
     const span = m.startDay === m.endDay ? m.startDay : `${m.startDay} to ${m.endDay} (${m.days} sessions)`;
-    return [`M${i + 1}: ${span}: the stock ${pct(m.returnPct)}, S&P 500 ${pct(m.benchReturn)}, abnormal ${pct(m.abnormal)} (${Math.abs(m.z).toFixed(1)} standard deviations).`, "Items dated around it:", ...lines].join("\n");
+    const reported = reportedAt(catalog, m.startDay).map((b) => {
+      const id = `${b.periodType} ended ${b.period}`;
+      figures.set(id, b.lines.join("\n"));
+      return id;
+    });
+    return [
+      `M${i + 1}: ${span}: the stock ${pct(m.returnPct)}, S&P 500 ${pct(m.benchReturn)}, abnormal ${pct(m.abnormal)} (${Math.abs(m.z).toFixed(1)} standard deviations).`,
+      "Items dated around it:",
+      ...lines,
+      `Figures just reported: ${reported.length ? reported.join("; ") : "none collected for that time"}.`,
+    ].join("\n");
   });
-  return { prompt: [`${symbol}${name ? ` (${name})` : ""}: ${moves.length} significant price moves.`, "", ...blocks].join("\n\n"), itemIds };
+  const figureBlocks = [...figures].map(([id, text]) => `Figures for the ${id} (vs the same period a year earlier):\n${text}`);
+  return { prompt: [`${symbol}${name ? ` (${name})` : ""}: ${moves.length} significant price moves.`, "", ...figureBlocks, "", ...blocks].join("\n\n"), itemIds };
 }
 
-export type MoveVerdict = { kind: MoveCauseKind; fact: string | null; category: DriverCategory | null; cites: MoveCandidate[]; confidence: number };
+export type MoveVerdict = { kind: MoveCauseKind; fact: string | null; category: DriverCategory | null; cites: MoveCandidate[]; confidence: number; metric: MoveMetric | null; lasting: MoveLasting };
 
 /** Parses a batch answer: one verdict per move; unknown cited ids dropped; a move missing from the answer = an error. */
-export function parseBatch(text: string, itemIds: Map<string, MoveCandidate>[]): MoveVerdict[] {
+export function parseBatch(text: string, itemIds: Map<string, MoveCandidate>[], catalog: Map<string, StoredSeries> = new Map(), moves: Pick<GoldPriceMove, "startDay">[] = []): MoveVerdict[] {
   const obj = JSON.parse(firstJsonObject(text)) as { moves?: unknown };
   if (!Array.isArray(obj.moves)) throw new Error(`move-causes: answer has no moves array: ${text.slice(0, 200)}`);
   const byId = new Map<string, Record<string, unknown>>();
@@ -152,9 +199,23 @@ export function parseBatch(text: string, itemIds: Map<string, MoveCandidate>[]):
     const cites = (Array.isArray(v.cites) ? v.cites : []).map((c) => ids.get(String(c))).filter((c): c is MoveCandidate => !!c);
     const category = DRIVER_CATEGORIES.includes(v.category as DriverCategory) ? (v.category as DriverCategory) : null;
     const fact = typeof v.fact === "string" && v.fact.trim() ? v.fact.trim().replace(/\s*[—–]\s*/g, ", ") : null;
-    const confidence = Number(v.confidence);
-    return { kind, fact, category: kind === "unknown" ? null : category, cites: [...new Set(cites)], confidence: confidence >= 0 && confidence <= 1 ? confidence : 0.5 };
+    const confidence = typeof v.confidence === "number" && v.confidence >= 0 && v.confidence <= 1 ? v.confidence : null;
+    if (confidence === null) throw new Error(`move-causes: confidence "${String(v.confidence)}" for M${i + 1} is not a number from 0 to 1`);
+    const lasting: MoveLasting = kind === "fundamental" && (v.lasting === "structural" || v.lasting === "temporary") ? v.lasting : "n-a";
+    return { kind, fact, category: kind === "unknown" ? null : category, cites: [...new Set(cites)], confidence, metric: kind === "fundamental" ? metricOf(v.metric, catalog, moves[i]?.startDay) : null, lasting };
   });
+}
+
+/** The judge's figure, kept only when it names a series it was shown for that move; its label and period come from the catalog. */
+function metricOf(raw: unknown, catalog: Map<string, StoredSeries>, day: string | undefined): MoveMetric | null {
+  if (!raw || typeof raw !== "object" || !day) return null;
+  const m = raw as Record<string, unknown>;
+  const s = typeof m.series === "string" ? catalog.get(m.series) : undefined;
+  if (!s || typeof m.to !== "string" || !m.to.trim()) return null;
+  const block = reportedAt(catalog, day).find((b) => b.lines.some((l) => l.includes(`[${s.key}]`)));
+  if (!block) return null;
+  const str = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim() : null);
+  return { series: s.key, label: s.label, period: block.period, from: str(m.from), to: m.to.trim(), change: str(m.change) };
 }
 
 const citeOf = (c: MoveCandidate): MoveCite => ({ kind: c.kind, id: c.id, title: c.title, url: c.url, at: c.at.toISOString(), publisher: c.publisher, sources: c.sources });
@@ -174,9 +235,10 @@ export const moveCausesSource: Source = {
     const moves = all.filter((m) => ids.includes(m.id) && (cands.get(m.id) ?? []).length > 0);
     if (moves.length === 0) return { request: { symbol, moves: ids.length }, httpStatus: null, error: "no move with items around it in this batch any more" };
     const [profile] = await db.select({ name: gold.companyProfiles.name }).from(gold.companyProfiles).where(eq(gold.companyProfiles.symbol, symbol));
-    const { prompt, itemIds } = batchPrompt(symbol, profile?.name ?? null, moves, cands);
+    const catalog = await seriesCatalog(db, symbol);
+    const { prompt, itemIds } = batchPrompt(symbol, profile?.name ?? null, moves, cands, catalog);
     const r = await ctx.complete({ system: MOVE_SYSTEM, prompt });
-    const verdicts = parseBatch(r.text, itemIds);
+    const verdicts = parseBatch(r.text, itemIds, catalog, moves);
     const rows = moves.map((m, i) => {
       const v = verdicts[i];
       return {
@@ -189,7 +251,7 @@ export const moveCausesSource: Source = {
         citedSentence: null,
         reason: v.fact,
         model: r.model,
-        raw: { batch: moves.length, category: v.category, cites: v.cites.map(citeOf) },
+        raw: { batch: moves.length, category: v.category, cites: v.cites.map(citeOf), metric: v.metric, lasting: v.lasting },
       };
     });
     await db.insert(silver.judgments).values(rows).onConflictDoNothing();
@@ -207,7 +269,7 @@ export async function rebuildMoveCauses(db: Db, symbols: string[]): Promise<numb
     const rows = moves.map((m) => {
       const c = cands.get(m.id) ?? [];
       const j = c.length ? stored.get(`${m.id}\u0000${moveKey(m.id, c)}`) : undefined;
-      const raw = (j?.raw ?? {}) as { category?: DriverCategory | null; cites?: MoveCite[] };
+      const raw = (j?.raw ?? {}) as { category?: DriverCategory | null; cites?: MoveCite[]; metric?: MoveMetric | null; lasting?: MoveLasting };
       return {
         id: m.id,
         symbol,
@@ -217,6 +279,8 @@ export async function rebuildMoveCauses(db: Db, symbols: string[]): Promise<numb
         cites: raw.cites ?? [],
         candidates: c.length,
         confidence: j?.probability ?? null,
+        metric: raw.metric ?? null,
+        lasting: raw.lasting ?? null,
         judgmentId: j?.id ?? null,
       };
     });
