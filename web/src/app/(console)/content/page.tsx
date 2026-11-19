@@ -1,7 +1,6 @@
 import { Badge } from "@cloudflare/kumo";
 import { LightbulbIcon } from "@phosphor-icons/react/ssr";
 import { FORMAT_LABEL, PROPOSED_FORMATS } from "@/collectors/dimensions/content-drafts/format";
-import { canDispatch } from "@/content/dispatch";
 import { lastContentRun, listIdeas } from "@/console/content-queries";
 import { dateFormat, relativeTime } from "@/console/format";
 import { itemHref } from "@/console/analysis";
@@ -192,14 +191,14 @@ function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
   );
 }
 
-/** Per channel x format, read only: Drafting… (with when it starts) or Open draft. A draft is asked through Claude (connector tool draft_idea). */
+/** Per channel x format, read only: Drafting… (with when it starts) or Open draft. The 2 daily posts are drafted by themselves (content-picks). */
 function RequestAction({ request }: { request: IdeaRequest | undefined }) {
   if (request?.status === "pending") {
     return (
       <span className="flex flex-col items-end gap-0.5 text-right">
         <Badge variant="neutral">Drafting…</Badge>
         <span className="text-xs text-kumo-subtle">
-          {canDispatch() ? `asked ${relativeTime(new Date(request.requestedAt))}, about 3 min` : "starts with the next morning run"}
+          asked {relativeTime(new Date(request.requestedAt))}
         </span>
       </span>
     );

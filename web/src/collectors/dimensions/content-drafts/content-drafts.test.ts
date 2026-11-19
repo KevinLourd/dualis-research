@@ -5,7 +5,6 @@ import * as gold from "@/db/schema/gold";
 import type { Db } from "@/db/types";
 import type { Complete } from "@/llm/complete";
 import { addAccount, requestDraft, setDraftStatus } from "@/content/manual";
-import { canDispatch, dispatchDraftWriter } from "@/content/dispatch";
 import { seedAnalysedTicker } from "@/test/content-seed";
 import { testDb } from "@/test/db";
 import { runDimension } from "../../runner";
@@ -136,20 +135,6 @@ describe("content-drafts dimension", () => {
   });
 });
 
-describe("draft writer dispatch", () => {
-  it("does nothing without a token; with one, starts draft.yml on main and fails loud on a refusal", async () => {
-    const f = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
-    expect(canDispatch({})).toBe(false);
-    expect(await dispatchDraftWriter({}, f)).toBe(false);
-    expect(f).not.toHaveBeenCalled();
-    expect(await dispatchDraftWriter({ DRAFT_DISPATCH_TOKEN: "tok" }, f)).toBe(true);
-    const [url, init] = f.mock.calls[0];
-    expect(url).toBe("https://api.github.com/repos/dualis-research/dualis-research/actions/workflows/draft.yml/dispatches");
-    expect(JSON.parse(String(init?.body))).toEqual({ ref: "main", inputs: {} });
-    const refused = vi.fn<typeof fetch>(async () => new Response("Bad credentials", { status: 401 }));
-    await expect(dispatchDraftWriter({ DRAFT_DISPATCH_TOKEN: "tok" }, refused)).rejects.toThrow(/401 Bad credentials/);
-  });
-});
 
 describe("draft format", () => {
   it("gives a signal post its 3 lines: the market's belief, the real reported figure with both values, why in one sentence; never a fair value", () => {
