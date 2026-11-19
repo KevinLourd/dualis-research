@@ -79,6 +79,10 @@ describe("what the connector may edit", () => {
     [".github/workflows/deploy.yml", false],
     ["web/src/app/page.tsx", false],
     ["site/package.json", false],
+    [".claude/skills/dualis-charts/SKILL.md", true],
+    [".claude/skills/dualis-charts/dualis_charts.py", true],
+    [".claude/skills/x/../../web/src/db/client.ts", false],
+    [".claude/settings.json", false],
   ])("%s -> %s, same in the console and in the workflow's script", (path, ok) => {
     expect(editablePath(path)).toBe(ok);
     expect(script.editablePath(path)).toBe(ok);
@@ -178,7 +182,7 @@ describe("MCP", () => {
     expect(init.result.instructions).toMatch(/publish it at once/);
     const list = (await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ctx)) as { result: { tools: { name: string }[] } };
     expect(list.result.tools.map((t) => t.name)).toEqual([
-      "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
+      "read_skill", "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
       "list_ideas", "draft_idea", "list_drafts", "set_draft_status", "list_positions", "edit_position", "set_fair_value", "update_outreach",
     ]);
     expect(await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ctx)).toBeNull();

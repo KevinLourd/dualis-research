@@ -52,9 +52,6 @@ kept only in the chat, in a local copy or in this skill's tokens.json does not e
 ## Install in Claude Desktop (Thierry)
 1. Settings > Connectors > Add custom connector: name `Dualis Research`, URL `https://console.dualisresearch.com/mcp`,
    Add, then Connect: sign in to the Dualis console and click Allow.
-2. Settings > Capabilities: turn on code execution.
-3. Settings > Capabilities > Skills > Upload skill: `dualis-charts.zip`
-   (https://github.com/dualis-research/dualis-research/releases/download/design-skill/dualis-charts.zip), and the same for
-   `site-wording.zip` (same address, the website's words). Links also on https://console.dualisresearch.com/design.
-4. In any chat or stock project: attach the data and ask "Chart this in the Dualis style".
-The zip carries a copy of tokens.json for sandboxes without internet; with internet the skill reads the live file.
+2. Nothing else: the connector serves this skill and `dualis_charts.py` (tool `read_skill`), always the version on main;
+   no upload. Then in any chat: attach the data and ask "Chart this in the Dualis style".
+The zip (release `design-skill`) stays for a sandbox without the connector; it carries a copy of tokens.json.

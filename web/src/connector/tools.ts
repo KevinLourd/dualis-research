@@ -16,13 +16,23 @@ type Result = { text: string; isError?: boolean };
 export function editablePath(path: unknown): boolean {
   if (typeof path !== "string" || path.includes("..") || path.startsWith("/")) return false;
   if (path === "design/tokens.json") return true;
+  if (/^\.claude\/skills\/[a-z0-9-]+\/[^/]+\.(md|py)$/.test(path)) return true;
   if (!/^site\/src\/.+\.(tsx|ts|css)$/.test(path)) return false;
   return path !== "site/src/app/tokens.css" && !path.endsWith(".test.ts");
 }
 
+/** Served by the connector itself (read_skill): Thierry uploads nothing (Kevin 2026-11-18). */
+export const SKILLS = ["dualis-charts", "site-wording"] as const;
+
 const SUMMARY = { type: "string", description: "One line in English saying what changed, for the commit (e.g. \"Home: new line under the title\")." };
 
 export const TOOLS = [
+  {
+    name: "read_skill",
+    description:
+      "Read a Dualis skill from GitHub main, always the latest: dualis-charts (how to draw any Dualis chart; also returns dualis_charts.py, save it next to your script and import it) or site-wording (how to change the website's words). Read it before drawing a chart or changing site text. No skill upload needed.",
+    inputSchema: { type: "object", properties: { name: { type: "string", enum: ["dualis-charts", "site-wording"] } }, required: ["name"], additionalProperties: false },
+  },
   {
     name: "read_design_system",
     description:
@@ -60,13 +70,13 @@ export const TOOLS = [
   },
   {
     name: "read_file",
-    description: "Read one file of the website's source (site/src/...) or design/tokens.json, exactly as it is on GitHub main now.",
+    description: "Read one file of the website's source (site/src/...), a skill (.claude/skills/<name>/SKILL.md) or design/tokens.json, exactly as it is on GitHub main now.",
     inputSchema: { type: "object", properties: { path: { type: "string", description: "e.g. site/src/app/page.tsx" } }, required: ["path"], additionalProperties: false },
   },
   {
     name: "edit_files",
     description:
-      "Publish a change to the website's words or to design/tokens.json (chart style, type, any token): each edit replaces one exact piece of text (copied from read_file, appearing once in the file) with the new text. It is committed to GitHub main after the site's copy tests and type check pass, and the website redeploys (about 3 minutes). Use it right after Thierry approves the change. Change only the words, keep code and quotes intact.",
+      "Publish a change to the website's words, to design/tokens.json (chart style, type, any token) or to a skill (.claude/skills/<name>/SKILL.md, dualis_charts.py; it applies at once to every Claude and writer that reads it): each edit replaces one exact piece of text (copied from read_file, appearing once in the file) with the new text. It is committed to GitHub main after the site's copy tests and type check pass, and the website redeploys (about 3 minutes). Use it right after Thierry approves the change. Change only the words, keep code and quotes intact.",
     inputSchema: {
       type: "object",
       properties: {
@@ -129,11 +139,20 @@ function describe(s: ChangeStatus): Result {
 export async function callTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<Result> {
   const { env, fetch: f } = ctx;
   switch (name) {
+    case "read_skill": {
+      const skill = String(args.name);
+      if (!(SKILLS as readonly string[]).includes(skill)) throw new Error(`Skills: ${SKILLS.join(", ")}`);
+      const body = await readFile(`.claude/skills/${skill}/SKILL.md`, env, f);
+      if (skill !== "dualis-charts") return { text: body };
+      const helper = await readFile(".claude/skills/dualis-charts/dualis_charts.py", env, f);
+      return { text: `${body}\n\n--- dualis_charts.py (save it as dualis_charts.py; it reads design/tokens.json live from GitHub) ---\n${helper}` };
+    }
+
     case "read_design_system":
       return { text: await readFile("design/tokens.json", env, f) };
 
     case "read_file": {
-      if (!editablePath(args.path)) throw new Error(`Readable files: design/tokens.json and the site's source under site/src/ (pages, components, styles, model). Not: ${String(args.path)}`);
+      if (!editablePath(args.path)) throw new Error(`Readable files: design/tokens.json, the skills under .claude/skills/ and the site's source under site/src/ (pages, components, styles, model). Not: ${String(args.path)}`);
       return { text: await readFile(String(args.path), env, f) };
     }
 
@@ -165,7 +184,7 @@ export async function callTool(name: string, args: Record<string, unknown>, ctx:
       if (!edits.length) throw new Error("Give at least one edit");
       const byPath = new Map<string, string>();
       for (const e of edits) {
-        if (!editablePath(e.path)) throw new Error(`Not editable from Claude Desktop: ${e.path}. Allowed: design/tokens.json and the site's source under site/src/.`);
+        if (!editablePath(e.path)) throw new Error(`Not editable from Claude Desktop: ${e.path}. Allowed: design/tokens.json, .claude/skills/<skill>/*.md|py and the site's source under site/src/.`);
         if (typeof e.find !== "string" || !e.find || typeof e.replace !== "string") throw new Error(`${e.path}: each edit needs find and replace texts`);
         if (!byPath.has(e.path)) byPath.set(e.path, await readFile(e.path, env, f));
         const n = countOf(byPath.get(e.path)!, e.find);
