@@ -34,7 +34,8 @@ import { analysedSymbols } from "../watchlist";
 
 export const DRIVER_CONFIDENCE_DIMENSION = "driver-confidence";
 export const CONFIDENCE_SUBJECT_KIND = "driver-confidence";
-export const CONFIDENCE_QUESTION = "driver-confidence@v1";
+/** v2 (2026-11-19): the reason names moves by date and size, never by their M labels (a reader never sees them). */
+export const CONFIDENCE_QUESTION = "driver-confidence@v2";
 /** The reason at the top of the panel: at most this many words (stated in the prompt). */
 export const CONFIDENCE_REASON_WORDS = 20;
 
@@ -60,9 +61,9 @@ export const CONFIDENCE_SYSTEM = [
   "You are the equity research associate of a small-cap long/short analyst. He trusts a narrative driver only when the market has shown, again and again, that it trades the stock on that reason.",
   "A driver was found from the business moves of the past (its origin). You test it on every business move that came AFTER its origin: did this reason move the price again, the way its story says?",
   "For each move listed under a driver, fit = explains (the move's business fact is about THIS reason's subject and the price moved the way the story predicts), contradicts (this reason's subject changed and the price ignored it or moved the other way), or unrelated (the move was about another subject). Judge from the move's fact and its figure, never from the date alone.",
-  "why = at most 12 words: the fact that makes it fit or not.",
+  "why = at most 12 words: the fact that makes it fit or not, never an M label.",
   "level: strong = the market traded this reason again and again after its origin, the way the story says, with no clear contradiction: a reason a fundamental investor can rely on. weak = it explains some later moves, or too few later moves exist to test it, or one contradicts it. noise = no later move confirms it, or the moves contradict it: the market does not trade the stock on this reason.",
-  `reason = ONE sentence of at most ${CONFIDENCE_REASON_WORDS} words for an equity research expert: why he can trust this driver, or not, naming how many moves it explains and the figure behind them.`,
+  `reason = ONE sentence of at most ${CONFIDENCE_REASON_WORDS} words for an equity research expert: why he can trust this driver, or not, naming how many moves it explains and the figure behind them. Name a move by its month and size (\"the -12.7% of Aug 2025\"), never by its M label: the reader never sees the labels.`,
   "No em dash, no en dash. Answer with JSON only, no prose, no code fence:",
   '{"drivers": [{"id": "D1", "level": "strong" | "weak" | "noise", "reason": string, "moves": [{"id": "M3", "fit": "explains" | "contradicts" | "unrelated", "why": string}]}]}',
 ].join("\n");
