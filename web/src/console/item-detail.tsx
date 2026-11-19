@@ -380,9 +380,11 @@ async function confidenceItem(symbol: string, id: string): Promise<ItemView | nu
     body: (
       <>
         <div className="flex flex-col gap-3">
-          <span>
-            <ConfidenceBadge level={c?.level ?? null} />
-          </span>
+          {c && (
+            <span>
+              <ConfidenceBadge level={c.level} />
+            </span>
+          )}
           <p className="text-xl leading-snug font-semibold text-kumo-strong">{c?.reason ?? "Not tested yet: the next run checks the business moves that followed its origin."}</p>
           {c && (
             <p className="text-sm text-kumo-subtle">
