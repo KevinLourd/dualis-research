@@ -222,7 +222,7 @@ export function Drivers({ symbol, drivers, thesis }: { symbol: string; drivers: 
 /** B. Driver Signals (Kevin 2026-11-19): among A, the drivers turning NOW (strong or weak). Each row opens why (`driver:` panel). */
 export function DriverSignals({ symbol, drivers, side, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
   const shown = drivers.filter(signalling).sort((a, b) => Number(b.state!.strength === "strong") - Number(a.state!.strength === "strong") || a.rank - b.rank);
-  if (shown.length === 0) return <p className="text-lg text-kumo-subtle">No driver is turning now.</p>;
+  if (shown.length === 0) return <p className="text-lg text-kumo-subtle">{drivers.some((d) => d.confidence) ? "No driver is turning now." : "Not tested yet."}</p>;
   return (
     <ol className="flex flex-col">
       {shown.map((d) => (

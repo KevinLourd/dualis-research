@@ -18,7 +18,7 @@ import { reactionLine } from "../market-reaction/compute";
 import { reactionsOf } from "../market-reaction";
 import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
-import { confidentDriverIds } from "../driver-confidence";
+import { testedDrivers } from "../driver-confidence";
 import { resultsPages, verifyQuote, type ResultsPage } from "../filing-documents/read";
 
 /**
@@ -532,7 +532,10 @@ export const narrativeStateSource: Source = {
     if (!d) return { request: { symbol, side }, httpStatus: null, error: "no narrative or no driver for this thesis yet" };
     // Driver Signal (Kevin 2026-11-19): asked only of the drivers the market has shown it trades on (driver-confidence
     // strong or weak); a noise driver, or one not tested yet, never signals. None left = no signal, no call.
-    const confident = await confidentDriverIds(ctx.db, symbol);
+    const tested = await testedDrivers(ctx.db, symbol);
+    // Not tested yet (a run that stopped before driver-confidence): judge nothing, the last states stay.
+    if (!d.drivers.some((x) => tested.some((t) => t.id === x.id))) return { request: { symbol, side, version: d.version }, httpStatus: null, error: "driver confidence not judged yet for this thesis" };
+    const confident = new Set(tested.filter((t) => t.level !== "noise").map((t) => t.id));
     const drivers = d.drivers.filter((x) => confident.has(x.id));
     if (drivers.length === 0) return { request: { symbol, side, version: d.version, confident: 0 }, httpStatus: null, payload: noConfidentDriver(symbol, side) };
     const charts = await driverExhibits(ctx.db, drivers.map((x) => x.id));

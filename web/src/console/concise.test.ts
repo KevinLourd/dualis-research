@@ -48,5 +48,6 @@ describe("Narrative Drivers (A) and Driver Signals (B) in the panel", () => {
     expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver the market has shown it trades on.");
     expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
     expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver is turning now.");
+    expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
   });
 });

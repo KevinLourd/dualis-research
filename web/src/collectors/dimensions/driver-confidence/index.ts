@@ -224,8 +224,12 @@ export async function rebuildDriverConfidence(db: Db): Promise<number> {
 
 /** The drivers a Driver Signal is asked for: the ones the market has shown it trades on (strong or weak confidence). */
 export async function confidentDriverIds(db: Db, symbol: string): Promise<Set<string>> {
-  const rows = await db.select({ id: driverConfidence.id, level: driverConfidence.level }).from(driverConfidence).where(eq(driverConfidence.symbol, symbol));
-  return new Set(rows.filter((r) => r.level !== "noise").map((r) => r.id));
+  return new Set((await testedDrivers(db, symbol)).filter((r) => r.level !== "noise").map((r) => r.id));
+}
+
+/** Every driver of the ticker whose confidence was judged, with its level. */
+export async function testedDrivers(db: Db, symbol: string): Promise<{ id: string; level: ConfidenceLevel }[]> {
+  return db.select({ id: driverConfidence.id, level: driverConfidence.level }).from(driverConfidence).where(eq(driverConfidence.symbol, symbol));
 }
 
 export const driverConfidenceDim: Dimension = {
