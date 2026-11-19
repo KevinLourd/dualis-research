@@ -13,7 +13,7 @@ const VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 export const INSTRUCTIONS =
   "Dualis Research's console, driven from Claude (nobody clicks in the console: it only shows). Design system and website words: once Thierry approves a change, publish it at once " +
   "with set_colours (a colour) or edit_files (website words, any other design token), then call change_status until it says live and give him the commit link. " +
-  "Never keep a change only in the chat or in a local file: if it is not published here, it does not exist. Website words follow the site-wording skill; charts the dualis-charts skill. " +
+  "Never keep a change only in the chat or in a local file: if it is not published here, it does not exist. Before drawing a chart call read_skill dualis-charts, before changing website words read_skill site-wording, and follow it (no skill upload needed). " +
   "Content, portfolio and outreach acts (draft an Idea, approve or mark a draft posted, a position's facts, his fair value, an outreach message or status) go through their tools as soon as he says so.";
 
 type Rpc = { jsonrpc: "2.0"; id?: string | number | null; method: string; params?: Record<string, unknown> };

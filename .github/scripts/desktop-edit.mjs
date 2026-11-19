@@ -20,6 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 export function editablePath(path) {
   if (typeof path !== "string" || path.includes("..") || path.startsWith("/")) return false;
   if (path === "design/tokens.json") return true;
+  if (/^\.claude\/skills\/[a-z0-9-]+\/[^/]+\.(md|py)$/.test(path)) return true;
   if (!/^site\/src\/.+\.(tsx|ts|css)$/.test(path)) return false;
   return path !== "site/src/app/tokens.css" && !path.endsWith(".test.ts");
 }
@@ -46,7 +47,7 @@ export function parseChange(raw) {
   if (!Array.isArray(edits) || !Array.isArray(colours)) throw new Error("edits and colours must be lists");
   if (!edits.length && !colours.length) throw new Error("Nothing to change: give at least one edit or one colour");
   for (const e of edits) {
-    if (!editablePath(e?.path)) throw new Error(`Not editable from Claude Desktop: ${e?.path}. Allowed: design/tokens.json and the site's source under site/src/ (pages, components, styles, model).`);
+    if (!editablePath(e?.path)) throw new Error(`Not editable from Claude Desktop: ${e?.path}. Allowed: design/tokens.json, .claude/skills/<skill>/*.md|py and the site's source under site/src/ (pages, components, styles, model).`);
   }
   for (const c of colours) {
     if (typeof c?.name !== "string" || (c.light === undefined && c.dark === undefined)) throw new Error("Each colour needs a token name and a light and/or dark value");
@@ -84,7 +85,7 @@ export async function applyChange(change, root = ROOT) {
   }
   for (const [path, text] of files) writeFileSync(join(root, path), text);
   const paths = [...files.keys()];
-  return { design: paths.some((p) => p.startsWith("design/")), site: paths.some((p) => p.startsWith("site/")), paths };
+  return { design: paths.some((p) => p.startsWith("design/")), site: paths.some((p) => p.startsWith("site/")), skills: paths.some((p) => p.startsWith(".claude/skills/")), paths };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -92,7 +93,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const change = parseChange(process.env.CHANGE ?? "");
     const touched = await applyChange(change);
     console.log(`Changed: ${touched.paths.join(", ")}`);
-    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `design=${touched.design}\nsite=${touched.site}\n`);
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `design=${touched.design}\nsite=${touched.site}\nskills=${touched.skills}\n`);
   } catch (e) {
     console.log(`::error::${String(e.message).replace(/\r?\n/g, " ")}`);
     process.exit(1);

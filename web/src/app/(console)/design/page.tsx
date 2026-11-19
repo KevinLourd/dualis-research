@@ -4,7 +4,7 @@ import { TableSearch } from "@/console/table-search";
 import { Card, PageHeader } from "@/console/ui";
 import { ChartSample } from "@/design/chart-sample";
 import { MCP_URL } from "@/connector/oauth";
-import { DESIGN_ON_GITHUB, type DesignSystem, getDesignSystem, SKILL_ZIP, WORDING_ZIP } from "@/design/queries";
+import { DESIGN_ON_GITHUB, type DesignSystem, getDesignSystem } from "@/design/queries";
 
 export const metadata = { title: "Design system" };
 export const dynamic = "force-dynamic";
@@ -154,25 +154,9 @@ export default async function DesignPage() {
       <Card title="Claude Desktop">
         <div className="flex max-w-prose flex-col gap-4 p-4 text-base text-kumo-default">
           <p>Claude changes this design system and the website&apos;s words for you, and publishes each change you approve.</p>
-          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
-            <li>
-              Settings, Connectors, Add custom connector: name Dualis Research, URL <code className="text-sm">{MCP_URL}</code>, then Connect and Allow.
-            </li>
-            <li>Settings, Capabilities: turn on code execution.</li>
-            <li>Settings, Capabilities, Skills, Upload skill: add both skills below.</li>
-          </ol>
-          <div className="flex flex-wrap gap-2">
-            <a href={SKILL_ZIP}>
-              <Button variant="primary" tabIndex={-1}>
-                Chart skill
-              </Button>
-            </a>
-            <a href={WORDING_ZIP}>
-              <Button variant="secondary" tabIndex={-1}>
-                Website wording skill
-              </Button>
-            </a>
-          </div>
+          <p>
+            Settings, Connectors, Add custom connector: name Dualis Research, URL <code className="text-sm">{MCP_URL}</code>, then Connect and Allow. Nothing else: the connector brings the chart and wording skills with it.
+          </p>
         </div>
       </Card>
     </>
