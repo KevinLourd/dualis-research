@@ -31,7 +31,7 @@ export default async function DriversPage({ params, searchParams }: { params: Pr
                 <KTableRow>
                   <KTableHead className="pl-4">KPI</KTableHead>
                   <KTableHead>Confidence</KTableHead>
-                  <KTableHead>Releases</KTableHead>
+                  <KTableHead>Tests</KTableHead>
                   <KTableHead>Now</KTableHead>
                   <KTableHead className="w-10 pr-4" />
                 </KTableRow>
@@ -49,7 +49,7 @@ export default async function DriversPage({ params, searchParams }: { params: Pr
                       <ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />
                     </KTableCell>
                     <KTableCell className="py-3 text-sm whitespace-nowrap tabular text-kumo-default">
-                      ✓ {k.confirmed} · ✗ {k.invalidated} · of {k.rows.length}
+                      ✓ {k.confirmed} · ✗ {k.invalidated}
                     </KTableCell>
                     <KTableCell className="py-3">
                       {k.signal === "strong" || k.signal === "weak" ? (

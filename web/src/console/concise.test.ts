@@ -30,7 +30,7 @@ describe("Narrative Drivers (A) and Driver Signals (B) in the panel, read from t
     expect(html).not.toContain("Cash returned to holders");
     expect(html.indexOf("Order intake")).toBeLessThan(html.indexOf("Operating margin"));
     expect(html).toContain("Strong confidence");
-    expect(html).toContain("Confirmed on 2 of 3 releases");
+    expect(html).toContain("Confirmed 2 times");
     expect(html).toContain(encodeURIComponent("kdriver:X:kpi:3"));
   });
 
