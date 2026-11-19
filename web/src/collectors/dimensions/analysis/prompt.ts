@@ -7,7 +7,8 @@ import { stripDashes } from "../thesis/structure";
  * side. v8 (INFLECTION-1117): drivers found from the moves the market made on the business, each citing them; leverage
  * read against earnings.
  */
-export const ANALYSIS_VERSION = "analysis@v8";
+/** v9 (Kevin 2026-11-19): 5 years of business moves, each with the reported figure behind it; a driver names that figure. */
+export const ANALYSIS_VERSION = "analysis@v9";
 
 const METHOD = [
   "The analyst's method: he does not believe in one true value. The price reflects the market's NARRATIVE; the FAIR VALUE is what the business is worth if its plan works.",
@@ -64,6 +65,7 @@ export function analysisPrompt(factsText: string, side: ThesisSide, previous: Pr
     '  "drivers": [ 1 to 5, the REASONS the market holds that story, most important first:',
     `    {"category": <one of: ${DRIVER_CATEGORIES.map((c) => JSON.stringify(c)).join(", ")}>, "title": "<5 to 9 words, the reason itself>", "summary": "<ONE short plain sentence, subject verb complement, no figure>", "text": "<2 to 3 sentences with the reported figures>",`,
     '     "moves": [<the date of each [move YYYY-MM-DD] listed in the facts that this reason caused, e.g. "2025-08-14"; [] when none did>],',
+    '     (the "text" names the reported figure behind those moves, e.g. the operating margin or backlog to revenue, with its values: the structural element the market reacted to)',
     '     "exhibits": [1 or 2 charts that show it: {"title": "<chart title>", "chart": "bar" | "line", "series": [<1 to 3 keys from the stored chart series list, same period type>], "takeaway": "<one line: what the chart shows>"}]}',
     "  ]",
     "}",

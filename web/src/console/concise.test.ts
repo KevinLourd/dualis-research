@@ -19,22 +19,35 @@ describe("a claim's drawer title is its first sentence, whole", () => {
   });
 });
 
-describe("Narrative Drivers: only the ones that turn show", () => {
-  const driver = (rank: number, title: string, state: { effect: string; strength: string } | null) => ({ id: `X:long:${rank}`, rank, category: "Business economics", title, summary: "A long sentence nobody needs here.", evidence: [], exhibits: [], state: state && { ...state, durability: null } }) as never;
-  it("a turning driver sits on screen, the others in one closed drawer, no summary sentence", async () => {
+describe("Narrative Drivers (A) and Driver Signals (B) in the panel", () => {
+  const driver = (rank: number, title: string, level: "strong" | "weak" | "noise" | null, state: { effect: string; strength: string } | null) =>
+    ({ id: `X:long:${rank}`, rank, category: "Business economics", title, summary: "A long sentence nobody needs here.", evidence: [], exhibits: [], state: state && { ...state, durability: null }, confidence: level && { level } }) as never;
+  const drivers = [driver(1, "Cash pile earns little", "noise", null), driver(2, "Profits peaked and fell", "weak", { effect: "reversal", strength: "weak" }), driver(3, "Value-up plan underway", "strong", { effect: "continuation", strength: "weak" })];
+
+  it("A lists the trusted drivers only, strongest first, each opening its confidence panel", async () => {
     const { Drivers } = await import("@/console/analysis");
-    const html = renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "Profits swing", { effect: "continuation", strength: "weak" }), driver(2, "Debt is too high", { effect: "reversal", strength: "weak" }), driver(3, "Nobody covers it", { effect: "noise", strength: "noise" })] }));
-    const at = (s: string) => html.indexOf(s);
-    expect(at("Debt is too high")).toBeGreaterThan(-1);
-    expect(at("Debt is too high")).toBeLessThan(at("2 other drivers, not turning"));
-    expect(at("2 other drivers, not turning")).toBeLessThan(at("Profits swing"));
+    const html = renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers }));
+    expect(html).not.toContain("Cash pile earns little");
+    expect(html.indexOf("Value-up plan underway")).toBeLessThan(html.indexOf("Profits peaked and fell"));
+    expect(html).toContain("Strong confidence");
+    expect(html).toContain(encodeURIComponent("confidence:X:long:3"));
     expect(html).not.toContain("A long sentence nobody needs here.");
-    expect(html).not.toContain("Checked");
   });
-  it("no driver turning says so", async () => {
-    const { Drivers } = await import("@/console/analysis");
-    const html = renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "Profits swing", { effect: "noise", strength: "noise" })] }));
-    expect(html).toContain("No driver is turning.");
-    expect(html).toContain("1 driver");
+
+  it("B lists, among A, only the drivers turning now, each opening its signal panel", async () => {
+    const { DriverSignals } = await import("@/console/analysis");
+    const html = renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers }));
+    expect(html).toContain("Profits peaked and fell");
+    expect(html).not.toContain("Value-up plan underway");
+    expect(html).toContain(encodeURIComponent("driver:X:long:2"));
+  });
+
+  it("says so when nothing is trusted or turning", async () => {
+    const { Drivers, DriverSignals } = await import("@/console/analysis");
+    const none = [driver(1, "Cash pile earns little", "noise", null)];
+    expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver the market has shown it trades on.");
+    expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
+    expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver is turning now.");
+    expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
   });
 });

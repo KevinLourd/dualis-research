@@ -22,6 +22,7 @@ import { fxDim } from "./dimensions/fx";
 import { evidenceDim } from "./dimensions/evidence";
 import { marketReactionDim } from "./dimensions/market-reaction";
 import { moveCausesDim } from "./dimensions/move-causes";
+import { driverConfidenceDim } from "./dimensions/driver-confidence";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { narrativeSinceDim } from "./dimensions/narrative-since";
 import { signalsDim } from "./dimensions/signals";
@@ -66,7 +67,7 @@ import type { Dimension } from "./types";
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, filingDocumentsDim, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, marketReactionDim, moveCausesDim, analysis, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, filingDocumentsDim, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, marketReactionDim, moveCausesDim, driverConfidenceDim, analysis, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -96,7 +97,8 @@ export const STAGES: readonly (readonly string[])[] = [
   ["market-reaction"],
   ["move-causes"],
   ["analysis"],
-  ["narrative-since"],
+  // How far each driver can be trusted (Kevin 2026-11-19): only strong and weak drivers get a Driver Signal.
+  ["narrative-since", "driver-confidence"],
   ["evidence"],
   ["narrative-state"],
   ["signals"],

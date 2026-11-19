@@ -1,11 +1,12 @@
-import { ArrowSquareOutIcon, ArrowsDownUpIcon, BuildingsIcon, CalculatorIcon, ChartBarIcon, ChartLineIcon, ChatTextIcon, CrosshairIcon, DatabaseIcon, FileTextIcon, FilesIcon, GaugeIcon, LightbulbIcon, MathOperationsIcon, NewspaperIcon, SlidersHorizontalIcon, StackIcon, TableIcon, TextAlignLeftIcon } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOutIcon, ArrowsDownUpIcon, BuildingsIcon, CalculatorIcon, ChartBarIcon, ChartLineIcon, ChatTextIcon, CrosshairIcon, DatabaseIcon, FileTextIcon, FilesIcon, GaugeIcon, LightbulbIcon, MathOperationsIcon, NewspaperIcon, SlidersHorizontalIcon, StackIcon, TableIcon, TextAlignLeftIcon, TrendUpIcon } from "@phosphor-icons/react/ssr";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
 import { Badge } from "@cloudflare/kumo";
 import Link from "@/console/link";
 import { getPriceMove, getTickerAnalysis, getValuation } from "./analysis-queries";
 import { ArticleBody } from "./article";
 import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
-import { driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
+import { confidenceDetail, driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
+import { ConfidenceBadge } from "./confidence-badge";
 import { StrengthBadge } from "./board";
 import { TagBadge } from "./tag-badge";
 import { DriverReason } from "./driver-reason";
@@ -338,6 +339,93 @@ async function driverItem(symbol: string, id: string): Promise<ItemView | null> 
           )}
         </DriverReason>
         <SourceNote sources={sources} />
+      </>
+    ),
+  };
+}
+
+const FIT: Record<string, { mark: string; word: string; tone: string }> = {
+  explains: { mark: "✓", word: "Explains", tone: "text-dualis-long" },
+  contradicts: { mark: "✗", word: "Contradicts", tone: "text-dualis-short" },
+  unrelated: { mark: "–", word: "Unrelated", tone: "text-kumo-subtle" },
+};
+const figureOf = (m: { label: string; from: string | null; to: string; change: string | null } | null | undefined) => (m ? `${m.label}: ${m.from ? `${m.from} → ` : ""}${m.to}${m.change ? ` (${m.change})` : ""}` : null);
+
+/**
+ * Driver Temporal Confidence (Kevin 2026-11-19, « pourquoi cette évaluation est fiable aux yeux d'un expert »): the verdict
+ * and its one-sentence reason, the count of later business moves it explains, then drawers: the moves it was found from,
+ * every later move tested with ✓ / ✗ and why, and the reason itself.
+ */
+async function confidenceItem(symbol: string, id: string): Promise<ItemView | null> {
+  const d = await confidenceDetail(symbol, id);
+  if (!d) return null;
+  const c = d.confidence;
+  const row = (href: string, on: string, ret: number, fact: string | null, figure: string | null, right?: React.ReactNode) => (
+    <li key={href}>
+      <Link href={href} scroll={false} className="-mx-3 flex items-start justify-between gap-4 rounded-lg px-3 py-2.5 transition-colors hover:bg-kumo-tint">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-sm text-kumo-subtle tabular">
+            {day(on)} · {`${ret >= 0 ? "+" : ""}${(ret * 100).toFixed(1)}%`}
+          </span>
+          <span className="text-base text-kumo-strong">{fact ?? "No fact written."}</span>
+          {figure && <span className="text-sm text-kumo-default">{figure}</span>}
+        </span>
+        {right}
+      </Link>
+    </li>
+  );
+  return {
+    title: d.driver.title,
+    subtitle: `${d.driver.category} · how far it can be trusted`,
+    body: (
+      <>
+        <div className="flex flex-col gap-3">
+          <span>
+            <ConfidenceBadge level={c?.level ?? null} />
+          </span>
+          <p className="text-xl leading-snug font-semibold text-kumo-strong">{c?.reason ?? "Not tested yet: the next run checks the business moves that followed its origin."}</p>
+          {c && (
+            <p className="text-sm text-kumo-subtle">
+              Explains {c.explained} of {c.tested} later business {c.tested === 1 ? "move" : "moves"}
+              {c.contradicted ? `, ${c.contradicted} against it` : ""}. Market-wide and unexplained moves left out.
+            </p>
+          )}
+        </div>
+        <Drawers>
+          <Drawer icon={<TrendUpIcon size={16} aria-hidden />} title={`Where it comes from · ${d.origin.length}`}>
+            {d.origin.length ? (
+              <ul className="flex flex-col">{d.origin.map((m) => row(itemHref(symbol, `move:${m.id}`), m.startDay, m.returnPct, m.cause?.fact ?? null, figureOf(m.cause?.metric)))}</ul>
+            ) : (
+              <p className="text-base text-kumo-subtle">No past move cites it: it was read from the figures, then tested on every business move.</p>
+            )}
+          </Drawer>
+          {c && (
+            <Drawer icon={<TableIcon size={16} aria-hidden />} title={`Later moves tested · ${c.tested}`}>
+              {c.rows.length ? (
+                <ul className="flex flex-col">
+                  {c.rows.map((r) =>
+                    row(
+                      itemHref(symbol, `move:${r.moveId}`),
+                      r.day,
+                      r.returnPct,
+                      r.fact,
+                      [figureOf(r.metric), r.why].filter(Boolean).join(" · ") || null,
+                      <span className={`shrink-0 text-sm font-medium ${FIT[r.fit].tone}`}>
+                        {FIT[r.fit].mark} {FIT[r.fit].word}
+                      </span>,
+                    ),
+                  )}
+                </ul>
+              ) : (
+                <p className="text-base text-kumo-subtle">No business move came after its origin yet.</p>
+              )}
+            </Drawer>
+          )}
+          <Drawer icon={<LightbulbIcon size={16} aria-hidden />} title="Why the market holds it">
+            <p className="text-base leading-relaxed text-kumo-default">{d.driver.text}</p>
+          </Drawer>
+        </Drawers>
+        <SourceNote sources={["claude"]} />
       </>
     ),
   };
@@ -756,6 +844,7 @@ export async function itemView(symbol: string, item: string, thesis: ThesisSide 
   if (kind === "news") return newsItem(symbol, key);
   if (kind === "kpi") return kpiItem(symbol, key);
   if (kind === "driver") return driverItem(symbol, key);
+  if (kind === "confidence") return confidenceItem(symbol, key);
   if (kind === "exhibit") return exhibitItem(symbol, key);
   if (kind === "valuation") return methodItem(symbol, key);
   if (kind === "move") return moveItem(symbol, key);

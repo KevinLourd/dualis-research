@@ -4,6 +4,7 @@ import type { Assertion } from "@/bsg/provenance";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import * as gold from "@/db/schema/gold";
 import * as silver from "@/db/schema/silver";
+import { signals } from "@/db/schema/analysis";
 import type { Db } from "@/db/types";
 import type { Dimension, PromoteResult, Source } from "../../types";
 import { PROFILE_DIMENSION, rebuildGoldProfiles } from "../company-profile/gold";
@@ -154,10 +155,17 @@ export async function activeSymbols(db: Db): Promise<string[]> {
  * (news, filings, statements, consensus, judges, LLM drafts). Cheap ones the Portfolio page needs (profile, price) keep `activeSymbols`.
  */
 export async function analysedSymbols(db: Db): Promise<string[]> {
-  const rows = await db
-    .select({ symbol: silver.tickers.symbol })
-    .from(silver.tickers)
-    .where(sql`${silver.tickers.active} and ${silver.tickers.analysed}`)
-    .orderBy(silver.tickers.symbol);
-  return rows.map((r) => r.symbol);
+  // Portfolio first, then the tickers that signal, then the rest (Kevin 2026-11-19): when a run hits the Claude
+  // subscription's limit, what Thierry holds and what signals have been judged first.
+  const [rows, signalling] = await Promise.all([
+    db
+      .select({ symbol: silver.tickers.symbol, inPortfolio: silver.tickers.inPortfolio })
+      .from(silver.tickers)
+      .where(sql`${silver.tickers.active} and ${silver.tickers.analysed}`)
+      .orderBy(silver.tickers.symbol),
+    db.select({ symbol: signals.symbol, signal: signals.signal, strength: signals.strength }).from(signals),
+  ]);
+  const signals_ = new Set(signalling.filter((x) => x.signal !== "none" && x.strength !== "noise").map((x) => x.symbol));
+  const rank = (r: { symbol: string; inPortfolio: boolean }) => (r.inPortfolio ? 0 : signals_.has(r.symbol) ? 1 : 2);
+  return [...rows].sort((a, b) => rank(a) - rank(b) || a.symbol.localeCompare(b.symbol)).map((r) => r.symbol);
 }
