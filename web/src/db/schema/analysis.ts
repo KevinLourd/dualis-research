@@ -294,7 +294,8 @@ export const narrativeStates = gold.table(
     explanation: text("explanation"),
     /** Driver level: the document pages the explanation quotes, each quote checked as printed on its page. */
     citations: jsonb("citations").$type<DocCitation[]>().notNull().default([]),
-    judgmentId: uuid("judgment_id").notNull(),
+    /** null for a thesis with no driver the market trades on: no call was made (driver-confidence). */
+    judgmentId: uuid("judgment_id"),
     /** When the judge made this verdict (never the time of the run that re-read it). */
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
     rebuiltAt,
@@ -645,3 +646,42 @@ export const priceMoveCauses = gold.table(
   (t) => [index("gold_price_move_causes_symbol").on(t.symbol)],
 );
 export type GoldPriceMoveCause = typeof priceMoveCauses.$inferSelect;
+
+/** How well a Narrative Driver explained the business moves that followed it (Kevin 2026-11-19). */
+export const CONFIDENCE_LEVELS = ["strong", "weak", "noise"] as const;
+export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
+/** One later business move, judged against the driver: did this reason move the price, the way its story says? */
+export const MOVE_FITS = ["explains", "contradicts", "unrelated"] as const;
+export type MoveFit = (typeof MOVE_FITS)[number];
+export type ConfidenceRow = { moveId: string; day: string; returnPct: number; fact: string | null; metric: MoveMetric | null; fit: MoveFit; why: string };
+
+/**
+ * Narrative Driver Temporal Confidence (Kevin 2026-11-19, « vérifier si ce même driver a continué à être consistant
+ * lors des variations de prix majeures qui ont suivi »): per driver, from the moves it rests on (its origin) and every
+ * business move after the first of them (macro, trading and unexplained moves left out), the judge says for each move
+ * whether this reason explains it, contradicts it or is unrelated, then how far the driver can be trusted: strong,
+ * weak or noise. One stored judgment per driver words + moves (`silver.judgments` subject kind `driver-confidence`,
+ * key `driver-confidence@v1:<hash>`). id = the driver id. Only strong and weak drivers get a Driver Signal.
+ */
+export const driverConfidence = gold.table(
+  "driver_confidence",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    side: text("side").$type<ThesisSide>().notNull(),
+    level: text("level").$type<ConfidenceLevel>().notNull(),
+    /** ONE sentence for the top of the panel: why this driver can be trusted, or not. */
+    reason: text("reason").notNull(),
+    /** The moves the driver was found from (its origin), oldest first. */
+    originMoveIds: text("origin_move_ids").array().notNull(),
+    rows: jsonb("rows").$type<ConfidenceRow[]>().notNull(),
+    explained: integer("explained").notNull(),
+    contradicted: integer("contradicted").notNull(),
+    tested: integer("tested").notNull(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    judgmentId: uuid("judgment_id"),
+    rebuiltAt,
+  },
+  (t) => [index("gold_driver_confidence_symbol").on(t.symbol)],
+);
+export type GoldDriverConfidence = typeof driverConfidence.$inferSelect;

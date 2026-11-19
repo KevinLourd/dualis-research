@@ -104,6 +104,15 @@ beforeEach(async () => {
 });
 afterEach(async () => close());
 
+
+/** Every driver of the ticker trusted (driver-confidence weak): the Driver Signal is asked only of trusted drivers. */
+async function trustDrivers(db: Db) {
+  const { driverConfidence, narrativeDrivers } = await import("@/db/schema/analysis");
+  const ds = await db.select().from(narrativeDrivers);
+  await db.delete(driverConfidence);
+  if (ds.length) await db.insert(driverConfidence).values(ds.map((d) => ({ id: d.id, symbol: d.symbol, side: d.side, level: "weak" as const, reason: "test", originMoveIds: [], rows: [], explained: 0, contradicted: 0, tested: 0, asOf: new Date() })));
+}
+
 describe("analysis dimension", () => {
   it("writes Narrative, Drivers, Exhibits bound to stored series only, and the Report, once per input; reads the Fair Value, never writes it", async () => {
     await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
@@ -188,6 +197,7 @@ describe("analysis dimension", () => {
     expect(lastEvidencePrompt).toContain("fair value 40000 (range 35000 to 46000)");
 
     calls = [];
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual(["driver-state", "driver-state", "thesis-state"]);
     const states = await db.select().from(narrativeStates);
@@ -200,6 +210,7 @@ describe("analysis dimension", () => {
     expect(lastThesisPrompt).toContain(`Today is ${new Date().toISOString().slice(0, 10)}`);
     // Same inputs: never asked again.
     calls = [];
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual([]);
 
@@ -226,18 +237,21 @@ describe("analysis dimension", () => {
     await runDimension(db, analysis, { trigger: "test", ctx: ctx() });
     await db.insert(gold.filings).values({ id: "6f1d1a52-4444-4a3b-9c1d-000000000001", symbol: SYMBOL, registry: "dart", filingKey: "s1", form: null, title: "Share buyback trust", filedAt: new Date(), url: null, language: "ko", sources: ["dart"] });
     await runDimension(db, evidenceDim, { trigger: "test", ctx: ctx() });
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     expect(lastThesisPrompt).not.toContain("Your last reading");
 
     // +1%: same 5% bucket, nothing asked.
     await db.update(gold.quotes).set({ close: 30300 }).where(eq(gold.quotes.symbol, SYMBOL));
     calls = [];
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual([]);
 
     // +12%: asked again, each judge reading its own last reading.
     await db.update(gold.quotes).set({ close: 33600 }).where(eq(gold.quotes.symbol, SYMBOL));
     calls = [];
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     expect(calls).toEqual(["driver-state", "driver-state", "thesis-state"]);
     expect(lastThesisPrompt).toContain(`Your last reading, on ${new Date().toISOString().slice(0, 10)}: reversal:weak, signal weak since 2026-11-02`);
@@ -309,6 +323,7 @@ describe("Too old (Kevin 2026-11-06)", () => {
     expect(tooOld.why).toMatch(/^Before \w+ \d{4}, when the market adopted its current story/);
     expect(rows.find((r) => r.id === `${SYMBOL}|filing:${recent}`)).toMatchObject({ effect: "reversal", strength: "strong" });
 
+    await trustDrivers(db);
     await runDimension(db, narrativeStateDim, { trigger: "test", ctx: ctx() });
     const states = await db.select().from(narrativeStates);
     expect(states.flatMap((x) => x.evidenceIds)).not.toContain(tooOld.id);
@@ -406,7 +421,7 @@ describe("speed (Kevin 2026-11-06)", () => {
     expect(STAGES.flat().sort()).toEqual(DIMENSIONS.map((d) => d.name).sort());
     const at = (n: string) => STAGES.findIndex((s) => s.includes(n));
     for (const [before, after] of [["company-profile", "news"], ["price", "financials"], ["filings", "financials"], ["consensus", "peers"], ["peers", "valuation"], ["valuation", "analysis"], ["valuation", "market-reaction"], ["move-causes", "analysis"], ["market-reaction", "evidence"], ["market-reaction", "move-causes"], ["analysis", "evidence"], ["analysis", "narrative-since"], ["narrative-since", "evidence"], ["evidence", "narrative-state"], ["narrative-state", "signals"], ["price", "intraday-price"], ["intraday-price", "financials"], ["intraday-price", "market-reaction"], ["intraday-price", "signals"], ["signals", "signal-alerts"]]) expect(at(before)).toBeLessThan(at(after));
-    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["market-reaction"], ["move-causes"], ["analysis"], ["narrative-since"], ["evidence"], ["narrative-state"], ["signals"], ["signal-alerts"]]);
+    expect(stagesFor(dimensionsFor("from:valuation")).map((s) => s.map((d) => d.name))).toEqual([["valuation"], ["market-reaction"], ["move-causes"], ["analysis"], ["narrative-since", "driver-confidence"], ["evidence"], ["narrative-state"], ["signals"], ["signal-alerts"]]);
   });
   it("a merge collects only what its files can move", () => {
     expect(collectPlan(["web/src/console/analysis.tsx", "site/src/app/page.tsx", "CLAUDE.md"])).toBeNull();

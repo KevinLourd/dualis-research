@@ -18,6 +18,7 @@ import { reactionLine } from "../market-reaction/compute";
 import { reactionsOf } from "../market-reaction";
 import { stripDashes } from "../thesis/structure";
 import { analysedSymbols } from "../watchlist";
+import { confidentDriverIds } from "../driver-confidence";
 import { resultsPages, verifyQuote, type ResultsPage } from "../filing-documents/read";
 
 /**
@@ -73,7 +74,8 @@ type StateVerdict = {
   verdict: string;
   probability: number;
   reason: string | null;
-  judgmentId: string;
+  /** null when no call was made (no driver the market trades on). */
+  judgmentId: string | null;
   evidenceIds: string[];
   headline: string | null;
   since: string | null;
@@ -528,11 +530,25 @@ export const narrativeStateSource: Source = {
     const { symbol, side } = parseThesisId(subject);
     const d = await driversOf(ctx.db, symbol, side);
     if (!d) return { request: { symbol, side }, httpStatus: null, error: "no narrative or no driver for this thesis yet" };
-    const charts = await driverExhibits(ctx.db, d.drivers.map((x) => x.id));
-    const payload = await judgeThesis(ctx.db, ctx.complete, dbStore(ctx.db), symbol, { side, version: d.version, narrative: d.narrative, market: d.market, drivers: d.drivers.map((x) => ({ ...x, moveIds: x.moveIds ?? [], exhibits: charts.get(x.id) ?? [] })) });
-    return { request: { symbol, side, version: d.version }, httpStatus: null, payload };
+    // Driver Signal (Kevin 2026-11-19): asked only of the drivers the market has shown it trades on (driver-confidence
+    // strong or weak); a noise driver, or one not tested yet, never signals. None left = no signal, no call.
+    const confident = await confidentDriverIds(ctx.db, symbol);
+    const drivers = d.drivers.filter((x) => confident.has(x.id));
+    if (drivers.length === 0) return { request: { symbol, side, version: d.version, confident: 0 }, httpStatus: null, payload: noConfidentDriver(symbol, side) };
+    const charts = await driverExhibits(ctx.db, drivers.map((x) => x.id));
+    const payload = await judgeThesis(ctx.db, ctx.complete, dbStore(ctx.db), symbol, { side, version: d.version, narrative: d.narrative, market: d.market, drivers: drivers.map((x) => ({ ...x, moveIds: x.moveIds ?? [], exhibits: charts.get(x.id) ?? [] })) });
+    return { request: { symbol, side, version: d.version, confident: drivers.length }, httpStatus: null, payload };
   },
 };
+
+/** The thesis state when no driver can be trusted yet: noise, no signal, said in words. */
+export function noConfidentDriver(symbol: string, side: ThesisSide, now = new Date()): NarrativeStatePayload {
+  return {
+    side,
+    drivers: [],
+    thesis: { id: thesisId(symbol, side), driverId: null, verdict: "noise", probability: 1, reason: "No driver the market has shown it trades on: nothing can signal yet.", judgmentId: null, evidenceIds: [], headline: null, since: null, pricedIn: null, signal: "noise", at: now.toISOString() },
+  };
+}
 
 /** Each driver's charts (gold.exhibits), in rank order: what its own figures are. */
 export async function driverExhibits(db: Db, driverIds: string[]): Promise<Map<string, DriverExhibit[]>> {

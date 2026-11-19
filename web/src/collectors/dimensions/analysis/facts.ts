@@ -16,7 +16,8 @@ import { seriesCatalog, seriesMenu, type StoredSeries } from "./series";
 export type AnalysisFacts = { symbol: string; text: string; hash: string; catalog: Map<string, StoredSeries>; quote: { close: number; date: string; currency: string | null } | null; currency: string | null; hasFinancials: boolean; moveIds: Set<string> };
 
 /** How far back the analysis reads the significant price moves, and how many business ones at most (the largest). */
-export const MOVE_YEARS = 3;
+/** 5 years since the filings reach that far (Kevin 2026-11-19): a driver's origin can be an old move. */
+export const MOVE_YEARS = 5;
 export const MOVES_SHOWN = 30;
 const signedPct = (x: number | null) => (x === null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`);
 
@@ -44,7 +45,8 @@ export async function movesText(db: Db, symbol: string, now = new Date()): Promi
   const unknown = rows.filter((r) => r.price_move_causes.kind === "unknown").length;
   const lines = business.map(({ price_moves: m, price_move_causes: c }) => {
     const span = m.startDay === m.endDay ? m.startDay : `${m.startDay} to ${m.endDay}`;
-    return `- [move ${m.startDay}] ${span}: stock ${signedPct(m.returnPct)}, S&P 500 ${signedPct(m.benchReturn)} (${Math.abs(m.z).toFixed(1)} standard deviations). ${c.category ?? "Uncategorised"}: ${c.fact ?? "no fact written"}`;
+    const figure = c.metric ? ` Figure behind it: ${c.metric.label} ${c.metric.from ? `${c.metric.from} to ` : ""}${c.metric.to}${c.metric.change ? ` (${c.metric.change})` : ""}, period ended ${c.metric.period}${c.lasting && c.lasting !== "n-a" ? `, ${c.lasting}` : ""}.` : "";
+    return `- [move ${m.startDay}] ${span}: stock ${signedPct(m.returnPct)}, S&P 500 ${signedPct(m.benchReturn)} (${Math.abs(m.z).toFixed(1)} standard deviations). ${c.category ?? "Uncategorised"}: ${c.fact ?? "no fact written"}${figure}`;
   });
   return {
     text: [
