@@ -222,7 +222,8 @@ export const dart: FinancialsSource = {
     const y = now.getUTCFullYear();
     const wanted: [number, DartReportCode][] = [
       ...Array.from({ length: YEARS }, (_, i) => [y - 1 - i, "11011"] as [number, DartReportCode]),
-      ...[y, y - 1].flatMap((yr) => (["11013", "11012", "11014"] as const).map((rc) => [yr, rc] as [number, DartReportCode])),
+      // 3 years of quarters (Kevin 2026-11-19: a KPI driver is tested on every release of 3 years).
+      ...[y, y - 1, y - 2, y - 3].flatMap((yr) => (["11013", "11012", "11014"] as const).map((rc) => [yr, rc] as [number, DartReportCode])),
     ];
     const reports: DartReport[] = [];
     let lastStatus = 200;

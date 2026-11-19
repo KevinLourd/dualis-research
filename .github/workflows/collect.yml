@@ -15,6 +15,10 @@ on:
         description: "schedule (dualis-cron) or manual"
         default: manual
         required: false
+      only:
+        description: "One ticker only (COLLECT_ONLY), for a test run; empty = every ticker"
+        default: ""
+        required: false
 
 concurrency:
   group: collect
@@ -47,6 +51,7 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ONEDRIVE_TOKEN_KEY: ${{ secrets.ONEDRIVE_TOKEN_KEY }}
       COLLECT_TRIGGER: ${{ github.event.inputs.trigger || 'manual' }}
+      COLLECT_ONLY: ${{ github.event.inputs.only || '' }}
     steps:
       - name: Database secret is set
         working-directory: .

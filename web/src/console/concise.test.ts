@@ -19,35 +19,33 @@ describe("a claim's drawer title is its first sentence, whole", () => {
   });
 });
 
-describe("Narrative Drivers (A) and Driver Signals (B) in the panel", () => {
-  const driver = (rank: number, title: string, level: "strong" | "weak" | "noise" | null, state: { effect: string; strength: string } | null) =>
-    ({ id: `X:long:${rank}`, rank, category: "Business economics", title, summary: "A long sentence nobody needs here.", evidence: [], exhibits: [], state: state && { ...state, durability: null }, confidence: level && { level } }) as never;
-  const drivers = [driver(1, "Cash pile earns little", "noise", null), driver(2, "Profits peaked and fell", "weak", { effect: "reversal", strength: "weak" }), driver(3, "Value-up plan underway", "strong", { effect: "continuation", strength: "weak" })];
+describe("Narrative Drivers (A) and Driver Signals (B) in the panel, read from the KPI drivers", () => {
+  const kpi = (rank: number, name: string, level: "strong" | "weak" | "none", signal: "strong" | "weak" | "none" | null) =>
+    ({ id: `X:kpi:${rank}`, rank, name, level, signal, signalWhy: `${name} moved`, direction: "up", confirmed: 2, rows: [{}, {}, {}] }) as never;
+  const kpis = [kpi(1, "Cash returned to holders", "none", null), kpi(2, "Operating margin", "weak", "weak"), kpi(3, "Order intake", "strong", "none")];
 
-  it("A lists the trusted drivers only, strongest first, each opening its confidence panel", async () => {
-    const { Drivers } = await import("@/console/analysis");
-    const html = renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers }));
-    expect(html).not.toContain("Cash pile earns little");
-    expect(html.indexOf("Value-up plan underway")).toBeLessThan(html.indexOf("Profits peaked and fell"));
+  it("A lists the trusted KPIs only, strongest first, each opening its test panel", async () => {
+    const { KpiDrivers } = await import("@/console/analysis");
+    const html = renderToStaticMarkup(createElement(KpiDrivers, { symbol: "X", kpis }));
+    expect(html).not.toContain("Cash returned to holders");
+    expect(html.indexOf("Order intake")).toBeLessThan(html.indexOf("Operating margin"));
     expect(html).toContain("Strong confidence");
-    expect(html).toContain(encodeURIComponent("confidence:X:long:3"));
-    expect(html).not.toContain("A long sentence nobody needs here.");
+    expect(html).toContain("Confirmed on 2 of 3 releases");
+    expect(html).toContain(encodeURIComponent("kdriver:X:kpi:3"));
   });
 
-  it("B lists, among A, only the drivers turning now, each opening its signal panel", async () => {
-    const { DriverSignals } = await import("@/console/analysis");
-    const html = renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers }));
-    expect(html).toContain("Profits peaked and fell");
-    expect(html).not.toContain("Value-up plan underway");
-    expect(html).toContain(encodeURIComponent("driver:X:long:2"));
+  it("B lists, among A, only the KPIs turning now", async () => {
+    const { KpiSignals } = await import("@/console/analysis");
+    const html = renderToStaticMarkup(createElement(KpiSignals, { symbol: "X", kpis }));
+    expect(html).toContain("Operating margin");
+    expect(html).not.toContain("Order intake");
+    expect(html).toContain("Weak turn · up");
   });
 
-  it("says so when nothing is trusted or turning", async () => {
-    const { Drivers, DriverSignals } = await import("@/console/analysis");
-    const none = [driver(1, "Cash pile earns little", "noise", null)];
-    expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver the market has shown it trades on.");
-    expect(renderToStaticMarkup(createElement(Drivers, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
-    expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: none }))).toContain("No driver is turning now.");
-    expect(renderToStaticMarkup(createElement(DriverSignals, { symbol: "X", side: "long", thesis: null, drivers: [driver(1, "x", null, null)] }))).toContain("Not tested yet.");
+  it("says Not tested yet before a run, and a dash when no KPI is trusted", async () => {
+    const { KpiDrivers, KpiSignals } = await import("@/console/analysis");
+    expect(renderToStaticMarkup(createElement(KpiDrivers, { symbol: "X", kpis: [] }))).toContain("Not tested yet.");
+    expect(renderToStaticMarkup(createElement(KpiDrivers, { symbol: "X", kpis: [kpis[0]] }))).toContain("–");
+    expect(renderToStaticMarkup(createElement(KpiSignals, { symbol: "X", kpis: [kpis[2]] }))).toContain("No driver is turning now.");
   });
 });

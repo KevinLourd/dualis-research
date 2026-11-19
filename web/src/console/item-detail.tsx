@@ -7,6 +7,7 @@ import { ArticleBody } from "./article";
 import { MethodsTable, RangeCards, ValuationField } from "./valuation-ui";
 import { confidenceDetail, driverDetail, evidenceDetail, exhibitDetail, fairValueDetail, kpiDetail, priceDetail } from "./board-queries";
 import { ConfidenceBadge } from "./confidence-badge";
+import { kpiDriver } from "./kpi-queries";
 import { StrengthBadge } from "./board";
 import { TagBadge } from "./tag-badge";
 import { DriverReason } from "./driver-reason";
@@ -433,6 +434,76 @@ async function confidenceItem(symbol: string, id: string): Promise<ItemView | nu
   };
 }
 
+const VERDICT: Record<string, { mark: string; word: string; tone: string }> = {
+  confirms: { mark: "✓", word: "Confirms", tone: "text-dualis-long" },
+  invalidates: { mark: "✗", word: "Invalidates", tone: "text-dualis-short" },
+  neutral: { mark: "–", word: "Neutral", tone: "text-kumo-subtle" },
+};
+
+/**
+ * A KPI driver (Kevin + Thierry 2026-11-19): how far it can be trusted in one sentence, then every results release of
+ * 3 years: what the KPI did, what the price did over the next 5 trading days, confirms / invalidates, the report's own
+ * words one click away. Then whether it turns now.
+ */
+async function kpiDriverItem(symbol: string, id: string): Promise<ItemView | null> {
+  const k = await kpiDriver(id);
+  if (!k || k.symbol !== symbol) return null;
+  const pct = (x: number | null) => (x === null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`);
+  return {
+    title: k.name,
+    subtitle: k.why,
+    body: (
+      <>
+        <div className="flex flex-col gap-3">
+          <span>
+            <ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />
+          </span>
+          <p className="text-xl leading-snug font-semibold text-kumo-strong">{k.reason}</p>
+          <p className="text-sm text-kumo-subtle">
+            Confirmed on {k.confirmed} of {k.rows.length} results releases, invalidated on {k.invalidated}. Price measured over the 5 trading days after each release, against the S&amp;P 500.
+          </p>
+        </div>
+        <Drawers>
+          {k.signal && (
+            <Drawer icon={<CrosshairIcon size={16} aria-hidden />} title={`Now: ${k.signal === "none" ? "not turning" : `${k.signal} turn${k.direction ? `, ${k.direction}` : ""}`}`}>
+              <p className="text-base leading-relaxed text-kumo-default">{k.signalWhy ?? "Nothing moved enough at the latest release."}</p>
+            </Drawer>
+          )}
+          <Drawer icon={<TableIcon size={16} aria-hidden />} title={`Every release · ${k.rows.length}`}>
+            <ul className="flex flex-col">
+              {[...k.rows].reverse().map((r) => (
+                <li key={r.releaseId} className="flex items-start justify-between gap-4 border-b border-kumo-hairline py-2.5 last:border-b-0">
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm text-kumo-subtle tabular">
+                      {day(r.day)} · price {pct(r.reaction)} vs S&amp;P 500
+                    </span>
+                    <span className="text-base text-kumo-strong">{r.from || r.to ? `${k.name}: ${r.from ? `${r.from} → ` : ""}${r.to ?? "?"}${r.change ? ` (${r.change})` : ""}` : "Not shown in this release"}</span>
+                    {r.why && <span className="text-sm text-kumo-default">{r.why}</span>}
+                    {r.cite && (
+                      <Link href={itemHref(symbol, docItemId(r.cite.documentId, r.cite.page, r.cite.quote))} scroll={false} className="text-sm text-kumo-link hover:underline">
+                        « {r.cite.quote.length > 90 ? `${r.cite.quote.slice(0, 90)}…` : r.cite.quote} » p. {r.cite.page}
+                      </Link>
+                    )}
+                  </span>
+                  <span className={`shrink-0 text-sm font-medium ${VERDICT[r.verdict].tone}`}>
+                    {VERDICT[r.verdict].mark} {VERDICT[r.verdict].word}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Drawer>
+          {(k.series || k.approximation) && (
+            <Drawer icon={<DatabaseIcon size={16} aria-hidden />} title="How it is measured">
+              <p className="text-base text-kumo-default">{k.approximation ? `Not reported: approximated as ${k.approximation}.` : `Reported figure (${k.series}).`}</p>
+            </Drawer>
+          )}
+        </Drawers>
+        <SourceNote sources={["claude"]} />
+      </>
+    ),
+  };
+}
+
 async function exhibitItem(symbol: string, id: string): Promise<ItemView | null> {
   const d = await exhibitDetail(symbol, id);
   if (!d) return null;
@@ -847,6 +918,7 @@ export async function itemView(symbol: string, item: string, thesis: ThesisSide 
   if (kind === "kpi") return kpiItem(symbol, key);
   if (kind === "driver") return driverItem(symbol, key);
   if (kind === "confidence") return confidenceItem(symbol, key);
+  if (kind === "kdriver") return kpiDriverItem(symbol, key);
   if (kind === "exhibit") return exhibitItem(symbol, key);
   if (kind === "valuation") return methodItem(symbol, key);
   if (kind === "move") return moveItem(symbol, key);

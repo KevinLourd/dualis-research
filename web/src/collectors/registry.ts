@@ -23,6 +23,7 @@ import { evidenceDim } from "./dimensions/evidence";
 import { marketReactionDim } from "./dimensions/market-reaction";
 import { moveCausesDim } from "./dimensions/move-causes";
 import { driverConfidenceDim } from "./dimensions/driver-confidence";
+import { kpiDriversDim } from "./dimensions/kpi-drivers";
 import { narrativeStateDim } from "./dimensions/narrative-state";
 import { narrativeSinceDim } from "./dimensions/narrative-since";
 import { signalsDim } from "./dimensions/signals";
@@ -67,7 +68,7 @@ import type { Dimension } from "./types";
  * One signal engine since 2026-11-09: the legacy catalysts / thesis-confidence chain is gone; the WhatsApp alert is the Signal Change.
  * Signal alerts right after signals: a Signal Change that makes the signal better goes to Kevin and Thierry with its picture.
  */
-export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, filingDocumentsDim, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, marketReactionDim, moveCausesDim, driverConfidenceDim, analysis, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
+export const DIMENSIONS: readonly Dimension[] = [watchlist, portfolio, companyProfile, news, onedrive, thesis, price, intradayPrice, filingsDimension, filingDocumentsDim, onedriveFilings, earnings, financials, consensusDim, peersDim, fxDim, valuationDim, marketReactionDim, moveCausesDim, driverConfidenceDim, kpiDriversDim, analysis, narrativeSinceDim, evidenceDim, narrativeStateDim, signalsDim, signalAlertsDim, contentAccounts, contentPosts, coverPhotos, contentVoices, contentIdeas, contentPicks, contentDrafts, contentVisuals, sandboxAccounts, sandboxPosts, sandboxVisuals, sandboxImageFix, sandboxReview, contentDispatch, contentReplies, growthOutreach, substackNetwork, growthBriefDim, xPublish];
 
 /**
  * Growth and content dimensions (Substack crawl, outreach, posts, voices, drafts): the daily schedule only. A deploy's
@@ -81,7 +82,8 @@ export const GROWTH_DIMENSIONS: readonly string[] = ["content-accounts", "conten
  * consensus, financials, peers) sit in different stages so they never hit its rate limit together.
  */
 /** Dimensions that run only when named: never part of `all`, `core` or `growth`. */
-export const ON_DEMAND_DIMENSIONS: readonly string[] = ["x-publish"];
+/** kpi-drivers runs only when named while it is tested on one ticker (Kevin 2026-11-19: « un seul ticker… jusqu'à ce qu'on ait qqchose de convaincant »). */
+export const ON_DEMAND_DIMENSIONS: readonly string[] = ["x-publish", "kpi-drivers"];
 
 export const STAGES: readonly (readonly string[])[] = [
   ["watchlist"],
