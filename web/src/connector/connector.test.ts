@@ -183,7 +183,7 @@ describe("MCP", () => {
     const list = (await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ctx)) as { result: { tools: { name: string }[] } };
     expect(list.result.tools.map((t) => t.name)).toEqual([
       "read_skill", "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
-      "list_ideas", "draft_idea", "list_drafts", "set_draft_status", "update_outreach",
+      "update_outreach",
     ]);
     expect(await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ctx)).toBeNull();
   });

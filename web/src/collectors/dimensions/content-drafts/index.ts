@@ -186,7 +186,7 @@ export async function promoteDrafts(db: Db, rows: BronzeFetch[]): Promise<Promot
     const generated = parseGeneration(format, f.payloadText ?? "", offered.map((x) => x.id));
     const charts: DraftChart[] | null = format === "substack-article" ? generated.exhibitIds.map((id) => offered.find((x) => x.id === id)!.chart) : null;
     const inputKey = `idea:${req.ideaId}`;
-    // A daily pick (content-picks) goes to WhatsApp as soon as it is written: its slot is now. A draft asked through Claude (draft_idea) has no slot.
+    // A daily pick (content-picks) goes to WhatsApp as soon as it is written: its slot is now. A draft asked any other way has no slot.
     const [asked] = await db.select({ sources: content.contentDraftRequests.sources }).from(content.contentDraftRequests).where(eq(content.contentDraftRequests.id, requestId));
     const scheduledAt = asked?.sources.includes(PICK_SOURCE) ? new Date() : null;
     const [{ prior }] = await db

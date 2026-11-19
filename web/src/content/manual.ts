@@ -61,7 +61,7 @@ export async function setDraftStatus(
 }
 
 /**
- * Thierry asks for a draft of an Idea on one channel x format (through Claude: connector tool draft_idea). The request lands in bronze,
+ * Thierry asks for a draft of an Idea on one channel x format (the daily picks, content-picks; tests). The request lands in bronze,
  * then silver (pending), then the Idea's gold row; the content-drafts dimension writes the draft. A second click while
  * one is pending changes nothing.
  */

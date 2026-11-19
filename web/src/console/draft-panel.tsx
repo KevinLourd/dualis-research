@@ -21,7 +21,7 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={s.variant}>{s.text}</Badge>;
 }
 
-/** Right panel of one draft, read only: the text, publish / copy, status, and what it was built from. Its status changes through Claude (connector tool set_draft_status) or WhatsApp. */
+/** Right panel of one draft, read only: the text, publish / copy, status, and what it was built from. Its status changes on WhatsApp (go / dismiss). */
 export function DraftPanel({ draft, closeHref, visuals = [] }: { draft: GoldContentDraft; closeHref: string; visuals?: GoldContentVisual[] }) {
   const text = draft.title ? `${draft.title}\n\n${draft.body}` : draft.body;
   const link = publishLink(draft.format, draft.body);
