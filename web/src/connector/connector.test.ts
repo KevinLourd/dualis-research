@@ -166,17 +166,21 @@ describe("tools", () => {
   it("reads why a run refused the change from its log", () => {
     const log = "2026-11-18T10:00:00Z ##[error]site/src/app/page.tsx: text not found\n2026-11-18T10:00:01Z ##[error]Process completed with exit code 1.\n";
     expect(errorLines(log)).toEqual(["site/src/app/page.tsx: text not found"]);
+    expect(errorLines("x ##[error]\x1b[31mAssertionError\x1b[39m: expected a\nx ##[error]::error file=/a.ts,line=1::AssertionError\n")).toEqual(["AssertionError: expected a"]);
   });
 });
 
 describe("MCP", () => {
-  const ctx = { author: "Kevin" };
+  const ctx = { author: "Kevin", userId: "user_1" };
   it("initializes, lists the tools and ignores notifications", async () => {
     const init = (await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, ctx)) as { result: { protocolVersion: string; instructions: string } };
     expect(init.result.protocolVersion).toBe("2025-06-18");
     expect(init.result.instructions).toMatch(/publish it at once/);
     const list = (await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ctx)) as { result: { tools: { name: string }[] } };
-    expect(list.result.tools.map((t) => t.name)).toEqual(["read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status"]);
+    expect(list.result.tools.map((t) => t.name)).toEqual([
+      "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
+      "list_ideas", "draft_idea", "list_drafts", "set_draft_status", "list_positions", "edit_position", "set_fair_value", "update_outreach",
+    ]);
     expect(await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ctx)).toBeNull();
   });
 

@@ -1,10 +1,8 @@
 import { Badge } from "@cloudflare/kumo";
 import { LightbulbIcon } from "@phosphor-icons/react/ssr";
 import { FORMAT_LABEL, PROPOSED_FORMATS } from "@/collectors/dimensions/content-drafts/format";
-import { requestDraftAction } from "@/content/actions";
 import { canDispatch } from "@/content/dispatch";
 import { lastContentRun, listIdeas } from "@/console/content-queries";
-import { PendingButton } from "@/console/content-ui";
 import { dateFormat, relativeTime } from "@/console/format";
 import { itemHref } from "@/console/analysis";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "@/console/kumo";
@@ -142,7 +140,7 @@ function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-medium text-kumo-subtle">Draft it</h3>
         <ul className="divide-y divide-kumo-hairline rounded-lg ring-1 ring-kumo-hairline">
-          {formats.map((format, n) => {
+          {formats.map((format) => {
             const s = scoreOf.get(format);
             const r = latest(format);
             return (
@@ -153,7 +151,7 @@ function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
                   {s?.why && <span className="text-sm text-kumo-subtle">{s.why}</span>}
                   {r?.status === "failed" && <span className="text-sm text-dualis-short">The last try failed: {r.error}</span>}
                 </span>
-                <RequestAction ideaId={idea.id} format={format} request={r} primary={n === 0} />
+                <RequestAction request={r} />
               </li>
             );
           })}
@@ -194,15 +192,8 @@ function IdeaPanel({ idea }: { idea: GoldContentIdea }) {
   );
 }
 
-/** Per channel x format: Create draft, Drafting… (with when it starts), or Open draft + Draft again. */
-function RequestAction({ ideaId, format, request, primary }: { ideaId: string; format: string; request: IdeaRequest | undefined; primary: boolean }) {
-  const form = (label: string, variant: "primary" | "secondary") => (
-    <form action={requestDraftAction}>
-      <input type="hidden" name="ideaId" value={ideaId} />
-      <input type="hidden" name="format" value={format} />
-      <PendingButton label={label} pendingLabel="Asking…" variant={variant} />
-    </form>
-  );
+/** Per channel x format, read only: Drafting… (with when it starts) or Open draft. A draft is asked through Claude (connector tool draft_idea). */
+function RequestAction({ request }: { request: IdeaRequest | undefined }) {
   if (request?.status === "pending") {
     return (
       <span className="flex flex-col items-end gap-0.5 text-right">
@@ -215,13 +206,10 @@ function RequestAction({ ideaId, format, request, primary }: { ideaId: string; f
   }
   if (request?.status === "done" && request.draftId) {
     return (
-      <span className="flex items-center gap-2">
-        <Link href={`/content/drafts?draft=${request.draftId}`} className="text-sm font-medium text-kumo-link hover:underline">
-          Open draft ›
-        </Link>
-        {form("Draft again", "secondary")}
-      </span>
+      <Link href={`/content/drafts?draft=${request.draftId}`} className="text-sm font-medium text-kumo-link hover:underline">
+        Open draft ›
+      </Link>
     );
   }
-  return form(request?.status === "failed" ? "Try again" : "Create draft", primary ? "primary" : "secondary");
+  return null;
 }

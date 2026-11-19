@@ -1,5 +1,4 @@
-import { Button, Input } from "@cloudflare/kumo";
-import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, ClockCounterClockwiseIcon, FileTextIcon, ListBulletsIcon, NewspaperIcon, PencilSimpleIcon, ScalesIcon, TargetIcon } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, ClockCounterClockwiseIcon, FileTextIcon, ListBulletsIcon, NewspaperIcon, ScalesIcon, TargetIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import type { GoldEvidence, GoldExhibit, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
@@ -20,7 +19,6 @@ import { day, numberFormat, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
 import { getThesis } from "./thesis-queries";
-import { saveFairValue } from "./thesis-actions";
 import { ComingNext } from "./ui";
 import { PRICED_WORD } from "@/content/signal-words";
 
@@ -229,7 +227,7 @@ export function Drivers({ symbol, drivers, side, thesis }: { symbol: string; dri
  * one, else the long. The competition between two theses stays in the backend.
  */
 export function AnalysisBody({ analysis, variant }: { analysis: Analysis; variant: "panel" | "page" }) {
-  const { row, ownFair: thesis, consensus, objects, chart, valuation, moves } = analysis;
+  const { row, consensus, objects, chart, valuation, moves } = analysis;
   const exhibitByNumber = new Map(objects.drivers.flatMap((d) => d.exhibits).map((x) => [x.number, x]));
   const symbol = row.symbol;
   // The analysis writes the narrative; nobody edits it by hand (Kevin 2026-11-09).
@@ -298,13 +296,6 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
               <NewsTable rows={newsRows(symbol, objects, keep)} drivers={objects.drivers.map((d) => ({ rank: d.rank, title: d.title }))} side={side} />
             </Drawer>
           )}
-          <Drawer icon={<PencilSimpleIcon size={16} aria-hidden />} title="Your fair value">
-            <form action={saveFairValue.bind(null, symbol, thesis?.currency ?? row.currency)} className="flex flex-wrap items-end gap-3">
-              <Input name="value" label={`Fair value per share${row.currency ? ` (${row.currency})` : ""}`} inputMode="decimal" defaultValue={thesis?.fairValue ?? ""} className="w-40" />
-              <Input name="basis" label="How you got it" placeholder="10x EV/EBITDA on 2027 EBITDA" defaultValue={thesis?.fairValueBasis ?? ""} className="w-80" />
-              <Button type="submit" variant="secondary">Save</Button>
-            </form>
-          </Drawer>
           {objects.report && (
             <Drawer icon={<FileTextIcon size={16} aria-hidden />} title="Research report">
               <article className="flex max-w-3xl flex-col gap-4">
