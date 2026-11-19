@@ -685,3 +685,50 @@ export const driverConfidence = gold.table(
   (t) => [index("gold_driver_confidence_symbol").on(t.symbol)],
 );
 export type GoldDriverConfidence = typeof driverConfidence.$inferSelect;
+
+/** A results release a KPI driver is tested on: the company's report and what the price did in the 5 trading days after. */
+export type KpiRelease = { id: string; day: string; title: string; reaction: number | null; stock: number | null; bench: number | null };
+/** One release judged against one KPI (Thierry 2026-11-19: a hypothesis, invalidated when the KPI moved strongly and the price did not). */
+export const KPI_VERDICTS = ["confirms", "invalidates", "neutral"] as const;
+export type KpiVerdict = (typeof KPI_VERDICTS)[number];
+export type KpiTestRow = { releaseId: string; day: string; title: string; reaction: number | null; from: string | null; to: string | null; change: string | null; verdict: KpiVerdict; why: string; cite: DocCitation | null };
+export const KPI_LEVELS = ["strong", "weak", "none"] as const;
+export type KpiLevel = (typeof KPI_LEVELS)[number];
+
+/**
+ * KPI Drivers (Kevin + Thierry 2026-11-19, private `docs/meeting-2026-11-19.md`): a driver is a fundamental KPI the
+ * market trades the stock on. The AI lists the candidate KPIs from the business model and what management writes in
+ * its reports (any number, approximations of unreported ones included), then tests each one on every results release
+ * of 3 years: confirms / invalidates / neutral, with the 5-trading-day price reaction, then how far it can be trusted
+ * (strong / weak / none) and whether it turns NOW (signal). id = `<symbol>:kpi:<n>`.
+ */
+export const kpiDrivers = gold.table(
+  "kpi_drivers",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    rank: integer("rank").notNull(),
+    name: text("name").notNull(),
+    /** Why this KPI moves this business, in one sentence. */
+    why: text("why").notNull(),
+    /** A stored series key it reads (`qmetric:operating-margin`), else null: read in the reports' words. */
+    series: text("series"),
+    /** How it is approximated when the company does not report it (« revenue / PP&E »), else null. */
+    approximation: text("approximation"),
+    level: text("level").$type<KpiLevel>(),
+    /** ONE sentence: why this KPI can be trusted, or not. */
+    reason: text("reason"),
+    rows: jsonb("rows").$type<KpiTestRow[]>().notNull().default([]),
+    confirmed: integer("confirmed").notNull().default(0),
+    invalidated: integer("invalidated").notNull().default(0),
+    /** Does it turn NOW (the latest release): strong / weak / none, and why. Null for a KPI not trusted. */
+    signal: text("signal").$type<KpiLevel>(),
+    signalWhy: text("signal_why"),
+    /** Which way it turns, read against the story (`up` / `down` in the KPI itself). */
+    direction: text("direction").$type<"up" | "down">(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    rebuiltAt,
+  },
+  (t) => [index("gold_kpi_drivers_symbol").on(t.symbol)],
+);
+export type GoldKpiDriver = typeof kpiDrivers.$inferSelect;

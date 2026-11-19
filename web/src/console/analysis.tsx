@@ -1,14 +1,17 @@
-import { ArrowSquareOutIcon, CaretRightIcon, ChartLineIcon, ClockCounterClockwiseIcon, FileTextIcon, NewspaperIcon, ScalesIcon, TargetIcon } from "@phosphor-icons/react/ssr";
+import { ArrowSquareOutIcon, CaretRightIcon, ClockCounterClockwiseIcon, FileTextIcon, NewspaperIcon, ScalesIcon, TargetIcon } from "@phosphor-icons/react/ssr";
 import Link from "@/console/link";
 import type { GoldEvidence, GoldExhibit, ThesisSide } from "@/db/schema/analysis";
 import type { GoldConsensus } from "@/db/schema/consensus";
-import { type DriverWithExhibits, getTickerAnalysis, getValuation, priceMoveMarkers } from "./analysis-queries";
+import { getTickerAnalysis, getValuation, priceMoveMarkers } from "./analysis-queries";
 import { MethodsTable, ValuationField } from "./valuation-ui";
 import { ArticleBody } from "./article";
 import { type BoardRow, boardRowOf, priceVsFairValue } from "./board-queries";
 import { CallBadge, TickerTag } from "./board";
 import { Drawer, Drawers } from "./drawer";
 import { ConfidenceBadge } from "./confidence-badge";
+import { kpiDriversOf } from "./kpi-queries";
+import type { GoldKpiDriver } from "@/db/schema/analysis";
+import { Badge } from "@cloudflare/kumo";
 import { KTable, KTableBody, KTableCell, KTableHead, KTableHeader, KTableRow } from "./kumo";
 import { RowLink } from "./row-link";
 import { signalWordsOf } from "./signal-history";
@@ -19,7 +22,6 @@ import { TagBadge } from "./tag-badge";
 import { day, numberFormat, utc } from "./format";
 import { consensusOf, getTicker } from "./queries";
 import { Section } from "./signal";
-import { ComingNext } from "./ui";
 import { PRICED_WORD } from "@/content/signal-words";
 
 /**
@@ -34,7 +36,7 @@ export const itemHref = (symbol: string, item: string, thesis?: ThesisSide | nul
 export const parseThesis = (v: string | undefined): ThesisSide | null => (v === "long" || v === "short" ? v : null);
 
 export async function analysisData(symbol: string, thesis: ThesisSide | null = null, page = false) {
-  const [row, data, consensus, objects, chart, valuation, moves] = await Promise.all([
+  const [row, data, consensus, objects, chart, valuation, moves, kpis] = await Promise.all([
     boardRowOf(symbol),
     getTicker(symbol),
     consensusOf(symbol),
@@ -43,9 +45,10 @@ export async function analysisData(symbol: string, thesis: ThesisSide | null = n
     getValuation(symbol),
     // The significant moves' markers sit on the Analysis page's chart only (the Signals panel stays light).
     page ? priceMoveMarkers(symbol) : [],
+    kpiDriversOf(symbol),
   ]);
   if (!row || !data) return null;
-  return { row, data, consensus, objects, chart, valuation, moves };
+  return { row, data, consensus, objects, chart, valuation, moves, kpis };
 }
 type Analysis = NonNullable<Awaited<ReturnType<typeof analysisData>>>;
 
@@ -175,19 +178,17 @@ export function EvidenceRows({ symbol, rows, driverId, side }: { symbol: string;
 
 export { PRICED_WORD };
 
-const LEVEL_RANK = { strong: 0, weak: 1, noise: 2 } as const;
-const trusted = (d: DriverWithExhibits) => d.confidence !== null && d.confidence.level !== "noise";
-/** A Driver Signal worth showing: a trusted driver turning now, strong or weak. */
-const signalling = (d: DriverWithExhibits) => trusted(d) && d.state?.effect === "reversal" && (d.state.strength === "strong" || d.state.strength === "weak");
+const LEVEL_RANK = { strong: 0, weak: 1, none: 2 } as const;
+const STRENGTH_RANK = { strong: 0, weak: 1, none: 2 } as const;
 
-/** One row: the driver (category above its title) on the left, one badge on the right, a caret. */
-function DriverRow({ href, d, badge }: { href: string; d: DriverWithExhibits; badge: React.ReactNode }) {
+/** One row: the KPI on the left, one badge on the right, a caret. */
+function KpiRow({ href, name, sub, badge }: { href: string; name: string; sub?: string | null; badge: React.ReactNode }) {
   return (
     <li>
       <Link href={href} scroll={false} className="-mx-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-lg px-3 py-3 transition-colors hover:bg-kumo-tint">
         <span className="flex min-w-0 flex-col gap-1">
-          <span className="text-sm text-kumo-subtle">{d.category}</span>
-          <span className="text-lg font-semibold text-kumo-strong">{d.title}</span>
+          <span className="text-lg font-semibold text-kumo-strong">{name}</span>
+          {sub && <span className="text-sm text-kumo-subtle">{sub}</span>}
         </span>
         <span className="flex items-center gap-2">
           {badge}
@@ -199,32 +200,41 @@ function DriverRow({ href, d, badge }: { href: string; d: DriverWithExhibits; ba
 }
 
 /**
- * A. Narrative Drivers (Kevin 2026-11-19): the drivers the market has shown it trades on (strong or weak confidence),
- * strongest first; noise is left out. Each row opens why it can be trusted (`confidence:` panel).
+ * A. Narrative Drivers (Kevin + Thierry 2026-11-19): the fundamental KPIs the market has shown it trades the stock on
+ * (strong or weak confidence), strongest first; the others are left out. A row opens how it was tested (`kdriver:`).
  */
-export function Drivers({ symbol, drivers, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
-  const shown = drivers.filter(trusted).sort((a, b) => LEVEL_RANK[a.confidence!.level] - LEVEL_RANK[b.confidence!.level] || a.rank - b.rank);
-  if (shown.length === 0) {
-    const tested = drivers.some((d) => d.confidence);
-    return <p className="text-lg text-kumo-subtle">{tested ? "No driver the market has shown it trades on." : "Not tested yet."}</p>;
-  }
+export function KpiDrivers({ symbol, kpis }: { symbol: string; kpis: GoldKpiDriver[] }) {
+  const shown = kpis.filter((k) => k.level === "strong" || k.level === "weak").sort((a, b) => LEVEL_RANK[a.level!] - LEVEL_RANK[b.level!] || a.rank - b.rank);
+  if (kpis.length === 0) return <p className="text-lg text-kumo-subtle">Not tested yet.</p>;
+  if (shown.length === 0) return <p className="text-lg text-kumo-subtle">–</p>;
   return (
     <ol className="flex flex-col">
-      {shown.map((d) => (
-        <DriverRow key={d.id} href={itemHref(symbol, `confidence:${d.id}`, thesis)} d={d} badge={<ConfidenceBadge level={d.confidence!.level} />} />
+      {shown.map((k) => (
+        <KpiRow key={k.id} href={itemHref(symbol, `kdriver:${k.id}`)} name={k.name} sub={`Confirmed on ${k.confirmed} of ${k.rows.length} releases`} badge={<ConfidenceBadge level={k.level === "none" ? "noise" : k.level} />} />
       ))}
     </ol>
   );
 }
 
-/** B. Driver Signals (Kevin 2026-11-19): among A, the drivers turning NOW (strong or weak). Each row opens why (`driver:` panel). */
-export function DriverSignals({ symbol, drivers, side, thesis }: { symbol: string; drivers: DriverWithExhibits[]; side: ThesisSide; thesis: ThesisSide | null }) {
-  const shown = drivers.filter(signalling).sort((a, b) => Number(b.state!.strength === "strong") - Number(a.state!.strength === "strong") || a.rank - b.rank);
-  if (shown.length === 0) return <p className="text-lg text-kumo-subtle">{drivers.some((d) => d.confidence) ? "No driver is turning now." : "Not tested yet."}</p>;
+/** B. Driver Signals: among A, the KPIs turning NOW at the latest release (strong or weak). */
+export function KpiSignals({ symbol, kpis }: { symbol: string; kpis: GoldKpiDriver[] }) {
+  const shown = kpis.filter((k) => (k.level === "strong" || k.level === "weak") && (k.signal === "strong" || k.signal === "weak")).sort((a, b) => STRENGTH_RANK[a.signal!] - STRENGTH_RANK[b.signal!] || a.rank - b.rank);
+  if (kpis.length === 0) return <p className="text-lg text-kumo-subtle">Not tested yet.</p>;
+  if (shown.length === 0) return <p className="text-lg text-kumo-subtle">No driver is turning now.</p>;
   return (
     <ol className="flex flex-col">
-      {shown.map((d) => (
-        <DriverRow key={d.id} href={itemHref(symbol, `driver:${d.id}`, thesis)} d={d} badge={<TagBadge effect={d.state!.effect} strength={d.state!.strength} side={side} durability={d.state!.durability} />} />
+      {shown.map((k) => (
+        <KpiRow
+          key={k.id}
+          href={itemHref(symbol, `kdriver:${k.id}`)}
+          name={k.name}
+          sub={k.signalWhy}
+          badge={
+            <Badge appearance="dot" variant={k.signal === "strong" ? "success" : "warning"}>
+              {`${k.signal === "strong" ? "Strong" : "Weak"} turn${k.direction ? ` · ${k.direction === "up" ? "up" : "down"}` : ""}`}
+            </Badge>
+          }
+        />
       ))}
     </ol>
   );
@@ -271,22 +281,16 @@ export function AnalysisBody({ analysis, variant }: { analysis: Analysis; varian
       </Section>
 
       <Section title="Narrative drivers">
-        {objects.drivers.length > 0 && side ? (
-          <Drivers symbol={symbol} drivers={objects.drivers} side={side} thesis={keep} />
-        ) : (
-          <ComingNext size="sm" icon={<ChartLineIcon size={28} className="text-kumo-inactive" />} title="No driver yet" description="The next run writes them." />
-        )}
+        <KpiDrivers symbol={symbol} kpis={analysis.kpis} />
       </Section>
 
-      {objects.drivers.length > 0 && side && (
-        <Section title="Driver signals">
-          <DriverSignals symbol={symbol} drivers={objects.drivers} side={side} thesis={keep} />
-        </Section>
-      )}
+      <Section title="Driver signals">
+        <KpiSignals symbol={symbol} kpis={analysis.kpis} />
+      </Section>
 
-      {objects.drivers.length > 0 && (
-        <Link href={`/tickers/${encodeURIComponent(symbol)}/drivers${keep ? `?thesis=${keep}` : ""}`} className="inline-flex items-center gap-1 self-start text-sm font-medium text-kumo-link hover:underline">
-          Every driver, how it was found and tested <CaretRightIcon size={14} weight="bold" aria-hidden />
+      {analysis.kpis.length > 0 && (
+        <Link href={`/tickers/${encodeURIComponent(symbol)}/drivers`} className="inline-flex items-center gap-1 self-start text-sm font-medium text-kumo-link hover:underline">
+          Every KPI tested, release by release <CaretRightIcon size={14} weight="bold" aria-hidden />
         </Link>
       )}
 
