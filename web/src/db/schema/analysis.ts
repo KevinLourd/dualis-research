@@ -691,7 +691,29 @@ export type KpiRelease = { id: string; day: string; title: string; reaction: num
 /** One release judged against one KPI (Thierry 2026-11-19: a hypothesis, invalidated when the KPI moved strongly and the price did not). */
 export const KPI_VERDICTS = ["confirms", "invalidates", "neutral"] as const;
 export type KpiVerdict = (typeof KPI_VERDICTS)[number];
-export type KpiTestRow = { releaseId: string; day: string; title: string; reaction: number | null; from: string | null; to: string | null; change: string | null; verdict: KpiVerdict; why: string; cite: DocCitation | null };
+/**
+ * One moment judged against one KPI (Kevin 2026-11-19). step B1 = a results release or a news item: did the price move a
+ * lot in the 5 trading days after, and did the KPI change then? step B2 = any other company filing where the KPI moved
+ * strongly: did the price follow? A (the KPI's moves) = every row with `kpiChanged`.
+ */
+export type KpiTestRow = {
+  releaseId: string;
+  day: string;
+  title: string;
+  step?: "B1" | "B2";
+  kind?: "release" | "news" | "filing";
+  /** 5-day return against the S&P 500, and how unusual it is for this stock (that move in standard deviations of its own 5-day moves over the year before). */
+  reaction: number | null;
+  unusual?: number | null;
+  bigMove?: boolean;
+  kpiChanged?: boolean;
+  from: string | null;
+  to: string | null;
+  change: string | null;
+  verdict: KpiVerdict;
+  why: string;
+  cite: DocCitation | null;
+};
 export const KPI_LEVELS = ["strong", "weak", "none"] as const;
 export type KpiLevel = (typeof KPI_LEVELS)[number];
 

@@ -469,29 +469,53 @@ async function kpiDriverItem(symbol: string, id: string): Promise<ItemView | nul
               <p className="text-base leading-relaxed text-kumo-default">{k.signalWhy ?? "Nothing moved enough at the latest release."}</p>
             </Drawer>
           )}
-          <Drawer icon={<TableIcon size={16} aria-hidden />} title={`Every release · ${k.rows.length}`}>
-            <ul className="flex flex-col">
-              {[...k.rows].reverse().map((r) => (
-                <li key={r.releaseId} className="flex items-start justify-between gap-4 border-b border-kumo-hairline py-2.5 last:border-b-0">
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm text-kumo-subtle tabular">
-                      {day(r.day)} · price {pct(r.reaction)} vs S&amp;P 500
+          {(() => {
+            const KIND = { release: "Results release", news: "News", filing: "Filing" } as const;
+            const list = (rows: typeof k.rows, withVerdict: boolean) => (
+              <ul className="flex flex-col">
+                {[...rows].reverse().map((r) => (
+                  <li key={`${r.step}:${r.releaseId}`} className="flex items-start justify-between gap-4 border-b border-kumo-hairline py-2.5 last:border-b-0">
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-sm text-kumo-subtle tabular">
+                        {day(r.day)} · {KIND[r.kind ?? "release"]} · price {pct(r.reaction)} vs S&amp;P 500{r.bigMove ? ", a big move" : ""}
+                      </span>
+                      <span className="text-sm text-kumo-default">{r.title}</span>
+                      <span className="text-base text-kumo-strong">
+                        {r.from || r.to ? `${k.name}: ${r.from ? `${r.from} → ` : ""}${r.to ?? "?"}${r.change ? ` (${r.change})` : ""}` : r.kpiChanged ? `${k.name} moved` : `${k.name} did not move`}
+                      </span>
+                      {r.why && <span className="text-sm text-kumo-default">{r.why}</span>}
+                      {r.cite && (
+                        <Link href={itemHref(symbol, docItemId(r.cite.documentId, r.cite.page, r.cite.quote))} scroll={false} className="text-sm text-kumo-link hover:underline">
+                          « {r.cite.quote.length > 90 ? `${r.cite.quote.slice(0, 90)}…` : r.cite.quote} » p. {r.cite.page}
+                        </Link>
+                      )}
                     </span>
-                    <span className="text-base text-kumo-strong">{r.from || r.to ? `${k.name}: ${r.from ? `${r.from} → ` : ""}${r.to ?? "?"}${r.change ? ` (${r.change})` : ""}` : "Not shown in this release"}</span>
-                    {r.why && <span className="text-sm text-kumo-default">{r.why}</span>}
-                    {r.cite && (
-                      <Link href={itemHref(symbol, docItemId(r.cite.documentId, r.cite.page, r.cite.quote))} scroll={false} className="text-sm text-kumo-link hover:underline">
-                        « {r.cite.quote.length > 90 ? `${r.cite.quote.slice(0, 90)}…` : r.cite.quote} » p. {r.cite.page}
-                      </Link>
+                    {withVerdict && (
+                      <span className={`shrink-0 text-sm font-medium ${VERDICT[r.verdict].tone}`}>
+                        {VERDICT[r.verdict].mark} {VERDICT[r.verdict].word}
+                      </span>
                     )}
-                  </span>
-                  <span className={`shrink-0 text-sm font-medium ${VERDICT[r.verdict].tone}`}>
-                    {VERDICT[r.verdict].mark} {VERDICT[r.verdict].word}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Drawer>
+                  </li>
+                ))}
+              </ul>
+            );
+            const moved = k.rows.filter((r) => r.kpiChanged);
+            const b1 = k.rows.filter((r) => (r.step ?? "B1") === "B1");
+            const b2 = k.rows.filter((r) => r.step === "B2");
+            return (
+              <>
+                <Drawer icon={<TrendUpIcon size={16} aria-hidden />} title={`A. When ${k.name} moved · ${moved.length}`}>
+                  {moved.length ? list(moved, false) : <p className="text-base text-kumo-subtle">It never moved significantly in 3 years.</p>}
+                </Drawer>
+                <Drawer icon={<TableIcon size={16} aria-hidden />} title={`B1. Releases and news · ${b1.length}`}>
+                  {list(b1, true)}
+                </Drawer>
+                <Drawer icon={<FilesIcon size={16} aria-hidden />} title={`B2. The rest of the time · ${b2.length}`}>
+                  {b2.length ? list(b2, true) : <p className="text-base text-kumo-subtle">No other filing moved it.</p>}
+                </Drawer>
+              </>
+            );
+          })()}
           {(k.series || k.approximation) && (
             <Drawer icon={<DatabaseIcon size={16} aria-hidden />} title="How it is measured">
               <p className="text-base text-kumo-default">{k.approximation ? `Not reported: approximated as ${k.approximation}.` : `Reported figure (${k.series}).`}</p>
