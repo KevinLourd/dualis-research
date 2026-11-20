@@ -32,7 +32,20 @@ export function tickerBase(symbol: string): string {
 }
 
 /** Google News edition per watchlist market (hl=en-XX, gl=XX, ceid=XX:en). Others read the US edition. */
-export const GOOGLE_REGION: Record<string, string> = { US: "US", CA: "CA", AU: "AU", HK: "HK", UK: "GB" };
+export const GOOGLE_REGION: Record<string, string> = { US: "US", CA: "CA", AU: "AU", HK: "HK", UK: "GB", KR: "KR", JP: "JP" };
+
+/**
+ * The Google News edition a query is asked in (2026-11-19: Worldex's Korean name « 월덱스 » was asked in the US English
+ * edition and returned nothing, while the Korean edition has 100 articles): a term written in Hangul, kana or Chinese
+ * characters is asked in that language's edition, anything else in English for the ticker's market.
+ */
+export function googleEdition(term: string, market: string): string {
+  if (/[\uac00-\ud7af]/.test(term)) return "hl=ko&gl=KR&ceid=KR:ko";
+  if (/[\u3040-\u30ff]/.test(term)) return "hl=ja&gl=JP&ceid=JP:ja";
+  if (/[\u4e00-\u9fff]/.test(term)) return market === "JP" ? "hl=ja&gl=JP&ceid=JP:ja" : "hl=zh-HK&gl=HK&ceid=HK:zh-Hant";
+  const region = GOOGLE_REGION[market] ?? "US";
+  return `hl=en-${region}&gl=${region}&ceid=${region}:en`;
+}
 
 // Only true legal-form tokens: descriptive words (Group, Holdings) keep a name distinctive
 // ("ADF Group Inc." must not collapse to "ADF").
@@ -52,18 +65,22 @@ export function cleanCompanyName(name: string): string {
 export type NewsQuery = { kind: "name" | "alias"; term: string; q: string };
 
 /**
- * Exact-phrase Google News queries: the company name, then each alias. A one-word alias is too broad alone
- * ("Conrad"), so it is ANDed with the ticker. `when:7d` keeps each answer to the last week.
+ * Exact-phrase Google News queries: the company name, then each alias. A one-word Latin alias is too broad alone
+ * ("Conrad"), so it is ANDed with the ticker; a name in a local script (« 월덱스 ») is distinctive and news in that
+ * language never prints the ticker, so it stays alone. `window` = `when:7d` on a normal run, empty for the first
+ * run of a ticker with no news yet (the edition's most relevant articles across time: the history a KPI test reads).
  */
-export function googleQueries(symbol: string, name: string, aliases: readonly string[]): NewsQuery[] {
+export function googleQueries(symbol: string, name: string, aliases: readonly string[], window = "when:7d"): NewsQuery[] {
   const clean = cleanCompanyName(name);
   const seen = new Set([clean.toLowerCase()]);
-  const out: NewsQuery[] = [{ kind: "name", term: clean, q: `"${clean}" when:7d` }];
+  const w = window ? ` ${window}` : "";
+  const out: NewsQuery[] = [{ kind: "name", term: clean, q: `"${clean}"${w}` }];
   for (const raw of aliases) {
     const a = raw.trim();
     if (!a || seen.has(a.toLowerCase())) continue;
     seen.add(a.toLowerCase());
-    const q = a.split(/\s+/).length === 1 ? `"${a}" ${tickerBase(symbol)} when:7d` : `"${a}" when:7d`;
+    const latinWord = a.split(/\s+/).length === 1 && !/[^\u0000-\u024f]/.test(a);
+    const q = latinWord ? `"${a}" ${tickerBase(symbol)}${w}` : `"${a}"${w}`;
     out.push({ kind: "alias", term: a, q });
   }
   return out;

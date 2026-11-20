@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalUrl,
   cleanCompanyName,
+  googleEdition,
   googleQueries,
   mergeArticles,
   parseRss,
@@ -40,6 +41,11 @@ describe("query terms", () => {
       { kind: "alias", term: "Conrad", q: '"Conrad" CNRD when:7d' },
     ]);
     expect(googleQueries("4238.T", "Miraial", ["Mira"])[1].q).toBe('"Mira" 4238 when:7d');
+    // A local-script name stays alone (Korean news never prints the ticker); a first run asks across time.
+    expect(googleQueries("101160.KQ", "Worldexindustry&Tradingco.,Ltd", ["Worldex", "월덱스"], "").map((q) => q.q)).toEqual(['"Worldexindustry&Tradingco.,Ltd"', '"Worldex" 101160', '"월덱스"']);
+    expect(googleEdition("월덱스", "KR")).toBe("hl=ko&gl=KR&ceid=KR:ko");
+    expect(googleEdition("ミライアル", "JP")).toBe("hl=ja&gl=JP&ceid=JP:ja");
+    expect(googleEdition("Worldex", "KR")).toBe("hl=en-KR&gl=KR&ceid=KR:en");
   });
 });
 

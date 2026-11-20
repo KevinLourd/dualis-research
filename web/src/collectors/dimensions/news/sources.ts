@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm";
 import type { BronzeFetch } from "@/db/schema/bronze";
 import { companyProfiles } from "@/db/schema/gold";
+import { goldNewsLinks } from "@/db/schema/news";
 import * as silver from "@/db/schema/silver";
 import type { Db } from "@/db/types";
 import { getJson, isUsSymbol } from "../../http";
 import type { FetchOutcome, Source, SourceContext } from "../../types";
 import {
-  GOOGLE_REGION,
+  googleEdition,
   googleQueries,
   parseDate,
   parseRss,
@@ -121,11 +122,12 @@ export const googleNews: NewsSource = {
   async fetch(symbol, ctx) {
     if (!ctx.db) throw new Error("google-news needs the database to read names and aliases");
     const { market, name, aliases } = await queryTerms(ctx.db, symbol);
-    const region = GOOGLE_REGION[market] ?? "US";
+    // A ticker with no news yet asks across time once (its history), then the last week on every run.
+    const [known] = await ctx.db.select({ id: goldNewsLinks.newsItemId }).from(goldNewsLinks).where(eq(goldNewsLinks.symbol, symbol)).limit(1);
     const answers: GoogleAnswer[] = [];
     const errors: string[] = [];
-    for (const query of googleQueries(symbol, name, aliases)) {
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query.q)}&hl=en-${region}&gl=${region}&ceid=${region}:en`;
+    for (const query of googleQueries(symbol, name, aliases, known ? "when:7d" : "")) {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query.q)}&${googleEdition(query.term, market)}`;
       const res = await ctx.fetch(url, { headers: BROWSER_UA });
       const body = await res.text();
       answers.push({ ...query, url, httpStatus: res.status, body });
