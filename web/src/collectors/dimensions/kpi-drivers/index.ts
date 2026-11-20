@@ -187,7 +187,7 @@ export const CANDIDATES_SYSTEM = [
   "You are the equity research associate of a small-cap long/short analyst. He trusts only fundamental KPIs: figures about the business that the market trades the stock on.",
   "List every KPI that drives THIS business, from its business model and from what management itself writes in its reports (the KPIs it reports, discusses and explains results with).",
   "Know what drives each kind of business (capacity utilization for a manufacturer, same-store sales for a retailer, backlog for a contractor, net interest margin for a bank...). When the company does not report one, say how to approximate it from what it reports (capacity utilization ~ revenue / PP&E).",
-  "Any number of KPIs: none when nothing fundamental drives it, twenty if there are twenty. Never a price, a valuation multiple or a market-wide factor.",
+  "Any number of KPIs: none when nothing fundamental drives it, twenty if there are twenty. Only the company's OWN figures (reported, or computed from what it reports): never an external series (a customer's or the industry's numbers, a commodity, a rate, a currency, an index), never a price or a valuation multiple.",
   "series = the stored series key that holds it, copied exactly from the list (null when none does); approximation = the formula from stored keys, else null.",
   "No em dash. JSON only, no prose, no code fence:",
   '{"kpis": [{"name": "Operating margin", "why": "<at most 15 words: why it moves this business>", "series": "qmetric:operating-margin" | null, "approximation": string | null}]}',
