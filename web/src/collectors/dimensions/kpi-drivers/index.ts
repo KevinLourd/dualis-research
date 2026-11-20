@@ -160,8 +160,21 @@ export function seriesAt(s: StoredSeries, day: string): string | null {
 async function once<T>(db: Db, complete: Complete, kind: string, subjectId: string, key: string, question: string, system: string, prompt: string, parse: (text: string) => Promise<T> | T): Promise<T> {
   const [hit] = await db.select().from(silver.judgments).where(and(eq(silver.judgments.subjectKind, kind), eq(silver.judgments.subjectId, subjectId), eq(silver.judgments.questionKey, key)));
   if (hit) return parse((hit.raw as { text: string }).text);
-  const r = await complete({ system, prompt });
-  const parsed = await parse(r.text);
+  let r = await complete({ system, prompt });
+  let parsed: T;
+  try {
+    parsed = await parse(r.text);
+  } catch (err) {
+    // One repair ask, like the analysis (Worldex 2026-11-20: a 3-year answer came back as unreadable JSON); a second
+    // failure is loud, with the answer's size and end so the cause shows (cut off, or an unescaped quote).
+    const first = (err as Error).message;
+    r = await complete({ system, prompt: `${prompt}\n\nYour previous answer could not be read (${first.slice(0, 200)}). Answer again with valid JSON only: escape every double quote inside a string, keep each why short.` });
+    try {
+      parsed = await parse(r.text);
+    } catch (again) {
+      throw new Error(`${(again as Error).message.slice(0, 200)} (answer ${r.text.length} chars, ends: ${JSON.stringify(r.text.slice(-120))})`);
+    }
+  }
   await db.insert(silver.judgments).values({ subjectKind: kind, subjectId, questionKey: key, question, verdict: "answered", probability: 1, citedSentence: null, reason: null, model: r.model, raw: { text: r.text } }).onConflictDoNothing();
   return parsed;
 }
@@ -185,7 +198,7 @@ export const TEST_SYSTEM = [
   "Every dated moment of 3 years is listed: results releases (R, with the report's pages), news items (N) and the company's other filings (F), each with the price over the 5 trading days after against the S&P 500 and how unusual that move is for this stock.",
   "B1, on EVERY release and news item: bigMove = did the price move a lot in those 5 days (judge from the move and how unusual it is)? kpiChanged = did THIS KPI change significantly at that moment (from the figures given, the report's words and tables, the news)? verdict: confirms = the KPI changed and the price moved the way that change implies; invalidates = the KPI changed strongly and the price did not react, or moved the other way; neutral = the KPI did not change, or something else clearly moved the price.",
   "B2, the rest of the time: among the other filings (F), every one where THIS KPI moved strongly (a disclosure of a large change in sales or profit, an order, a capacity or customer event...): did the price move with it? Same verdicts. List only those filings.",
-  "from / to / change = the KPI values at that moment (with units), null when not shown. why = at most 15 words, the fact. cite = the release label, page and an EXACT quote of the report, only for releases, null otherwise.",
+  "from / to / change = the KPI values at that moment (with units), null when not shown or when it did not change. why = at most 12 words, the fact. cite = the release label, page and an EXACT quote of the report, only for releases, null otherwise.",
   "level: decide it yourself, as the analyst would, from B1 and B2: never by counting. Weigh each moment: how big the KPI move was, how clear the price reaction was, whether another fact or the market at large explains it, whether the evidence is recent. A small cap's price is noisy: one contrary moment can be noise, a clean, large KPI move the price ignored says much more. strong = the market clearly trades the stock on this KPI; weak = it does sometimes, or the evidence is thin; none = it does not.",
   "reason = ONE plain sentence, at most 15 words, that a reader landing on the page understands at once: the conclusion about how the stock reacts to this KPI. No dates, no list of figures, no labels.",
   "signal (only when level is strong or weak, else null): does the KPI turn NOW, at the latest moment, by enough to change the story, with the price not reacting yet? strong (only for a strong KPI) / weak / none. signalWhy = one sentence with the figure. direction = up or down, the way the KPI moved last.",

@@ -94,7 +94,8 @@ describe("kpi drivers", () => {
       expect(prompt).toContain("B1 has exactly 2 rows");
       return { text: JSON.stringify({ b1: [{ event: "R1", verdict: "neutral", why: "x" }], b2: [], level: "none", reason: "r" }), model: "fake" };
     };
-    await expect(kpiSource.fetch(SYMBOL, { env: { CLAUDE_OAUTH_TOKEN: "x" }, fetch, db, complete: fake })).rejects.toThrow(/R2/);
+    // Asked twice (one repair ask), then loud with the answer's size.
+    await expect(kpiSource.fetch(SYMBOL, { env: { CLAUDE_OAUTH_TOKEN: "x" }, fetch, db, complete: fake })).rejects.toThrow(/R2.*chars/);
     const stored = await db.select().from(silver.judgments);
     expect(stored.map((j) => j.subjectKind)).toEqual(["kpi-candidates"]);
   });
