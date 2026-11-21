@@ -1,7 +1,7 @@
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import { sql } from "drizzle-orm";
-import { displayUrl, openverseUrl, toCandidate, creditLine, type PhotoCandidate } from "@/collectors/dimensions/cover-photos";
+import { displayUrl } from "@/collectors/dimensions/cover-photos";
 import type { Db } from "@/db/types";
 
 /**
@@ -209,23 +209,70 @@ export const reportSpec = (r: Report): CoverSpec => ({ title: r.title, shelf: r.
 
 export type FoundPhoto = { photo_url: string; preview_url: string; title: string; credit: string; link: string; width: number; height: number };
 
-/** Commons photos for a new cover: the same open search the website's covers come from (Openverse, commercial licences). */
+/**
+ * Commons photos for a new cover, from the Wikimedia Commons API itself (Openverse, which the website's collector
+ * uses from GitHub, answers 403 to the console server). Photos only (jpg / png), at least 1000 px wide, any free
+ * licence Commons hosts (all allow commercial use), credited "Photo: <author>, <licence>".
+ */
 export async function findPhotos(words: string, f: typeof fetch = fetch): Promise<FoundPhoto[]> {
   const q = words.trim();
   if (!q) throw new Error("Give a few words naming what to show (e.g. semiconductor wafer, container port)");
-  const res = await f(openverseUrl(q), { headers: UA });
+  const res = await f(commonsSearchUrl(q), { headers: UA });
   if (!res.ok) throw new Error(`Photo search failed (${res.status}). Try again in a minute.`);
-  const body = (await res.json()) as { results?: Record<string, unknown>[] };
-  return (body.results ?? [])
-    .map(toCandidate)
-    .filter((c): c is PhotoCandidate => c !== null)
-    .map((c) => ({
-      photo_url: displayUrl(c, 2048),
-      preview_url: displayUrl(c, 640),
-      title: c.title,
-      credit: creditLine(c),
-      link: c.landing,
-      width: c.width,
-      height: c.height,
-    }));
+  return parseCommons((await res.json()) as CommonsAnswer);
+}
+
+export function commonsSearchUrl(q: string): string {
+  const p = new URLSearchParams({
+    action: "query",
+    format: "json",
+    generator: "search",
+    gsrnamespace: "6",
+    gsrsearch: `${q} filetype:bitmap`,
+    gsrlimit: "20",
+    prop: "imageinfo",
+    iiprop: "url|size|mime|extmetadata",
+    iiextmetadatafilter: "LicenseShortName|Artist|ObjectName",
+  });
+  return `https://commons.wikimedia.org/w/api.php?${p}`;
+}
+
+type CommonsAnswer = {
+  query?: {
+    pages?: Record<
+      string,
+      {
+        index?: number;
+        title?: string;
+        imageinfo?: { url: string; width: number; height: number; mime: string; descriptionurl: string; extmetadata?: Record<string, { value?: string }> }[];
+      }
+    >;
+  };
+};
+
+const plain = (html: string | undefined) => (html ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+export function parseCommons(body: CommonsAnswer): FoundPhoto[] {
+  const pages = Object.values(body.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  const out: FoundPhoto[] = [];
+  for (const p of pages) {
+    const i = p.imageinfo?.[0];
+    if (!i || !/^image\/(jpeg|png)$/.test(i.mime) || i.width < 1000) continue;
+    const url = i.url.split("?")[0];
+    if (!commonsUrl(url)) continue;
+    const m = i.extmetadata ?? {};
+    const licence = plain(m.LicenseShortName?.value) || "Wikimedia Commons";
+    const author = plain(m.Artist?.value) || "Wikimedia Commons";
+    out.push({
+      photo_url: displayUrl({ url, width: i.width }, 2048),
+      preview_url: displayUrl({ url, width: i.width }, 640),
+      title: plain(m.ObjectName?.value) || String(p.title ?? "").replace(/^File:/, ""),
+      credit: `Photo: ${author}, ${licence}`,
+      link: i.descriptionurl,
+      width: i.width,
+      height: i.height,
+    });
+    if (out.length === 10) break;
+  }
+  return out;
 }
