@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { callCoverTool, coverLink } from "./cover-tools";
-import { coverDate, coverSvg, pickReport, sizeOf, type Report } from "./covers";
+import { coverDate, coverSvg, parseCommons, pickReport, sizeOf, type Report } from "./covers";
 import { connectorHelpPage } from "./help-page";
 import { unseal } from "./oauth";
 import { GET as coverRoute } from "../app/covers/[file]/route";
@@ -67,6 +67,31 @@ describe("report covers", () => {
     expect(bad.status).toBe(404);
     const link = coverLink({ title: "T", shelf: "Other", date: null, photo: null }, { width: 400, height: 300 });
     expect(unseal(new URL(link).pathname.split("/").pop()!.replace(/\.png$/, ""), "access")).toBeNull();
+  });
+});
+
+describe("photo search for a new cover", () => {
+  it("keeps Commons photos 1000 px wide or more, credits author and licence, links the file page", () => {
+    const info = (url: string, width: number, mime = "image/jpeg") => ({
+      url: `${url}?utm_source=commons`,
+      width,
+      height: 900,
+      mime,
+      descriptionurl: "https://commons.wikimedia.org/wiki/File:Wafer.jpg",
+      extmetadata: { LicenseShortName: { value: "CC BY 4.0" }, Artist: { value: '<a href="x">Purdue Engineering</a>' }, ObjectName: { value: "A wafer" } },
+    });
+    const found = parseCommons({
+      query: {
+        pages: {
+          "2": { index: 2, title: "File:Small.jpg", imageinfo: [info("https://upload.wikimedia.org/wikipedia/commons/a/ab/Small.jpg", 600)] },
+          "1": { index: 1, title: "File:Wafer.jpg", imageinfo: [info("https://upload.wikimedia.org/wikipedia/commons/b/b8/Wafer.jpg", 3000)] },
+          "3": { index: 3, title: "File:Logo.svg", imageinfo: [info("https://upload.wikimedia.org/wikipedia/commons/c/cd/Logo.svg", 3000, "image/svg+xml")] },
+        },
+      },
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ title: "A wafer", credit: "Photo: Purdue Engineering, CC BY 4.0", link: "https://commons.wikimedia.org/wiki/File:Wafer.jpg" });
+    expect(found[0].photo_url).toBe("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Wafer.jpg/2048px-Wafer.jpg");
   });
 });
 
