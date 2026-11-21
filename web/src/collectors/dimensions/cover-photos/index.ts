@@ -81,7 +81,7 @@ export function parseQueries(text: string): string[] {
   return qs.slice(0, 3);
 }
 
-function toCandidate(r: Record<string, unknown>): PhotoCandidate | null {
+export function toCandidate(r: Record<string, unknown>): PhotoCandidate | null {
   const url = typeof r.url === "string" ? r.url : null;
   const width = Number(r.width);
   const height = Number(r.height);

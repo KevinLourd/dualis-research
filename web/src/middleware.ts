@@ -6,7 +6,7 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
  * its own OAuth bearer (web/src/connector/), discovery, registration and token answer anyone (Claude's servers);
  * /oauth/authorize stays behind the console sign-in.
  */
-const PUBLIC = /^\/(sign-in|mcp$|\.well-known\/oauth-|oauth\/(register|token)$)/;
+const PUBLIC = /^\/(sign-in|mcp$|covers\/|\.well-known\/oauth-|oauth\/(register|token)$)/;
 
 export default clerkMiddleware(
   async (auth, req) => {

@@ -1,5 +1,6 @@
 import { handleRpc } from "@/connector/mcp";
 import { bearerUser, unauthorized } from "@/connector/oauth";
+import { connectorHelpPage } from "@/connector/help-page";
 import { connectorUser } from "@/connector/user";
 
 /** The Claude connector (https://console.dualisresearch.com/mcp): stateless MCP over Streamable HTTP, OAuth bearer. */
@@ -22,6 +23,8 @@ export async function POST(req: Request): Promise<Response> {
 
 /** No server-to-client stream: every answer comes back on the POST. */
 export async function GET(req: Request): Promise<Response> {
+  // Opened in a browser (Thierry 2026-11-21 pasted the address in Chrome and got raw JSON): say where it goes.
+  if (!req.headers.get("authorization") && (req.headers.get("accept") ?? "").includes("text/html")) return connectorHelpPage();
   if (!bearerUser(req.headers.get("authorization"))) return unauthorized();
   return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
 }

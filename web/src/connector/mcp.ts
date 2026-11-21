@@ -1,7 +1,8 @@
 import { callConsoleTool, CONSOLE_TOOLS } from "./console-tools";
+import { callCoverTool, COVER_TOOLS } from "./cover-tools";
 import { callTool, TOOLS, type ToolContext } from "./tools";
 
-const ALL_TOOLS = [...TOOLS, ...CONSOLE_TOOLS];
+const ALL_TOOLS = [...TOOLS, ...CONSOLE_TOOLS, ...COVER_TOOLS];
 export type McpContext = ToolContext & { userId: string };
 
 /**
@@ -14,7 +15,9 @@ export const INSTRUCTIONS =
   "Dualis Research's console, driven from Claude (nobody clicks in the console: it only shows). Design system and website words: once Thierry approves a change, publish it at once " +
   "with set_colours (a colour) or edit_files (website words, any other design token), then call change_status until it says live and give him the commit link. " +
   "Never keep a change only in the chat or in a local file: if it is not published here, it does not exist. Before drawing a chart call read_skill dualis-charts, before changing website words read_skill site-wording, and follow it (no skill upload needed). " +
-  "An outreach message or status goes through update_outreach as soon as he says so.";
+  "An outreach message or status goes through update_outreach as soon as he says so. " +
+  "Report covers: the website's cover of a published report = get_report_cover (list_report_covers to find it); a cover for a new article = find_cover_photos, he picks a photo, then make_cover. " +
+  "Substack size unless he asks another; always give him the download link and, with a photo, its credit line.";
 
 type Rpc = { jsonrpc: "2.0"; id?: string | number | null; method: string; params?: Record<string, unknown> };
 type RpcResponse = { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string } };
@@ -42,6 +45,11 @@ async function one(msg: Rpc, ctx: McpContext): Promise<RpcResponse | null> {
       if (!ALL_TOOLS.some((t) => t.name === name)) return { jsonrpc: "2.0", id, error: { code: -32602, message: `Unknown tool ${name}` } };
       try {
         const args = (msg.params?.arguments ?? {}) as Record<string, unknown>;
+        if (COVER_TOOLS.some((t) => t.name === name)) {
+          const c = await callCoverTool(name, args);
+          if (!c) throw new Error(`Unknown tool ${name}`);
+          return ok({ content: c.content, isError: !!c.isError });
+        }
         const r = TOOLS.some((t) => t.name === name) ? await callTool(name, args, ctx) : await callConsoleTool(name, args, { userId: ctx.userId });
         if (!r) throw new Error(`Unknown tool ${name}`);
         return ok({ content: [{ type: "text", text: r.text }], isError: !!r.isError });

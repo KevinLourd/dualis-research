@@ -27,7 +27,7 @@ export class OAuthError extends Error {
   }
 }
 
-type Kind = "client" | "code" | "access" | "refresh";
+type Kind = "client" | "code" | "access" | "refresh" | "cover";
 type Sealed = { k: Kind; exp?: number } & Record<string, unknown>;
 
 function key(env: Record<string, string | undefined> = process.env): Buffer {
