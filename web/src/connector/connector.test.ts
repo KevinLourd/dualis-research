@@ -184,6 +184,7 @@ describe("MCP", () => {
     expect(list.result.tools.map((t) => t.name)).toEqual([
       "read_skill", "read_design_system", "set_colours", "find_site_text", "read_file", "edit_files", "change_status",
       "update_outreach",
+      "list_report_covers", "get_report_cover", "find_cover_photos", "make_cover",
     ]);
     expect(await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ctx)).toBeNull();
   });
